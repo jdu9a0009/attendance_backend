@@ -30,7 +30,7 @@ var scheme = []Scheme{
 		Query: `
         CREATE TABLE IF NOT EXISTS users (
                                      id serial primary key,
-                                     user_id text not null,
+                                     employee_id text not null,
                                      password text not null,
                                      role user_role,
                                      full_name text,
@@ -95,34 +95,42 @@ var scheme = []Scheme{
 
 		   
 		`,
-	},
-	{
+	},{
 		Index:       7,
-		Description: "Alter table users",
-		Query: `
-		ALTER TABLE users
-			RENAME COLUMN user_id TO employee_id;
-		`,
-	}, {
-		Index:       8,
 		Description: "Alter table users",
 		Query: `
 		   ALTER TABLE users
         ADD COLUMN IF NOT EXISTS phone VARCHAR(255),
+		ADD COLUMN IF NOT EXISTS status BOOLEAN DEFAULT false;
         ADD COLUMN IF NOT EXISTS email VARCHAR(255);
 
 		   
 		`,
+	},{
+		Index:       8,
+		Description: "Create table: attendance.",
+		Query: `
+                   CREATE TABLE attendance (
+                               id SERIAL PRIMARY KEY,
+                               employee_id VARCHAR NOT NULL,
+                               come_time TIME NOT NULL,
+                               work_day DATE NOT NULL,
+                               leave_time TIME NOT NULL,
+                               periods JSONB,
+                               status BOOLEAN DEFAULT true,
+                               come_lat DECIMAL,
+                               come_long DECIMAL,
+                               leave_lat DECIMAL,
+                               leave_long DECIMAL,
+                               created_at TIMESTAMP DEFAULT NOW(),
+                               created_by INT REFERENCES users(id),
+                               updated_at TIMESTAMP,
+                               updated_by INT REFERENCES users(id),
+                               deleted_at TIMESTAMP,
+                               deleted_by INT REFERENCES users(id)
+                           );
+			`,
 	},
-	// {
-	// 	Index: 9,
-	// 	Description: "Alter table users",
-	// 	Query: `
-	// 		ALTER TABLE users
-	// 		ADD COLUMN IF NOT EXISTS status BOOLEAN DEFAULT false;
-	// 	`,
-	// },
-
 }
 
 // Migrate creates the scheme in the database.
