@@ -50,7 +50,7 @@ func run(log *log.Logger) error {
 		DefaultLang   string `conf:"default:uz"`
 		ServerPort    string `conf:"default:5432"`
 		Web           struct {
-			APIHost         string        `conf:"default:0.0.0.0:3000"`
+			APIHost         string        `conf:"default:0.0.0.0:5432"`
 			DebugHost       string        `conf:"default:0.0.0.0:4000"`
 			ReadTimeout     time.Duration `conf:"default:5s"`
 			WriteTimeout    time.Duration `conf:"default:5s"`
