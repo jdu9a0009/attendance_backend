@@ -48,7 +48,7 @@ func run(log *log.Logger) error {
 		conf.Version
 		ServerBaseUrl string `conf:"default:http://university.uz"`
 		DefaultLang   string `conf:"default:uz"`
-		ServerPort    string `conf:"default:8080"`
+		ServerPort    string `conf:"default:5432"`
 		Web           struct {
 			APIHost         string        `conf:"default:0.0.0.0:3000"`
 			DebugHost       string        `conf:"default:0.0.0.0:4000"`
@@ -62,10 +62,10 @@ func run(log *log.Logger) error {
 			Algorithm      string `conf:"default:RS256"`
 		}
 		Postgres struct {
-			User       string `conf:"default:postgres"`
-			Password   string `conf:"default:1"`
-			Host       string `conf:"default:0.0.0.0"`
-			Name       string `conf:"default:attendance"`
+			User       string `conf:"default:attendance_5dou_user"`
+			Password   string `conf:"default:iBFFOXd8KeCqU78sZGUU9sM6cw4Vrc1D"`
+			Host       string `conf:"default:dpg-cqprrdaj1k6c73d6ua3g-a"`
+			Name       string `conf:"default:attendance_5dou"`
 			DisableTLS bool   `conf:"default:true"`
 		}
 		Zipkin struct {
