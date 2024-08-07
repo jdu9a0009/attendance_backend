@@ -4,10 +4,6 @@ import (
 	"crypto/rsa"
 	"expvar"
 	"fmt"
-	"github.com/ardanlabs/conf"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"log"
 	"os"
 	"time"
@@ -16,6 +12,11 @@ import (
 	"university-backend/internal/commands"
 	"university-backend/internal/pkg/repository/postgresql"
 	"university-backend/internal/router"
+
+	"github.com/ardanlabs/conf"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 )
 
 /*
@@ -36,7 +37,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	
 }
 
 func run(log *log.Logger) error {
@@ -62,10 +62,10 @@ func run(log *log.Logger) error {
 			Algorithm      string `conf:"default:RS256"`
 		}
 		Postgres struct {
-			User       string `conf:"default:attendance_5dou_user"`
-			Password   string `conf:"default:iBFFOXd8KeCqU78sZGUU9sM6cw4Vrc1D"`
-			Host       string `conf:"default:dpg-cqprrdaj1k6c73d6ua3g-a"`
-			Name       string `conf:"default:attendance_5dou"`
+			User       string `conf:"default:postgres"`
+			Password   string `conf:"default:1"`
+			Host       string `conf:"default:0.0.0.0"`
+			Name       string `conf:"default:attendance"`
 			DisableTLS bool   `conf:"default:true"`
 		}
 		Zipkin struct {
