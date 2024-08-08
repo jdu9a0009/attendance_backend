@@ -48,7 +48,7 @@ func run(log *log.Logger) error {
 		conf.Version
 		ServerBaseUrl string `conf:"default:http://university.uz"`
 		DefaultLang   string `conf:"default:uz"`
-		ServerPort    string `conf:"default:8000"`
+		ServerPort    string `conf:"default:8080"`
 		Web           struct {
 			APIHost         string        `conf:"default:0.0.0.0:3000"`
 			DebugHost       string        `conf:"default:0.0.0.0:4000"`

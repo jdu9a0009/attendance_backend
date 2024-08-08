@@ -47,7 +47,7 @@ var scheme = []Scheme{
 		Description: "Create area with user_id: Admin01, password: 1",
 		Query: `
         INSERT INTO users(employee_id, role, password)
-        SELECT 'Admin01', 'EMPLOYEE', '$2a$10$NKtnMwDPFSQLG6uOi4Zqheru5Ygbj9TWFHjpl478rRSaO5cJ9QuH2'
+        SELECT 'Admin01', 'ADMIN', '$2a$10$NKtnMwDPFSQLG6uOi4Zqheru5Ygbj9TWFHjpl478rRSaO5cJ9QuH2'
         WHERE NOT EXISTS (SELECT employee_id FROM users WHERE employee_id = 'Admin01');
         `,
 	},
