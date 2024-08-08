@@ -4,6 +4,10 @@ import (
 	"crypto/rsa"
 	"expvar"
 	"fmt"
+	"github.com/ardanlabs/conf"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"os"
 	"time"
@@ -12,11 +16,6 @@ import (
 	"university-backend/internal/commands"
 	"university-backend/internal/pkg/repository/postgresql"
 	"university-backend/internal/router"
-
-	"github.com/ardanlabs/conf"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 )
 
 /*
@@ -49,7 +48,7 @@ func run(log *log.Logger) error {
 		conf.Version
 		ServerBaseUrl string `conf:"default:http://university.uz"`
 		DefaultLang   string `conf:"default:uz"`
-		ServerPort    string `conf:"default:8080"`
+		ServerPort    string `conf:"default:8000"`
 		Web           struct {
 			APIHost         string        `conf:"default:0.0.0.0:3000"`
 			DebugHost       string        `conf:"default:0.0.0.0:4000"`
@@ -66,7 +65,7 @@ func run(log *log.Logger) error {
 			User       string `conf:"default:postgres"`
 			Password   string `conf:"default:1"`
 			Host       string `conf:"default:0.0.0.0"`
-			Name       string `conf:"default:attendance"`
+			Name       string `conf:"default:attendances"`
 			DisableTLS bool   `conf:"default:true"`
 		}
 		Zipkin struct {
