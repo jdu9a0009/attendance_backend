@@ -64,7 +64,7 @@ func run(log *log.Logger) error {
 		Postgres struct {
 			User       string `conf:"default:postgres"`
 			Password   string `conf:"default:1"`
-			Host       string `conf:"default:monorail.proxy.rlwy.net:11276"`
+			Host       string `conf:"default:0.0.0.0"`
 			Name       string `conf:"default:attendances"`
 			DisableTLS bool   `conf:"default:true"`
 		}
