@@ -38,157 +38,159 @@ func main() {
 
 	
 }
+
 func run(log *log.Logger) error {
-    // =========================================================================
-    // Configuration
 
-    var cfg struct {
-        conf.Version
-        ServerBaseUrl string `conf:"default:http://university.uz"`
-        DefaultLang   string `conf:"default:uz"`
-        ServerPort    string `conf:"default:5432"`
-        Web           struct {
-            APIHost         string        `conf:"default:0.0.0.0:5432"`
-            DebugHost       string        `conf:"default:0.0.0.0:4000"`
-            ReadTimeout     time.Duration `conf:"default:5s"`
-            WriteTimeout    time.Duration `conf:"default:5s"`
-            ShutdownTimeout time.Duration `conf:"default:5s"`
-        }
-        Auth struct {
-            KeyID          string `conf:"default:54bb2165-71e1-41a6-af3e-7da4a0e1e2c1"`
-            PrivateKeyFile string `conf:"default:./private.pem"`
-            Algorithm      string `conf:"default:RS256"`
-        }
-        Postgres struct {
-            User       string `conf:"default:attendance_5dou_user"`
-            Password   string `conf:"default:iBFFOXd8KeCqU78sZGUU9sM6cw4Vrc1D"`
-            Host       string `conf:"default:dpg-cqprrdaj1k6c73d6ua3g-a.singapore-postgres.render.com"`
-            Name       string `conf:"default:attendance_5dou"`
-            DisableTLS bool   `conf:"default:true"`
-        }
-        Zipkin struct {
-            ReporterURI string  `conf:"default:http://zipkin:9411/api/v2/spans"`
-            ServiceName string  `conf:"default:sale-api"`
-            Probability float64 `conf:"default:0.05"`
-        }
-        Redis struct {
-            Host string `conf:"default:localhost"`
-            Port string `conf:"default:6379"`
-            DB   int    `conf:"default:0"`
-        }
-    }
-    cfg.Version.SVN = build
-    cfg.Version.Desc = "copyright information here"
+	// =========================================================================
+	// Configuration
 
-    if err := conf.Parse(os.Args[1:], "attendance", &cfg); err != nil {
-        switch err {
-        case conf.ErrHelpWanted:
-            usage, err := conf.Usage("university", &cfg)
-            if err != nil {
-                return errors.Wrap(err, "generating config usage")
-            }
-            fmt.Println(usage)
-            return nil
-        case conf.ErrVersionWanted:
-            version, err := conf.VersionString("attendance", &cfg)
-            if err != nil {
-                return errors.Wrap(err, "generating config version")
-            }
-            fmt.Println(version)
-            return nil
-        }
-        return errors.Wrap(err, "parsing config")
-    }
+	var cfg struct {
+		conf.Version
+		ServerBaseUrl string `conf:"default:http://university.uz"`
+		DefaultLang   string `conf:"default:uz"`
+		ServerPort    string `conf:"default:8080"`
+		Web           struct {
+			APIHost         string        `conf:"default:0.0.0.0:3000"`
+			DebugHost       string        `conf:"default:0.0.0.0:4000"`
+			ReadTimeout     time.Duration `conf:"default:5s"`
+			WriteTimeout    time.Duration `conf:"default:5s"`
+			ShutdownTimeout time.Duration `conf:"default:5s"`
+		}
+		Auth struct {
+			KeyID          string `conf:"default:54bb2165-71e1-41a6-af3e-7da4a0e1e2c1"`
+			PrivateKeyFile string `conf:"default:./private.pem"`
+			Algorithm      string `conf:"default:RS256"`
+		}
+		Postgres struct {
+			User       string `conf:"default:postgres"`
+			Password   string `conf:"default:1"`
+			Host       string `conf:"default:0.0.0.0"`
+			Name       string `conf:"default:attendances"`
+			DisableTLS bool   `conf:"default:true"`
+		}
+		Zipkin struct {
+			ReporterURI string  `conf:"default:http://zipkin:9411/api/v2/spans"`
+			ServiceName string  `conf:"default:sale-api"`
+			Probability float64 `conf:"default:0.05"`
+		}
+		Redis struct {
+			Host string `conf:"default:localhost"`
+			Port string `conf:"default:6379"`
+			DB   int    `conf:"default:0"`
+		}
+	}
+	cfg.Version.SVN = build
+	cfg.Version.Desc = "copyright information here"
 
-    // =========================================================================
-    // App Starting
+	if err := conf.Parse(os.Args[1:], "attendance", &cfg); err != nil {
+		switch err {
+		case conf.ErrHelpWanted:
+			usage, err := conf.Usage("university", &cfg)
+			if err != nil {
+				return errors.Wrap(err, "generating config usage")
+			}
+			fmt.Println(usage)
+			return nil
+		case conf.ErrVersionWanted:
+			version, err := conf.VersionString("attendance", &cfg)
+			if err != nil {
+				return errors.Wrap(err, "generating config version")
+			}
+			fmt.Println(version)
+			return nil
+		}
+		return errors.Wrap(err, "parsing config")
+	}
 
-    // Print the build version for our logs. Also expose it under /debug/vars.
-    expvar.NewString("build").Set(build)
-    log.Printf("main : Started : Application initializing : version %q", build)
-    defer log.Println("main: Completed")
+	// =========================================================================
+	// App Starting
 
-    out, err := conf.String(&cfg)
-    if err != nil {
-        return errors.Wrap(err, "generating config for output")
-    }
-    log.Printf("main: Config :\n%v\n", out)
+	// Print the build version for our logs. Also expose it under /debug/vars.
+	expvar.NewString("build").Set(build)
+	log.Printf("main : Started : Application initializing : version %q", build)
+	defer log.Println("main: Completed")
 
-    // =========================================================================
-    // Initialize authentication support
+	out, err := conf.String(&cfg)
+	if err != nil {
+		return errors.Wrap(err, "generating config for output")
+	}
+	log.Printf("main: Config :\n%v\n", out)
 
-    log.Println("main : Started : Initializing authentication support")
+	// =========================================================================
+	// Initialize authentication support
 
-    privatePEM, err := os.ReadFile(cfg.Auth.PrivateKeyFile)
-    if err != nil {
-        return errors.Wrap(err, "reading auth private key")
-    }
+	log.Println("main : Started : Initializing authentication support")
 
-    privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(privatePEM)
-    if err != nil {
-        return errors.Wrap(err, "parsing auth private key")
-    }
+	privatePEM, err := os.ReadFile(cfg.Auth.PrivateKeyFile)
+	if err != nil {
+		return errors.Wrap(err, "reading auth private key")
+	}
 
-    lookup := func(kid string) (*rsa.PublicKey, error) {
-        switch kid {
-        case cfg.Auth.KeyID:
-            return &privateKey.PublicKey, nil
-        }
-        return nil, fmt.Errorf("no public key found for the specified kid: %s", kid)
-    }
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(privatePEM)
+	if err != nil {
+		return errors.Wrap(err, "parsing auth private key")
+	}
 
-    auth, err := auth.New(cfg.Auth.Algorithm, lookup, auth.Keys{cfg.Auth.KeyID: privateKey})
-    if err != nil {
-        return errors.Wrap(err, "constructing auth")
-    }
+	lookup := func(kid string) (*rsa.PublicKey, error) {
+		switch kid {
+		case cfg.Auth.KeyID:
+			return &privateKey.PublicKey, nil
+		}
+		return nil, fmt.Errorf("no public key found for the specified kid: %s", kid)
+	}
 
-    // =========================================================================
-    // Start Database: postgresql
+	auth, err := auth.New(cfg.Auth.Algorithm, lookup, auth.Keys{cfg.Auth.KeyID: privateKey})
+	if err != nil {
+		return errors.Wrap(err, "constructing auth")
+	}
 
-    log.Println("main: Initializing database support")
+	// =========================================================================
+	// Start Database: postgresql
 
-    postgresDB := postgresql.NewDB(postgresql.Config{
-        User:          cfg.Postgres.User,
-        Password:      cfg.Postgres.Password,
-        Host:          cfg.Postgres.Host,
-        Name:          cfg.Postgres.Name,
-        DisableTLS:    cfg.Postgres.DisableTLS,
-        ServerBaseUrl: cfg.ServerBaseUrl,
-        DefaultLang:   cfg.DefaultLang,
-    })
-    if err != nil {
-        return errors.Wrap(err, "connecting to db")
-    }
-    defer func() {
-        log.Printf("main: Database Stopping : %s", cfg.Postgres.Host)
-        postgresDB.Close()
-    }()
-    
-    // =====================
-    
-    // =========================================================================
-    // Start Cache: redis
+	log.Println("main: Initializing database support")
 
-    log.Println("main: Initializing cache support")
+	postgresDB := postgresql.NewDB(postgresql.Config{
+		User:          cfg.Postgres.User,
+		Password:      cfg.Postgres.Password,
+		Host:          cfg.Postgres.Host,
+		Name:          cfg.Postgres.Name,
+		DisableTLS:    cfg.Postgres.DisableTLS,
+		ServerBaseUrl: cfg.ServerBaseUrl,
+		DefaultLang:   cfg.DefaultLang,
+	})
+	if err != nil {
+		return errors.Wrap(err, "connecting to db")
+	}
+	defer func() {
+		log.Printf("main: Database Stopping : %s", cfg.Postgres.Host)
+		postgresDB.Close()
+	}()
 
-    redisDB := redis.NewClient(&redis.Options{
-        Addr:     fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
-        Password: "",
-        DB:       cfg.Redis.DB,
-    })
+	// =====================
 
-    // ======================
+	// =========================================================================
+	// Start Cache: redis
 
-    shutdown := make(chan os.Signal, 1)
+	log.Println("main: Initializing cache support")
 
-    // gin engine
-    webApp := web.NewApp(shutdown, cfg.DefaultLang)
+	redisDB := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", cfg.Redis.Host, cfg.Redis.Port),
+		Password: "",
+		DB:       cfg.Redis.DB,
+	})
 
-    // migrations
-    commands.MigrateUP(postgresDB)
-    //commands.Migrate(postgresDB)
+	// ======================
 
-    r := router.NewRouter(webApp, postgresDB, redisDB, fmt.Sprintf(":%s", cfg.ServerPort), auth, cfg.ServerBaseUrl)
+	shutdown := make(chan os.Signal, 1)
 
-    return r.Init()
+	// gin engine
+	webApp := web.NewApp(shutdown, cfg.DefaultLang)
+
+	// migrations
+	commands.MigrateUP(postgresDB)
+	//commands.Migrate(postgresDB)
+
+	r := router.NewRouter(webApp, postgresDB, redisDB, fmt.Sprintf(":%s", cfg.ServerPort), auth, cfg.ServerBaseUrl)
+
+	return r.Init()
 }
