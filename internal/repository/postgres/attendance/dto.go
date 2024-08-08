@@ -59,8 +59,8 @@ type CreateResponse struct {
 	EmployeeID *string      `json:"employee_id" bun:"employee_id"`
 	WorkDay    string      `json:"work_day" bun:"work_day"`
 	ComeTime   string      `json:"come_time" bun:"come_time"`
-	LeaveTime  string      `json:"leave_time,omitempty" bun:"leave_time"`
-	Periods    []time.Time `json:"periods" bun:"periods,type:jsonb"`
+	LeaveTime  *string      `json:"leave_time,omitempty" bun:"leave_time"`
+	Periods    []time.Time `json:"-" bun:"periods,type:jsonb"`
 	CreatedAt  time.Time   `json:"-"          bun:"created_at"`
 	CreatedBy  int         `json:"-"          bun:"created_by"`
 }

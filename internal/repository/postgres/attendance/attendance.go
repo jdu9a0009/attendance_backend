@@ -381,6 +381,9 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	response.CreatedAt = time.Now()
 	response.CreatedBy = claims.UserId
 
+	// query := `
+	//      Select
+	// `
 	// Create attendance entry
 	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
 	if err != nil {
