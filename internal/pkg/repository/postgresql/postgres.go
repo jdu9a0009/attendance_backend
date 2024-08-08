@@ -4,6 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/pkg/errors"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
+	"github.com/uptrace/bun/extra/bundebug"
 	"log"
 	"net/http"
 	"reflect"
@@ -11,12 +16,6 @@ import (
 	"time"
 	"university-backend/foundation/web"
 	"university-backend/internal/auth"
-
-	"github.com/pkg/errors"
-	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/driver/pgdriver"
-	"github.com/uptrace/bun/extra/bundebug"
 )
 
 type CurrencyValue struct {
@@ -48,7 +47,7 @@ type Database struct {
 }
 
 func NewDB(cfg Config) *Database {
-	dsn := fmt.Sprintf("postgres://%v:%vdpg-cqprrdaj1k6c73d6ua3g-a:5432/%v?sslmode=disable", cfg.User, cfg.Password, cfg.Name)
+	dsn := fmt.Sprintf("postgres://%v:%vpostgresql://attendance_5dou_user:iBFFOXd8KeCqU78sZGUU9sM6cw4Vrc1D@dpg-cqprrdaj1k6c73d6ua3g-a/attendance_5dou:5432/%v?sslmode=disable", cfg.User, cfg.Password, cfg.Name)
 
 	sqlDB := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 
