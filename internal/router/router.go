@@ -53,7 +53,7 @@ func NewRouter(
 func (r Router) Init() error {
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://attendance-apptest.netlify.app/"}, // Update with your front-end URLs
+		AllowOrigins:     []string{"https://attendance-admin.netlify.app//"}, // Update with your front-end URLs
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
