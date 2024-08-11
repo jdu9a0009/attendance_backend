@@ -32,7 +32,7 @@ func (uc Controller) SignIn(c *web.Context) error {
 		return c.RespondError(&web.Error{
 			Err:    errors.New("invalid request data"),
 			Status: http.StatusBadRequest,
-		})
+		}) 
 	}
 
 	detail, err := uc.user.GetByEmployeeID(c.Ctx, data.EmployeeID)
