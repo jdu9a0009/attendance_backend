@@ -201,7 +201,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
-	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "Role", "FullName"); err != nil {
+	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "FullName"); err != nil {
 		return CreateResponse{}, err
 	}
 	rand.Seed(time.Now().UnixNano())
