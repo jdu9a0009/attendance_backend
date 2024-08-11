@@ -25,46 +25,40 @@ func NewController(user User) *Controller {
 func (uc Controller) SignIn(c *web.Context) error {
 	var data user.SignInRequest
 	fmt.Println("Auth:", data)
+
 	err := c.BindFunc(&data, "EmployeeID", "Password")
 	if err != nil {
-		return c.RespondError(err)
+		fmt.Println("Error binding request data:", err)
+		return c.RespondError(&web.Error{
+			Err:    errors.New("invalid request data"),
+			Status: http.StatusBadRequest,
+		})
 	}
 
 	detail, err := uc.user.GetByEmployeeID(c.Ctx, data.EmployeeID)
 	if err != nil {
-		return c.RespondError(err)
+		fmt.Println("Error retrieving user by EmployeeID:", err)
+		return c.RespondError(&web.Error{
+			Err:    errors.New("user retrieval failed"),
+			Status: http.StatusInternalServerError,
+		})
 	}
 
 	if detail.Password == nil {
+		fmt.Println("User not found for EmployeeID:", data.EmployeeID)
 		return c.RespondError(&web.Error{
 			Err:    errors.New("user not found"),
 			Status: http.StatusNotFound,
 		})
 	}
 
-	//if *detail.Password != data.Password {
-	//	return c.RespondError(&web.Error{
-	//		Err:    errors.New("incorrect password"),
-	//		Status: http.StatusBadRequest,
-	//	})
-	//}
-
 	if err = bcrypt.CompareHashAndPassword([]byte(*detail.Password), []byte(data.Password)); err != nil {
-		return c.RespondError(web.NewRequestError(errors.New(fmt.Sprintf("incorrect password!")), http.StatusBadRequest))
+		fmt.Println("Incorrect password for EmployeeID:", data.EmployeeID)
+		return c.RespondError(&web.Error{
+			Err:    errors.New("incorrect password"),
+			Status: http.StatusForbidden, // Changed to 403 to reflect forbidden access
+		})
 	}
-
-	//var cfg struct {
-	//	conf.Version
-	//	Args conf.Args
-	//	DB   struct {
-	//		User       string `conf:"default:postgres"`
-	//		Password   string `conf:"default:1"`
-	//		Host       string `conf:"default:0.0.0.0"`
-	//		Name       string `conf:"default:onda_b2b"`
-	//		DisableTLS bool   `conf:"default:true"`
-	//	}
-	//}
-	//cfg.Version.SVN = build
 
 	accessToken, refreshToken, err := commands.GenToken(user.AuthClaims{
 		ID:   detail.ID,
@@ -72,7 +66,11 @@ func (uc Controller) SignIn(c *web.Context) error {
 	}, "./private.pem")
 
 	if err != nil {
-		return c.RespondError(err)
+		fmt.Println("Error generating tokens:", err)
+		return c.RespondError(&web.Error{
+			Err:    errors.New("token generation failed"),
+			Status: http.StatusInternalServerError,
+		})
 	}
 
 	return c.Respond(map[string]interface{}{
