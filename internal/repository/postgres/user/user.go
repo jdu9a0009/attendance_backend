@@ -41,7 +41,7 @@ func (r Repository) GetByEmployeeID(ctx context.Context, employee_id string) (en
 }
 
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
-	_, err := r.CheckClaims(ctx, auth.RoleEmployee)
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -148,7 +148,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 }
 
 func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdResponse, error) {
-	_, err := r.CheckClaims(ctx, auth.RoleEmployee)
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return GetDetailByIdResponse{}, err
 	}
@@ -252,7 +252,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 }
 
 func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {
-	claims, err := r.CheckClaims(ctx, auth.RoleEmployee)
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return err
 	}
@@ -294,7 +294,7 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 }
 
 func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) error {
-	claims, err := r.CheckClaims(ctx, auth.RoleEmployee)
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return err
 	}
