@@ -1,6 +1,7 @@
 package router
 
 import (
+	"time"
 	"university-backend/foundation/web"
 	"university-backend/internal/auth"
 	"university-backend/internal/controller/http/v1/file"
@@ -53,11 +54,15 @@ func NewRouter(
 func (r Router) Init() error {
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://attendance-admin.netlify.app"}, // Add other origins if needed
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, // Add more headers if needed
+		AllowOrigins:     []string{"*"}, // Add other origins if needed
+		AllowMethods:     []string{"*"},
+		AllowHeaders:     []string{"*"},
+		ExposeHeaders:    []string{"*"},
 		AllowCredentials: true,
-		// Optionally add a MaxAge and other settings if needed
+		AllowOriginFunc: func(origin string) bool {
+			return true
+		},
+		MaxAge: 12 * time.Hour,
 	}))
 
 	// repositories:
