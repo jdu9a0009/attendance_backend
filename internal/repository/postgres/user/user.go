@@ -196,7 +196,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 }
 
 func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
-	claims, err := r.CheckClaims(ctx, auth.RoleEmployee)
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return CreateResponse{}, err
 	}

@@ -205,8 +205,7 @@ func (a *Auth) ValidateToken(tokenStr string) (Claims, error) {
 //
 //	userDetail := entity.User{}
 //
-//	if err := a.postgresDB.	fmt.Println("Auth:", data)
-
+//	if err := a.postgresDB.
 //		NewSelect().
 //		Model(userDetail).
 //		Where(
