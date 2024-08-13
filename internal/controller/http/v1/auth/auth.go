@@ -32,7 +32,7 @@ func (uc Controller) SignIn(c *web.Context) error {
 		return c.RespondError(&web.Error{
 			Err:    errors.New("invalid request data"),
 			Status: http.StatusBadRequest,
-		}) 
+		})
 	}
 
 	detail, err := uc.user.GetByEmployeeID(c.Ctx, data.EmployeeID)
@@ -78,6 +78,7 @@ func (uc Controller) SignIn(c *web.Context) error {
 		"data": map[string]string{
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
+			"role":          *detail.Role,
 		},
 		"error": nil,
 	}, http.StatusOK)
