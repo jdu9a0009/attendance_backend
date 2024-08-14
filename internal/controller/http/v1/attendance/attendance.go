@@ -5,8 +5,11 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"strconv"
 	"university-backend/foundation/web"
 	"university-backend/internal/repository/postgres/attendance"
+
+	"github.com/Azure/go-autorest/autorest/date"
 )
 
 type Controller struct {
@@ -134,6 +137,64 @@ func (uc Controller) GetBarChartStatistics(c *web.Context) error {
 	}, http.StatusOK)
 }
 
+func (uc Controller) GetGraphStatistic(c *web.Context) error {
+	var filter attendance.GraphRequest
+	// Get the 'month' query parameter
+	monthStr := c.Query("month")
+	if monthStr == "" {
+		return c.RespondError(web.NewRequestError(errors.New("month parameter is required"), http.StatusBadRequest))
+	}
+
+	parsedMonth, err := date.ParseDate(monthStr)
+	if err != nil {
+		return c.RespondError(web.NewRequestError(errors.New("invalid date format"), http.StatusBadRequest))
+	}
+	filter.Month = parsedMonth
+
+	// Get the 'interval' query parameter
+	intervalStr := c.Query("interval")
+	if intervalStr == "" {
+		return c.RespondError(web.NewRequestError(errors.New("interval parameter is required"), http.StatusBadRequest))
+	}
+
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil {
+		return c.RespondError(web.NewRequestError(errors.New("invalid interval format"), http.StatusBadRequest))
+	}
+	filter.Interval = interval
+
+	list, err := uc.attendance.GetGraphStatistic(c.Ctx, filter)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return c.Respond(map[string]interface{}{
+		"data": map[string]interface{}{
+			"results": list,
+		},
+		"status": true,
+	}, http.StatusOK)
+}
+
+// func (uc Controller) GetGraphStatistic(c *web.Context) error {
+// 	var request attendance.GraphRequest
+// 	if err := c.BindFunc(&request, "month", "interval"); err != nil {
+// 		return c.RespondError(err)
+// 	}
+// 	fmt.Println("controllar request:", request)
+// 	response, err := uc.attendance.GetGraphStatistic(c.Ctx, request)
+// 	if err != nil {
+// 		return c.RespondError(err)
+// 	}
+
+// 	fmt.Println("controllar response:", response)
+// 	return c.Respond(map[string]interface{}{
+// 		"data":   response,
+// 		"status": true,
+// 	}, http.StatusOK)
+
+// }
+
 func (uc Controller) Create(c *web.Context) error {
 	var request attendance.CreateRequest
 	if err := c.BindFunc(&request, "Name"); err != nil {
@@ -150,6 +211,7 @@ func (uc Controller) Create(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
+
 func (uc Controller) UpdateAll(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
 

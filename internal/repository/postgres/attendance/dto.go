@@ -16,6 +16,7 @@ type Filter struct {
 	DepartmentID *int
 	PositionID   *int
 	Status       *bool
+	Date         *time.Time
 }
 
 type GetListResponse struct {
@@ -56,10 +57,10 @@ type CreateResponse struct {
 	bun.BaseModel `bun:"table:attendance"`
 
 	ID         int         `json:"id" bun:"-"`
-	EmployeeID *string      `json:"employee_id" bun:"employee_id"`
+	EmployeeID *string     `json:"employee_id" bun:"employee_id"`
 	WorkDay    string      `json:"work_day" bun:"work_day"`
 	ComeTime   string      `json:"come_time" bun:"come_time"`
-	LeaveTime  *string      `json:"leave_time,omitempty" bun:"leave_time"`
+	LeaveTime  *string     `json:"leave_time,omitempty" bun:"leave_time"`
 	Periods    []time.Time `json:"-" bun:"periods,type:jsonb"`
 	CreatedAt  time.Time   `json:"-"          bun:"created_at"`
 	CreatedBy  int         `json:"-"          bun:"created_by"`
@@ -95,22 +96,29 @@ type UpdateRequest struct {
 	Status    *bool  `json:"status" form:"status"`
 }
 type GetStatisticResponse struct {
-	TotalEmployee   *int `json:"total_employee" form:"total_employee"`
-	OnTime          *int `json:"ontime" form:"ontime"`
-	Absent          *int `json:"absent" form:"absent"`
-	LateArrival     *int `json:"late_arrival" form:"late_arrivale"`
-	EarlyDepartures *int `json:"early_departures" form:"early_departures"`
-	TimeOff         *int `json:"time_off" form:"time_off"`
+	TotalEmployee   *int `json:"total_employee" bun:"total_employee"`
+	OnTime          *int `json:"ontime" bun:"ontime"`
+	Absent          *int `json:"absent" bun:"absent"`
+	LateArrival     *int `json:"late_arrival" bun:"late_arrivale"`
+	EarlyDepartures *int `json:"early_departures" bun:"early_departures"`
+	TimeOff         *int `json:"time_off" bun:"time_off"`
 }
 
 type PieChartResponse struct {
-	Come   *int `json:"come" form:"come"`
-	Absent *int `json:"absent" form:"absent"`
+	Come   *int `json:"come" bun:"come"`
+	Absent *int `json:"absent" bun:"absent"`
 }
-
+type GraphRequest struct {
+	Month    date.Date
+	Interval int
+}
+type GraphResponse struct {
+	Percentage float64   `json:"percentage" bun:"percentage"`
+	WorkDay    *date.Date `json:"work_day" bun:"work_day"`
+}
 type BarChartResponse struct {
-	Department string  `json:"department" form:"department"`
-	Percentage float64 `json:"percentage" form:"percentage"`
+	Department string  `json:"department" bun:"department"`
+	Percentage float64 `json:"percentage" bun:"percentage"`
 }
 type Attendance struct {
 	ID             int             `json:"id" bun:"id,pk,autoincrement"`

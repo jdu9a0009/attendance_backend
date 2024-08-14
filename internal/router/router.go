@@ -124,6 +124,7 @@ func (r Router) Init() error {
 	r.Get("/api/v1/attendance", attendanceController.GetStatistics, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/attendance/piechart", attendanceController.GetPieChartStatistics, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/attendance/barchart", attendanceController.GetBarChartStatistics, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Get("/api/v1/attendance/graph", attendanceController.GetGraphStatistic, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
 	return r.Run(r.port)
 }

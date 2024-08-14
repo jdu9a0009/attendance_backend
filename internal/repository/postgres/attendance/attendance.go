@@ -66,6 +66,12 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		}
 		whereQuery += fmt.Sprintf(" AND a.status = %s", statusValue)
 	}
+	if filter.Date != nil {
+		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", filter.Date.Format("2006-01-02"))
+	} else {
+		today := time.Now().Format("2006-01-02")
+		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", today)
+	}
 	orderQuery := "ORDER BY a.created_at desc"
 
 	var limitQuery, offsetQuery string
@@ -85,7 +91,6 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 
 	query := fmt.Sprintf(`
 		SELECT
-			a.id,
 			a.employee_id,
 			u.full_name,
 			u.department_id,
@@ -121,7 +126,6 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		var comeTimeBytes []byte
 
 		if err = rows.Scan(
-			&detail.ID,
 			&detail.EmployeeID,
 			&detail.Fullname,
 			&detail.DepartmentID,
@@ -135,12 +139,11 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance list"), http.StatusBadRequest)
 		}
 
-		// Convert the string to date.Date
 		workDay, err := date.ParseDate(workDayString)
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "converting work_day to date.Date"), http.StatusBadRequest)
 		}
-		detail.WorkDay = &workDay
+		detail.WorkDay = &workDay // Convert the string to date.Date
 
 		// Convert the byte array to time.Time
 		comeTime, err := time.Parse("15:04:05", string(comeTimeBytes))
@@ -519,71 +522,38 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 }
 
 func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, error) {
-
 	var response GetStatisticResponse
 
-	err := r.DB.QueryRowContext(ctx, `
-    SELECT COUNT(DISTINCT employee_id) AS total
-    FROM users;
-  `).Scan(&response.TotalEmployee)
-	if err != nil {
-		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "response total employee not found"), http.StatusBadRequest)
-	}
+	query := `
+	SELECT
+		(SELECT COUNT(DISTINCT employee_id) FROM users) AS total_employee,
+		(SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '09:00' AND come_time < '10:00') AS on_time,
+		(SELECT COUNT(employee_id) FROM users WHERE status = 'false') AS absent,
+		(SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00') AS late_arrival,
+		(SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00') AS early_departures,
+		(SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00') AS time_off
+	`
 
-	err = r.DB.QueryRowContext(ctx, `
-	  SELECT COUNT(employee_id) AS OnTime
-         FROM attendance
-        WHERE come_time >= '09:00' AND come_time < '10:00';
-	`).Scan(&response.OnTime)
+	err := r.DB.QueryRowContext(ctx, query).Scan(
+		&response.TotalEmployee,
+		&response.OnTime,
+		&response.Absent,
+		&response.LateArrival,
+		&response.EarlyDepartures,
+		&response.TimeOff,
+	)
 	if err != nil {
-		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "response OnTime not found"), http.StatusBadRequest)
-	}
-
-	err = r.DB.QueryRowContext(ctx, `
-	select count(employee_id)as ABSENT 
-	    from users 
-		where status = 'false';
-	`).Scan(&response.Absent)
-	if err != nil {
-		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "response ABSENT not found"), http.StatusBadRequest)
-	}
-
-	err = r.DB.QueryRowContext(ctx, `
-	SELECT COUNT(employee_id) AS LateArrival
-          FROM attendance
-         WHERE come_time >= '10:00';
-	`).Scan(&response.LateArrival)
-	if err != nil {
-		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "response lateArrival not found"), http.StatusBadRequest)
-	}
-
-	err = r.DB.QueryRowContext(ctx, `
-	  SELECT COUNT(employee_id) AS EarlyDepartures
-              FROM attendance
-              WHERE leave_time < '18:00';
-	`).Scan(&response.EarlyDepartures)
-	if err != nil {
-		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "response Early Departires not found"), http.StatusBadRequest)
-	}
-
-	err = r.DB.QueryRowContext(ctx, `
-	SELECT COUNT(employee_id) AS TimeOff
-          FROM attendance
-        WHERE come_time < '09:00';
-	`).Scan(&response.TimeOff)
-	if err != nil {
-		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "response Early come not found"), http.StatusBadRequest)
+		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "fetching statistics"), http.StatusBadRequest)
 	}
 
 	return response, nil
 }
-
 func (r Repository) GetPieChartStatistic(ctx context.Context) (PieChartResponse, error) {
 	query := fmt.Sprintf(`
     WITH today_attendance AS (
         SELECT
-            COUNT(CASE WHEN a.status = true THEN 1 END) AS come_count,
-            COUNT(CASE WHEN  u.status  = false THEN 1 END) AS absent_count,
+            COUNT(a.status = true ) AS come_count,
+            COUNT( u.status  = false ) AS absent_count,
             COUNT(u.employee_id) AS total_count
         FROM attendance a
         JOIN users u ON a.employee_id = u.employee_id
@@ -656,4 +626,73 @@ func (r Repository) GetBarChartStatistic(ctx context.Context) ([]BarChartRespons
 	}
 
 	return results, nil
+}
+func (r Repository) GetGraphStatistic(ctx context.Context, filter GraphRequest) ([]GraphResponse, error) {
+	// Determine the start and end days based on the interval
+	var startDay, endDay int
+	switch filter.Interval {
+	case 0:
+		startDay, endDay = 1, 10
+	case 1:
+		startDay, endDay = 11, 20
+	case 2:
+		startDay, endDay = 21, 31 // Adjust for months with fewer than 31 days later
+	default:
+		return nil, web.NewRequestError(errors.New("invalid interval"), http.StatusBadRequest)
+	}
+
+	// Calculate start and end dates directly without string conversion
+	startDate := time.Date(filter.Month.Year(), filter.Month.Month(), startDay, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
+
+	// Use parameterized query to avoid SQL injection vulnerabilities
+	query := `
+	WITH today_attendance AS (
+		SELECT
+			a.work_day,
+			COUNT(CASE WHEN a.status = true THEN 1 END) AS come_count,
+			COUNT(u.employee_id) AS total_count
+		FROM attendance a
+		JOIN users u ON a.employee_id = u.employee_id
+		WHERE a.deleted_at IS NULL
+		AND a.work_day BETWEEN $1 AND $2
+		GROUP BY a.work_day
+	)
+	SELECT
+		work_day,
+		COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
+	FROM today_attendance;
+	`
+
+	stmt, err := r.Prepare(query)
+	if err != nil {
+		return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "selecting attendance query "), http.StatusInternalServerError)
+	}
+	defer stmt.Close()
+
+	rows, err := stmt.QueryContext(ctx, startDate, endDate)
+	if err != nil {
+		return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "selecting attendance filter"), http.StatusInternalServerError)
+	}
+	defer rows.Close()
+
+	var list []GraphResponse
+
+	for rows.Next() {
+		var detail GraphResponse
+		var workDayString string // Scan the work_day as a string
+
+		if err = rows.Scan(&workDayString, &detail.Percentage); err != nil {
+			return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "scanning Graph response"), http.StatusBadRequest)
+		}
+
+		workDay, err := date.ParseDate(workDayString) // Parse the string after scanning
+		if err != nil {
+			return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "converting work_day to date.Date"), http.StatusBadRequest)
+		}
+		detail.WorkDay = &workDay
+		list = append(list, detail)
+	}
+
+	return list, nil
 }

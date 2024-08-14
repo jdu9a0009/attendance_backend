@@ -15,6 +15,8 @@ type Attendance interface {
 	GetStatistics(ctx context.Context) (attendance.GetStatisticResponse, error)
 	GetPieChartStatistic(ctx context.Context) (attendance.PieChartResponse, error)
 	GetBarChartStatistic(ctx context.Context) ([]attendance.BarChartResponse, error)
+	GetGraphStatistic(ctx context.Context, filter attendance.GraphRequest) ([]attendance.GraphResponse, error)
+
 	CreateByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
 	ExitByPhone(ctx context.Context, request attendance.ExitByPhoneRequest) (attendance.ExitResponse, error)
 }

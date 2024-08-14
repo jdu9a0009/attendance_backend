@@ -4,10 +4,6 @@ import (
 	"crypto/rsa"
 	"expvar"
 	"fmt"
-	"github.com/ardanlabs/conf"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"log"
 	"os"
 	"time"
@@ -16,6 +12,11 @@ import (
 	"university-backend/internal/commands"
 	"university-backend/internal/pkg/repository/postgresql"
 	"university-backend/internal/router"
+
+	"github.com/ardanlabs/conf"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 )
 
 /*
@@ -36,7 +37,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	
 }
 
 func run(log *log.Logger) error {
