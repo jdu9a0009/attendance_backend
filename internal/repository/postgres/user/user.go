@@ -28,7 +28,6 @@ func NewRepository(database *postgresql.Database) *Repository {
 
 func (r Repository) GetByEmployeeID(ctx context.Context, employee_id string) (entity.User, error) {
 	var detail entity.User
-	fmt.Println("detail;", detail)
 	err := r.NewSelect().Model(&detail).Where("employee_id = ? AND deleted_at IS NULL", employee_id).Scan(ctx)
 	if err != nil {
 		return entity.User{}, &web.Error{
@@ -257,7 +256,7 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 		return err
 	}
 
-	if err := r.ValidateStruct(&request, "ID", "EmployeeID", "Role", "FullName"); err != nil {
+	if err := r.ValidateStruct(&request, "ID", "EmployeeID", "Role"); err != nil {
 		return err
 	}
 	userIdStatus := true
@@ -277,7 +276,7 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 
 	q.Set("employee_id = ?", request.EmployeeID)
 	q.Set("role = ?", role)
-	q.Set("fullname = ?", request.FullName)
+	q.Set("full_name = ?", request.FullName)
 	q.Set("department_id=?", request.DepartmentID)
 	q.Set("position_id=?", request.PositionID)
 	q.Set("phone=?", request.Phone)
@@ -353,4 +352,170 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 func (r Repository) Delete(ctx context.Context, id int) error {
 	return r.DeleteRow(ctx, "users", id)
+}
+
+func (r Repository) GetMonthlyStatistics(ctx context.Context, filter StatisticRequest) (MonthlyStatisticResponse, error) {
+	claims, err := r.CheckClaims(ctx)
+	if err != nil {
+		return MonthlyStatisticResponse{}, web.NewRequestError(errors.New("error getting user by token"), http.StatusBadRequest)
+	}
+
+	// Calculate full month dates
+	monthStart := time.Date(filter.Month.Year(), filter.Month.Month(), 1, 0, 0, 0, 0, time.UTC)
+	monthEnd := time.Date(filter.Month.Year(), filter.Month.Month()+1, 0, 23, 59, 59, 999999999, time.UTC)
+
+	// Query for monthly statistics
+	monthlyQuery := `
+		SELECT
+			SUM(CASE WHEN a.come_time <= '09:00' THEN 1 ELSE 0 END) AS early_come,
+			SUM(CASE WHEN a.leave_time < '18:00' THEN 1 ELSE 0 END) AS early_leave,
+			SUM(CASE WHEN u.status = 'false' THEN 1 ELSE 0 END) AS absent,
+			SUM(CASE WHEN a.come_time >= '10:00' THEN 1 ELSE 0 END) AS late
+		FROM attendance a
+		JOIN users u ON a.employee_id = u.employee_id
+		WHERE a.deleted_at IS NULL AND u.id = $1
+		AND a.work_day BETWEEN $2 AND $3;
+	`
+
+	// Execute monthly query
+	monthlyStmt, err := r.Prepare(monthlyQuery)
+	if err != nil {
+		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "preparing monthly query"), http.StatusInternalServerError)
+	}
+	defer monthlyStmt.Close()
+
+	// Execute interval query
+	Stmt, err := r.Prepare(monthlyQuery)
+	if err != nil {
+		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "preparing montly query"), http.StatusInternalServerError)
+	}
+	defer Stmt.Close()
+
+	rows, err := Stmt.QueryContext(ctx, claims.UserId, monthStart, monthEnd)
+	if err != nil {
+		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "executing monthly query"), http.StatusInternalServerError)
+	}
+	defer rows.Close()
+	var list MonthlyStatisticResponse
+	for rows.Next() {
+		err := rows.Scan(
+			&list.EarlyCome,
+			&list.EarlyLeave,
+			&list.Absent,
+			&list.Late,
+		)
+		if err != nil {
+			return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "scanning monthly statistics"), http.StatusInternalServerError)
+		}
+
+	}
+	return list, nil
+}
+
+func (r Repository) GetStatistics(ctx context.Context, filter StatisticRequest) ([]StatisticResponse, error) {
+	claims, err := r.CheckClaims(ctx)
+	if err != nil {
+		return nil, web.NewRequestError(errors.New("error getting user by token"), http.StatusBadRequest)
+	}
+
+	// Determine the start and end days based on the interval
+	var startDay, endDay int
+	switch filter.Interval {
+	case 0:
+		startDay, endDay = 1, 10
+	case 1:
+		startDay, endDay = 11, 20
+	case 2:
+		startDay, endDay = 21, 31 // Adjust for months with fewer than 31 days later
+	default:
+		return nil, web.NewRequestError(errors.New("invalid interval"), http.StatusBadRequest)
+	}
+
+	// Calculate start and end dates for the interval
+	startDate := time.Date(filter.Month.Year(), filter.Month.Month(), startDay, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
+
+	// Query for interval data
+	intervalQuery := `
+		SELECT
+			a.work_day,
+COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), NULL) AS come_time,
+			COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), NULL) AS leave_time,
+			CASE
+				WHEN a.come_time IS NOT NULL AND a.leave_time IS NOT NULL THEN TO_CHAR(a.leave_time - a.come_time, 'HH24:MI')
+				ELSE NULL
+			END AS total_hours
+		FROM attendance a
+		JOIN users u ON a.employee_id = u.employee_id
+		WHERE a.deleted_at IS NULL AND u.id = $1
+		AND a.work_day BETWEEN $2 AND $3
+		GROUP BY a.work_day, a.come_time, a.leave_time;
+	`
+
+	// Execute interval query
+	intervalStmt, err := r.Prepare(intervalQuery)
+	if err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "preparing interval query"), http.StatusInternalServerError)
+	}
+	defer intervalStmt.Close()
+
+	rows, err := intervalStmt.QueryContext(ctx, claims.UserId, startDate, endDate)
+	if err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "executing interval query"), http.StatusInternalServerError)
+	}
+	defer rows.Close()
+
+	var list []StatisticResponse
+	for rows.Next() {
+		var detail StatisticResponse
+		err := rows.Scan(
+			&detail.WorkDay,
+			&detail.ComeTime,
+			&detail.LeaveTime,
+			&detail.TotalHours,
+		)
+		if err != nil {
+			return nil, web.NewRequestError(errors.Wrap(err, "scanning interval statistics"), http.StatusInternalServerError)
+		}
+
+		list = append(list, detail)
+	}
+	return list, nil
+}
+
+func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse, error) {
+	claims, err := r.CheckClaims(ctx)
+	if err != nil {
+		return DashboardResponse{}, err
+	}
+	var detail DashboardResponse
+	query := fmt.Sprintf(`
+        SELECT
+            COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), NULL) AS come_time,
+			COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), NULL) AS leave_time,
+			CASE
+				WHEN a.come_time IS NOT NULL AND a.leave_time IS NOT NULL THEN TO_CHAR(a.leave_time - a.come_time, 'HH24:MI')
+				ELSE NULL
+			END AS total_hours
+        FROM
+            attendance as a
+			JOIN users u ON a.employee_id = u.employee_id
+
+        WHERE
+            a.deleted_at IS NULL
+            AND u.id = %d;
+	`, claims.UserId)
+	err = r.QueryRowContext(ctx, query).Scan(
+		&detail.ComeTime,
+		&detail.LeaveTime,
+		&detail.TotalHours,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return DashboardResponse{}, nil
+	}
+	if err != nil {
+		return DashboardResponse{}, web.NewRequestError(errors.Wrap(err, "selecting user detail on dashboard"), http.StatusBadRequest)
+	}
+	return detail, nil
 }

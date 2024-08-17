@@ -1,10 +1,15 @@
 package user
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"university-backend/foundation/web"
 	"university-backend/internal/repository/postgres/user"
+
+	"github.com/Azure/go-autorest/autorest/date"
 )
 
 type Controller struct {
@@ -153,6 +158,88 @@ func (uc Controller) DeleteUser(c *web.Context) error {
 
 	return c.Respond(map[string]interface{}{
 		"data":   "ok!",
+		"status": true,
+	}, http.StatusOK)
+}
+
+func (uc Controller) GetStatistics(c *web.Context) error {
+	var filter user.StatisticRequest
+	// Get the 'month' query parameter
+	monthStr := c.Query("month")
+	if monthStr == "" {
+		return c.RespondError(web.NewRequestError(errors.New("month parameter is required"), http.StatusBadRequest))
+	}
+	fmt.Println("Month", monthStr)
+	parsedMonth, err := date.ParseDate(monthStr)
+	if err != nil {
+		return c.RespondError(web.NewRequestError(errors.New("invalid date format"), http.StatusBadRequest))
+	}
+	filter.Month = parsedMonth
+
+	// Get the 'interval' query parameter
+	intervalStr := c.Query("interval")
+	if intervalStr == "" {
+		return c.RespondError(web.NewRequestError(errors.New("interval parameter is required"), http.StatusBadRequest))
+	}
+
+	interval, err := strconv.Atoi(intervalStr)
+	if err != nil {
+		return c.RespondError(web.NewRequestError(errors.New("invalid interval format"), http.StatusBadRequest))
+	}
+	filter.Interval = interval
+
+	list, err := uc.user.GetStatistics(c.Ctx, filter)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return c.Respond(map[string]interface{}{
+		"data": map[string]interface{}{
+			"results": list,
+		},
+		"status": true,
+	}, http.StatusOK)
+}
+
+func (uc Controller) GetMonthlyStatistics(c *web.Context) error {
+	var filter user.StatisticRequest
+	// Get the 'month' query parameter
+	monthStr := c.Query("month")
+	if monthStr == "" {
+		return c.RespondError(web.NewRequestError(errors.New("month parameter is required"), http.StatusBadRequest))
+	}
+	fmt.Println("Month", monthStr)
+	parsedMonth, err := date.ParseDate(monthStr)
+	if err != nil {
+		return c.RespondError(web.NewRequestError(errors.New("invalid date format"), http.StatusBadRequest))
+	}
+	filter.Month = parsedMonth
+
+	list, err := uc.user.GetMonthlyStatistics(c.Ctx, filter)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return c.Respond(map[string]interface{}{
+		"data": map[string]interface{}{
+			"results": list,
+		},
+		"status": true,
+	}, http.StatusOK)
+}
+func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
+
+	if err := c.ValidParam(); err != nil {
+		return c.RespondError(err)
+	}
+
+	response, err := uc.user.GetEmployeeDashboard(c.Ctx)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return c.Respond(map[string]interface{}{
+		"data":   response,
 		"status": true,
 	}, http.StatusOK)
 }

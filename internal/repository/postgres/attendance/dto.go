@@ -113,12 +113,12 @@ type GraphRequest struct {
 	Interval int
 }
 type GraphResponse struct {
-	Percentage float64   `json:"percentage" bun:"percentage"`
+	Percentage *float64   `json:"percentage" bun:"percentage"`
 	WorkDay    *date.Date `json:"work_day" bun:"work_day"`
 }
 type BarChartResponse struct {
-	Department string  `json:"department" bun:"department"`
-	Percentage float64 `json:"percentage" bun:"percentage"`
+	Department *string  `json:"department" bun:"department"`
+	Percentage *float64 `json:"percentage" bun:"percentage"`
 }
 type Attendance struct {
 	ID             int             `json:"id" bun:"id,pk,autoincrement"`

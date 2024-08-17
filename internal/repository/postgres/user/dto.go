@@ -3,6 +3,7 @@ package user
 import (
 	"time"
 
+	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/uptrace/bun"
 )
 
@@ -90,4 +91,25 @@ type UpdateRequest struct {
 	PositionID   *int    `json:"position_id" form:"position_id"`
 	Phone        *string `json:"phone" form:"phone"`
 	Email        *string `json:"email" form:"email"`
+}
+type StatisticRequest struct {
+	Month    date.Date
+	Interval int
+}
+type StatisticResponse struct {
+	WorkDay    *string `json:"work_day" bun:"work_day"`
+	ComeTime   *string `json:"come_time" bun:"come_time"`
+	LeaveTime  *string `json:"leave_time,omitempty" bun:"leave_time"`
+	TotalHours *string `json:"total_hours" bun:"total_hours"`
+}
+type DashboardResponse struct {
+	ComeTime   *string `json:"come_time" bun:"come_time"`
+	LeaveTime  *string `json:"leave_time" bun:"leave_time"`
+	TotalHours *string `json:"total_hours" bun:"total_hours"`
+}
+type MonthlyStatisticResponse struct {
+	EarlyCome  *int `json:"early_come" bun:"early_come"`
+	EarlyLeave *int `json:"early_leave" bun:"early_leave"`
+	Absent     *int `json:"absent" bun:"absent"`
+	Late       *int `json:"late" bun:"late"`
 }
