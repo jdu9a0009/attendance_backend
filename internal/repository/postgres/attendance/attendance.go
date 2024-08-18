@@ -66,14 +66,21 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		}
 		whereQuery += fmt.Sprintf(" AND a.status = %s", statusValue)
 	}
+
 	if filter.Date != nil {
-		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", filter.Date.Format("2006-01-02"))
+		Date, err := time.Parse("2006-01-02", *filter.Date)
+		if err != nil {
+			return []GetListResponse{}, 0, web.NewRequestError(errors.Wrap(err, "date parse"), http.StatusBadRequest)
+		}
+		date := Date.Format("2006-01-02")
+
+		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", date)
 	} else {
 		today := time.Now().Format("2006-01-02")
 		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", today)
 	}
 	orderQuery := "ORDER BY a.created_at desc"
-
+	fmt.Println("DAte:", filter.Date)
 	var limitQuery, offsetQuery string
 
 	if filter.Page != nil && filter.Limit != nil {
@@ -116,7 +123,6 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	if err != nil {
 		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting attendance"), http.StatusInternalServerError)
 	}
-
 	var list []GetListResponse
 
 	for rows.Next() {

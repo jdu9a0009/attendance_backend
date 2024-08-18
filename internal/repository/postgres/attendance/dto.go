@@ -16,7 +16,7 @@ type Filter struct {
 	DepartmentID *int
 	PositionID   *int
 	Status       *bool
-	Date         *time.Time
+	Date         *string
 }
 
 type GetListResponse struct {

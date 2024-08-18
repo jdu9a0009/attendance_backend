@@ -40,6 +40,9 @@ func (uc Controller) GetList(c *web.Context) error {
 	if page, ok := c.GetQueryFunc(reflect.Int, "page").(*int); ok {
 		filter.Page = page
 	}
+	if date, ok := c.GetQueryFunc(reflect.String, "date").(*string); ok {
+		filter.Date = date
+	}
 	if search, ok := c.GetQueryFunc(reflect.String, "search").(*string); ok {
 		filter.Search = search
 	}
