@@ -24,8 +24,6 @@ func NewController(user User) *Controller {
 
 func (uc Controller) SignIn(c *web.Context) error {
 	var data user.SignInRequest
-	fmt.Println("Auth:", data)
-
 	err := c.BindFunc(&data, "EmployeeID", "Password")
 	if err != nil {
 		fmt.Println("Error binding request data:", err)

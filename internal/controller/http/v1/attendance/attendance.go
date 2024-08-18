@@ -22,7 +22,7 @@ func NewController(attendance Attendance) *Controller {
 
 const (
 	OfficeLatitude  = 40.730610
-	OfficeLongitude = -73.935242
+	OfficeLongitude = 73.935242
 	OfficeRadius    = 200 // in meters
 )
 
@@ -287,7 +287,7 @@ func (uc Controller) Delete(c *web.Context) error {
 
 func (uc Controller) CreateByPhone(c *web.Context) error {
 	var request attendance.EnterRequest
-	if err := c.BindFunc(&request, "EmployeeID"); err != nil {
+	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
 		return c.RespondError(err)
 	}
 	distance := CalculateDistance(request.Latitude, request.Longitude, OfficeLatitude, OfficeLongitude)
@@ -305,10 +305,9 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 	}
 	return c.RespondError(web.NewRequestError(errors.New("distance from office is greater than office radius"), http.StatusBadRequest))
 }
-
 func (uc Controller) ExitByPhone(c *web.Context) error {
-	var request attendance.ExitByPhoneRequest
-	if err := c.BindFunc(&request, "EmployeeID"); err != nil {
+	var request attendance.EnterRequest
+	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
 		return c.RespondError(err)
 	}
 	distance := CalculateDistance(request.Latitude, request.Longitude, OfficeLatitude, OfficeLongitude)

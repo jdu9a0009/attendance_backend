@@ -37,6 +37,7 @@ func (r Repository) GetByEmployeeID(ctx context.Context, employee_id string) (en
 	}
 
 	return detail, err
+
 }
 
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {

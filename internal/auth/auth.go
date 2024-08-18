@@ -12,7 +12,7 @@ import (
 // These are the expected values for Claims.Roles.
 const (
 	RoleEmployee = "EMPLOYEE"
-	RoleAdmin  = "ADMIN"
+	RoleAdmin    = "ADMIN"
 )
 
 // ctxKey represents the type of value for the context key.
@@ -24,16 +24,18 @@ const Key ctxKey = 1
 // Claims represents the authorization claims transmitted via a JWT.
 type Claims struct {
 	jwt.StandardClaims
-	UserId int    `json:"user_id"`
-	Role   string `json:"roles"`
-	Type   string `json:"type"`
+	UserId     int    `json:"user_id"`
+	EmployeeID string `json:"employee_id"`
+	Role       string `json:"roles"`
+	Type       string `json:"type"`
 }
 
 type ClaimsParse struct {
 	jwt.StandardClaims
-	UserId string  `json:"user_id"`
-	Role   string  `json:"roles"`
-	Type   *string `json:"type"`
+	UserId     string `json:"user_id"`
+	Role       string `json:"roles"`
+	EmployeeID string `json:"employee_id"`
+	Type *string `json:"type"`
 }
 
 // Authorized returns true if the claims has at least one of the provided roles.
