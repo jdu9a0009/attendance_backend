@@ -385,42 +385,65 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	currentTime := time.Now()
 	workDay := currentTime.Format("2006-01-02")
 
+	// Create JSONB data for the periods column
+	periodsData := []map[string]string{
+		{"start": currentTime.Format("15:04")},
+	}
+
 	// Check if there is existing attendance data for the day
-	var existingAttendance CreateResponse
+	var existingAttendance ExitResponse
 	err = r.NewSelect().
 		Model(&existingAttendance).
 		Where("employee_id = ? AND work_day = ?", request.EmployeeID, workDay).
 		Limit(1).
 		Scan(ctx)
 
-	if err == nil {
-		// If come_time exists and leave_time is nil, return an error message
-		if existingAttendance.ComeTime != "" && existingAttendance.LeaveTime == nil {
-			return CreateResponse{}, web.NewRequestError(errors.New("you are already clicked this button,please click leave button"), http.StatusBadRequest)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "checking attendance"), http.StatusBadRequest)
+	}
+
+	if existingAttendance.ComeTime != "" {
+		if existingAttendance.LeaveTime == nil {
+			// If come_time exists and leave_time is nil, return an error message
+			return CreateResponse{}, web.NewRequestError(errors.New("you have already clicked the button, please click leave button"), http.StatusBadRequest)
+		}
+
+		// Update existing record if come_time exists and leave_time is not nil
+		existingAttendance.Periods = append(existingAttendance.Periods, map[string]string{"start": currentTime.Format("15:04")})
+		existingAttendance.LeaveTime = nil
+		existingAttendance.ComeTime = currentTime.Format("15:04")
+		existingAttendance.UpdatedAt = currentTime
+		existingAttendance.UpdatedBy = claims.UserId
+
+		_, err = r.NewUpdate().
+			Model(&existingAttendance).
+			Where("employee_id = ?", existingAttendance.EmployeeID).
+			Exec(ctx)
+
+		if err != nil {
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance creta by phone"), http.StatusBadRequest)
+		}
+		
+
+	} else {
+		// Prepare response data for a new entry
+		response.EmployeeID = request.EmployeeID
+		response.ComeTime = currentTime.Format(time.RFC3339)
+		response.WorkDay = workDay
+		response.CreatedAt = currentTime
+		response.CreatedBy = claims.UserId
+		response.Periods = periodsData
+
+		_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
+		if err != nil {
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance by phone"), http.StatusBadRequest)
 		}
 	}
 
-	// Prepare response data
-	timeString := currentTime.Format("15:04")
-	response.EmployeeID = request.EmployeeID
-	response.ComeTime = timeString
-	response.WorkDay = workDay
-	response.CreatedAt = currentTime
-	response.CreatedBy = claims.UserId
-
-	// Create JSONB data for the periods column
-	periodsData := map[string]string{
-		"start": timeString,
-	}
-	response.Periods = periodsData
-
-	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
-	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance by phone"), http.StatusBadRequest)
-	}
-
 	// Update user's status to true
-	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ?", request.EmployeeID).Set("status = true")
+	q := r.NewUpdate().Table("users").
+		Where("deleted_at IS NULL AND employee_id = ?", request.EmployeeID).
+		Set("status = true")
 
 	_, err = q.Exec(ctx)
 	if err != nil {
@@ -441,14 +464,37 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Exit
 	}
 
 	var response ExitResponse
-
 	currentTime := time.Now()
+	workDay := currentTime.Format("2006-01-02")
+	// Create JSONB data for the periods column
 	timeString := currentTime.Format("15:04")
+	// Create JSONB data for the periods column
+	periodsData := map[string]string{
+		"end": timeString,
+	}
+
+	// Check if there is existing attendance data for the day with come_time
+	var existingAttendance CreateResponse
+	err = r.NewSelect().
+		Model(&existingAttendance).
+		Where("employee_id = ? AND work_day = ?", request.EmployeeID, workDay).
+		Where("come_time IS NOT NULL").
+		Limit(1).
+		Scan(ctx)
+
+	if err != nil {
+		return ExitResponse{}, web.NewRequestError(errors.New("no entry record found for today, cannot record exit"), http.StatusBadRequest)
+	}
+
+	if existingAttendance.LeaveTime != nil {
+		return ExitResponse{}, web.NewRequestError(errors.New("you have already recorded an exit for today"), http.StatusBadRequest)
+	}
 
 	// Update the attendance record
 	q := r.NewUpdate().Table("attendance").
 		Where("deleted_at IS NULL AND employee_id = ? AND status = true", request.EmployeeID).
 		Set("leave_time = ?", timeString).
+		Set("periods=?", periodsData).
 		Set("status = ?", false).
 		Set("updated_at = ?", currentTime).
 		Set("updated_by = ?", claims.UserId)
@@ -460,7 +506,7 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Exit
 
 	// Update the user's status to false
 	userUpdate := r.NewUpdate().Table("users").
-		Where("deleted_at IS NULL AND employee_id = ? AND status = true", request.EmployeeID).
+		Where("deleted_at IS NULL AND employee_id = ?", request.EmployeeID).
 		Set("status = ?", false)
 
 	_, err = userUpdate.Exec(ctx)
@@ -470,6 +516,7 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Exit
 
 	return response, nil
 }
+
 func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {
 	if err := r.ValidateStruct(&request, "ID"); err != nil {
 		return err

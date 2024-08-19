@@ -56,32 +56,33 @@ type CreateRequest struct {
 type CreateResponse struct {
 	bun.BaseModel `bun:"table:attendance"`
 
-	ID         int               `json:"id" bun:"-"`
-	EmployeeID *string           `json:"employee_id" bun:"employee_id"`
-	WorkDay    string            `json:"work_day" bun:"work_day"`
-	ComeTime   string            `json:"come_time" bun:"come_time"`
-	LeaveTime  *string           `json:"leave_time,omitempty" bun:"leave_time"`
-	Periods    map[string]string `json:"-" bun:"periods,type:jsonb"`
-	CreatedAt  time.Time         `json:"-"          bun:"created_at"`
-	CreatedBy  int               `json:"-"          bun:"created_by"`
+	ID         int                 `json:"id" bun:"-"`
+	EmployeeID *string             `json:"employee_id" bun:"employee_id"`
+	WorkDay    string              `json:"work_day" bun:"work_day"`
+	ComeTime   string              `json:"come_time" bun:"come_time"`
+	LeaveTime  *string             `json:"leave_time,omitempty" bun:"leave_time"`
+	Periods    []map[string]string `json:"-" bun:"periods,type:jsonb"`
+	CreatedAt  time.Time           `json:"-"          bun:"created_at"`
+	CreatedBy  int                 `json:"-"          bun:"created_by"`
+}
+
+
+type ExitResponse struct {
+	bun.BaseModel `bun:"table:attendance"`
+
+	ID         int                 `json:"id" bun:"-"`
+	EmployeeID string              `json:"employee_id" bun:"employee_id"`
+	WorkDay    string              `json:"work_day" bun:"work_day"`
+	ComeTime   string              `json:"come_time" bun:"come_time"`
+	Periods    []map[string]string `json:"-" bun:"periods,type:jsonb"`
+	LeaveTime  *string             `json:"leave_time,omitempty" bun:"leave_time"`
+	UpdatedAt  time.Time           `json:"-"          bun:"updated_at"`
+	UpdatedBy  int                 `json:"-"          bun:"updated_by"`
 }
 type ExitByPhoneRequest struct {
 	EmployeeID *string `json:"employee_id" form:"employee_id"`
 	Latitude   float64 `json:"latitude" form:"latitude"`
 	Longitude  float64 `json:"longitude" form:"longitude"`
-}
-
-type ExitResponse struct {
-	bun.BaseModel `bun:"table:attendance"`
-
-	ID         int               `json:"id" bun:"-"`
-	EmployeeID string            `json:"employee_id" bun:"employee_id"`
-	WorkDay    string            `json:"work_day" bun:"work_day"`
-	ComeTime   *string            `json:"come_time" bun:"come_time"`
-	Periods    map[string]string `json:"-" bun:"periods,type:jsonb"`
-	LeaveTime  string            `json:"leave_time,omitempty" bun:"leave_time"`
-	UpdatedAt  time.Time         `json:"-"          bun:"updated_at"`
-	UpdatedBy  int               `json:"-"          bun:"updated_by"`
 }
 type EnterRequest struct {
 	Latitude   float64 `json:"latitude" form:"latitude"`
