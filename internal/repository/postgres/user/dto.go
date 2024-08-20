@@ -8,10 +8,12 @@ import (
 )
 
 type Filter struct {
-	Limit  *int
-	Offset *int
-	Page   *int
-	Search *string
+	Limit        *int
+	Offset       *int
+	Page         *int
+	Search       *string
+	DepartmentID *int
+	PositionID   *int
 }
 
 type SignInRequest struct {
@@ -96,16 +98,20 @@ type StatisticRequest struct {
 	Month    date.Date
 	Interval int
 }
+
 type StatisticResponse struct {
 	WorkDay    *string `json:"work_day" bun:"work_day"`
 	ComeTime   *string `json:"come_time" bun:"come_time"`
 	LeaveTime  *string `json:"leave_time,omitempty" bun:"leave_time"`
-	TotalHours *string `json:"total_hours" bun:"total_hours"`
+	TotalHours string `json:"total_hours" bun:"total_hours"`
 }
 type DashboardResponse struct {
 	ComeTime   *string `json:"come_time" bun:"come_time"`
 	LeaveTime  *string `json:"leave_time" bun:"leave_time"`
 	TotalHours *string `json:"total_hours" bun:"total_hours"`
+}
+type MonthlyStatisticRequest struct {
+	Month date.Date
 }
 type MonthlyStatisticResponse struct {
 	EarlyCome  *int `json:"early_come" bun:"early_come"`

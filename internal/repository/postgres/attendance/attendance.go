@@ -3,7 +3,6 @@ package attendance
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -39,49 +38,43 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		return nil, 0, err
 	}
 
-	whereQuery := fmt.Sprintf(`
-			WHERE 
-				a.deleted_at IS NULL
-			`)
+	whereQuery := fmt.Sprintf(`WHERE a.deleted_at IS NULL`)
 
 	if filter.Search != nil {
 		search := strings.Replace(*filter.Search, " ", "", -1)
 		search = strings.Replace(search, "'", "''", -1)
-
-		whereQuery += fmt.Sprintf(` AND
-		u.employee_id ilike '%s' OR u.full_name ilike '%s'`, "%"+search+"%", "%"+search+"%")
+		whereQuery += fmt.Sprintf(` AND (u.employee_id ILIKE '%s' OR u.full_name ILIKE '%s')`, "%"+search+"%", "%"+search+"%")
 	}
+
 	if filter.DepartmentID != nil {
 		whereQuery += fmt.Sprintf(` AND u.department_id = %d`, *filter.DepartmentID)
 	}
+
 	if filter.PositionID != nil {
 		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
+
 	if filter.Status != nil {
-		var statusValue string
+		statusValue := "false"
 		if *filter.Status {
 			statusValue = "true"
-		} else {
-			statusValue = "false"
 		}
 		whereQuery += fmt.Sprintf(" AND a.status = %s", statusValue)
 	}
 
 	if filter.Date != nil {
-		Date, err := time.Parse("2006-01-02", *filter.Date)
+		date, err := time.Parse("2006-01-02", *filter.Date)
 		if err != nil {
-			return []GetListResponse{}, 0, web.NewRequestError(errors.Wrap(err, "date parse"), http.StatusBadRequest)
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "date parse"), http.StatusBadRequest)
 		}
-		date := Date.Format("2006-01-02")
-
-		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", date)
+		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", date.Format("2006-01-02"))
 	} else {
 		today := time.Now().Format("2006-01-02")
 		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", today)
 	}
-	orderQuery := "ORDER BY a.created_at desc"
-	fmt.Println("DAte:", filter.Date)
-	var limitQuery, offsetQuery string
+
+	orderQuery := "ORDER BY a.created_at DESC"
+	limitQuery, offsetQuery := "", ""
 
 	if filter.Page != nil && filter.Limit != nil {
 		offset := (*filter.Page - 1) * (*filter.Limit)
@@ -89,15 +82,16 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	}
 
 	if filter.Limit != nil {
-		limitQuery += fmt.Sprintf(" LIMIT %d", *filter.Limit)
+		limitQuery = fmt.Sprintf("LIMIT %d", *filter.Limit)
 	}
 
 	if filter.Offset != nil {
-		offsetQuery += fmt.Sprintf(" OFFSET %d", *filter.Offset)
+		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset)
 	}
 
 	query := fmt.Sprintf(`
 		SELECT
+		    a.id,
 			a.employee_id,
 			u.full_name,
 			u.department_id,
@@ -108,30 +102,31 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			a.status,
 			a.come_time,
 			a.leave_time
-	 FROM   attendance as a
-		LEFT JOIN users u ON a.employee_id=u.employee_id
-		LEFT JOIN department d ON u.department_id=d.id	
-		LEFT JOIN position p ON u.position_id=p.id
-
+		FROM attendance AS a
+		LEFT JOIN users u ON a.employee_id = u.employee_id
+		LEFT JOIN department d ON u.department_id = d.id
+		LEFT JOIN position p ON u.position_id = p.id
 		%s %s %s %s
 	`, whereQuery, orderQuery, limitQuery, offsetQuery)
 
 	rows, err := r.QueryContext(ctx, query)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusNotFound)
-	}
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusNotFound)
+		}
 		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting attendance"), http.StatusInternalServerError)
 	}
+	defer rows.Close()
+
 	var list []GetListResponse
 
 	for rows.Next() {
 		var detail GetListResponse
 		var workDayString string
-		var leaveTimeBytes []byte
-		var comeTimeBytes []byte
+		var comeTimeBytes, leaveTimeBytes []byte
 
-		if err = rows.Scan(
+		err = rows.Scan(
+			&detail.ID,
 			&detail.EmployeeID,
 			&detail.Fullname,
 			&detail.DepartmentID,
@@ -141,7 +136,9 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			&workDayString,
 			&detail.Status,
 			&comeTimeBytes,
-			&leaveTimeBytes); err != nil {
+			&leaveTimeBytes,
+		)
+		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance list"), http.StatusBadRequest)
 		}
 
@@ -149,32 +146,29 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "converting work_day to date.Date"), http.StatusBadRequest)
 		}
-		detail.WorkDay = &workDay // Convert the string to date.Date
+		detail.WorkDay = &workDay
 
-		// Convert the byte array to time.Time
-		comeTime, err := time.Parse("15:04:05", string(comeTimeBytes))
+		// Convert byte array to time.Time
+		comeTimeStr := string(comeTimeBytes)
+		comeTime, err := time.Parse("15:04:05", comeTimeStr)
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "converting come_time to time.Time"), http.StatusBadRequest)
 		}
 		detail.ComeTime = &comeTime
 
 		if leaveTimeBytes != nil {
-			leaveTime, err := time.Parse("15:04:05", string(leaveTimeBytes))
+			leaveTimeStr := string(leaveTimeBytes)
+			leaveTime, err := time.Parse("15:04:05", leaveTimeStr)
 			if err != nil {
 				return nil, 0, web.NewRequestError(errors.Wrap(err, "converting leave_time to time.Time"), http.StatusBadRequest)
 			}
 			detail.LeaveTime = &leaveTime
 
-			// Calculate the time difference between leave_time and come_time
-			timeDiff := leaveTime.Sub(comeTime)
-
-			// Calculate total hours and minutes
-			hours := int(timeDiff.Hours())
-			minutes := int(timeDiff.Minutes()) % 60
-
-			// Format the total hours as HH:MM
-			totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
-
+			// Calculate total working hours
+			totalHours, err := r.calculateTotalHours(ctx, detail.EmployeeID, *detail.WorkDay)
+			if err != nil {
+				return nil, 0, web.NewRequestError(errors.Wrap(err, "calculating total hours"), http.StatusBadRequest)
+			}
 			detail.TotalHours = totalHours
 		} else {
 			detail.TotalHours = ""
@@ -184,26 +178,21 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	}
 
 	countQuery := fmt.Sprintf(`
-		SELECT
-			count(a.id)
-		FROM
-		    attendance as a
-		LEFT JOIN users u ON a.employee_id=u.employee_id
-		LEFT JOIN department d ON u.department_id=d.id	
-		LEFT JOIN position p ON u.position_id=p.id
+		SELECT COUNT(a.id)
+		FROM attendance AS a
+		LEFT JOIN users u ON a.employee_id = u.employee_id
+		LEFT JOIN department d ON u.department_id = d.id
+		LEFT JOIN position p ON u.position_id = p.id
 		%s
 	`, whereQuery)
 
 	countRows, err := r.QueryContext(ctx, countQuery)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-	}
 	if err != nil {
-		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting attendance"), http.StatusInternalServerError)
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "counting attendance records"), http.StatusInternalServerError)
 	}
+	defer countRows.Close()
 
-	count := 0
-
+	var count int
 	for countRows.Next() {
 		if err = countRows.Scan(&count); err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance count"), http.StatusInternalServerError)
@@ -213,25 +202,26 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	return list, count, nil
 }
 
-func (r *GetListResponse) MarshalJSON() ([]byte, error) {
-	type Alias GetListResponse
-	aux := &struct {
-		ComeTime  string `json:"come_time,omitempty"`
-		LeaveTime string `json:"leave_time,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(r),
+// calculateTotalHours calculates the total hours worked by the employee based on attendance_period records.
+func (r Repository) calculateTotalHours(ctx context.Context, employeeID *string, workDay date.Date) (string, error) {
+	var totalMinutes int
+	query := `
+		SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (leave_time - come_time)) / 60)::INT, 0) AS total_minutes
+		FROM attendance_period
+		WHERE attendance_id = (
+			SELECT id FROM attendance WHERE employee_id = ? AND work_day = ?
+		)`
+
+	err := r.QueryRowContext(ctx, query, employeeID, workDay).Scan(&totalMinutes)
+	if err != nil {
+		return "", errors.Wrap(err, "scanning total minutes")
 	}
 
-	if r.ComeTime != nil {
-		aux.ComeTime = r.ComeTime.Format("15:04")
-	}
+	hours := totalMinutes / 60
+	minutes := totalMinutes % 60
+	totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
 
-	if r.LeaveTime != nil {
-		aux.LeaveTime = r.LeaveTime.Format("15:04")
-	}
-
-	return json.Marshal(aux)
+	return totalHours, nil
 }
 
 func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdResponse, error) {
@@ -252,13 +242,12 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 			a.work_day,
 			a.status,
 			a.come_time,
-			a.leave_time,
-			(a.leave_time-a.come_time) as total_hours
-		FROM   attendance as a
-		LEFT JOIN users u ON a.employee_id=u.employee_id
-		LEFT JOIN department d ON u.department_id=d.id	
-		LEFT JOIN position p ON u.position_id=p.id
-		WHERE  a.deleted_at is NULL and a.id= %d
+			a.leave_time
+		FROM attendance a
+		LEFT JOIN users u ON a.employee_id = u.employee_id
+		LEFT JOIN department d ON u.department_id = d.id
+		LEFT JOIN position p ON u.position_id = p.id
+		WHERE a.deleted_at IS NULL AND a.id = %d
 	`, id)
 
 	var detail GetDetailByIdResponse
@@ -278,41 +267,45 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		&detail.Status,
 		&comeTimeBytes,
 		&leaveTimeBytes,
-		&detail.TotalHours,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return GetDetailByIdResponse{}, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
 	}
+	if err != nil {
+		return GetDetailByIdResponse{}, errors.Wrap(err, "scanning attendance details")
+	}
 
+	// Parse work_day
 	workDay, err := date.ParseDate(workDayString)
+	if err != nil {
+		return GetDetailByIdResponse{}, web.NewRequestError(errors.Wrap(err, "parsing work_day"), http.StatusBadRequest)
+	}
+	detail.WorkDay = &workDay
+
+	// Convert come_time
+	comeTimeStr := string(comeTimeBytes)
+	comeTime, err := time.Parse("15:04:05", comeTimeStr)
 	if err != nil {
 		return GetDetailByIdResponse{}, web.NewRequestError(errors.Wrap(err, "parsing come_time"), http.StatusBadRequest)
 	}
-	detail.WorkDay = &workDay
-	// Convert the byte array to time.Time
-	comeTime, err := time.Parse("15:04:05", string(comeTimeBytes))
-	if err != nil {
-		return GetDetailByIdResponse{}, web.NewRequestError(errors.Wrap(err, "converting come_time to time.Time"), http.StatusBadRequest)
-	}
-	detail.ComeTime = &comeTime
+	comeTimeFormatted := comeTime.Format("15:04")
+	detail.ComeTime = &comeTimeFormatted
 
+	// Convert leave_time
 	if leaveTimeBytes != nil {
-		leaveTime, err := time.Parse("15:04:05", string(leaveTimeBytes))
+		leaveTimeStr := string(leaveTimeBytes)
+		leaveTime, err := time.Parse("15:04:05", leaveTimeStr)
 		if err != nil {
-			return GetDetailByIdResponse{}, web.NewRequestError(errors.Wrap(err, "converting leave_time to time.Time"), http.StatusBadRequest)
+			return GetDetailByIdResponse{}, web.NewRequestError(errors.Wrap(err, "parsing leave_time"), http.StatusBadRequest)
 		}
-		detail.LeaveTime = &leaveTime
+		leaveTimeFormatted := leaveTime.Format("15:04")
+		detail.LeaveTime = &leaveTimeFormatted
 
-		// Calculate the time difference between leave_time and come_time
-		timeDiff := leaveTime.Sub(comeTime)
-
-		// Calculate total hours and minutes
-		hours := int(timeDiff.Hours())
-		minutes := int(timeDiff.Minutes()) % 60
-
-		// Format the total hours as HH:MM
-		totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
-
+		// Calculate total working hours
+		totalHours, err := r.calculateTotalHours(ctx, detail.EmployeeID, *detail.WorkDay)
+		if err != nil {
+			return GetDetailByIdResponse{}, web.NewRequestError(errors.Wrap(err, "calculating total_hours"), http.StatusBadRequest)
+		}
 		detail.TotalHours = totalHours
 	} else {
 		detail.TotalHours = ""
@@ -346,31 +339,6 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	return response, nil
 }
 
-// func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (CreateResponse, error) {
-// 	claims, err := r.CheckClaims(ctx)
-// 	if err != nil {
-// 		return CreateResponse{}, err
-// 	}
-
-// 	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
-// 		return CreateResponse{}, err
-// 	}
-
-// 	var response CreateResponse
-
-// 	response.EmployeeID = request.EmployeeID
-// 	response.ComeTime = time.Now().Format("15:04")
-// 	response.WorkDay = time.Now().Format("2006-01-02")
-// 	response.CreatedAt = time.Now()
-// 	response.CreatedBy = claims.UserId
-
-// 	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
-// 	if err != nil {
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance by phone"), http.StatusBadRequest)
-// 	}
-
-//		return response, nil
-//	}
 func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (CreateResponse, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
@@ -384,11 +352,6 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	var response CreateResponse
 	currentTime := time.Now()
 	workDay := currentTime.Format("2006-01-02")
-
-	// Create JSONB data for the periods column
-	periodsData := []map[string]string{
-		{"start": currentTime.Format("15:04")},
-	}
 
 	// Check if there is existing attendance data for the day
 	var existingAttendance ExitResponse
@@ -405,49 +368,72 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	if existingAttendance.ComeTime != "" {
 		if existingAttendance.LeaveTime == nil {
 			// If come_time exists and leave_time is nil, return an error message
-			return CreateResponse{}, web.NewRequestError(errors.New("you have already clicked the button, please click leave button"), http.StatusBadRequest)
+			return CreateResponse{}, web.NewRequestError(errors.New("you have already clicked the button, please click the leave button"), http.StatusBadRequest)
 		}
 
 		// Update existing record if come_time exists and leave_time is not nil
-		existingAttendance.Periods = append(existingAttendance.Periods, map[string]string{"start": currentTime.Format("15:04")})
 		existingAttendance.LeaveTime = nil
-		existingAttendance.ComeTime = currentTime.Format("15:04")
 		existingAttendance.UpdatedAt = currentTime
 		existingAttendance.UpdatedBy = claims.UserId
 
 		_, err = r.NewUpdate().
 			Model(&existingAttendance).
-			Where("employee_id = ?", existingAttendance.EmployeeID).
+			Where("id = ?", existingAttendance.ID).
 			Exec(ctx)
 
 		if err != nil {
-			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance creta by phone"), http.StatusBadRequest)
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance by phone"), http.StatusBadRequest)
 		}
-		
 
+		// Update or create the attendance_period
+		var periods PeriodsCreate
+		periods.Attendance = existingAttendance.ID
+		periods.WorkDay = currentTime.Format("2006-01-02")
+		periods.ComeTime = currentTime.Format("15:04")
+
+		_, err = r.NewInsert().Model(&periods).Returning("id").Exec(ctx, &periods.ID)
+		if err != nil {
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance_period by phone"), http.StatusBadRequest)
+		}
+
+		// Populate the response with updated data
+		response.ID = existingAttendance.ID
+		response.EmployeeID = request.EmployeeID
+		response.ComeTime = existingAttendance.ComeTime
+		response.WorkDay = workDay
 	} else {
 		// Prepare response data for a new entry
 		response.EmployeeID = request.EmployeeID
-		response.ComeTime = currentTime.Format(time.RFC3339)
-		response.WorkDay = workDay
+		response.ComeTime = currentTime.Format("15:04")
+		response.WorkDay = currentTime.Format("2006-01-02")
 		response.CreatedAt = currentTime
 		response.CreatedBy = claims.UserId
-		response.Periods = periodsData
 
 		_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
 		if err != nil {
 			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance by phone"), http.StatusBadRequest)
 		}
+
+		// Create the attendance_period
+		var periods PeriodsCreate
+		periods.Attendance = response.ID
+		periods.WorkDay = currentTime.Format("2006-01-02")
+		periods.ComeTime = currentTime.Format("15:04")
+
+		_, err = r.NewInsert().Model(&periods).Returning("id").Exec(ctx, &periods.ID)
+		if err != nil {
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance_period by phone"), http.StatusBadRequest)
+		}
 	}
 
 	// Update user's status to true
-	q := r.NewUpdate().Table("users").
+	_, err = r.NewUpdate().
+		Table("users").
 		Where("deleted_at IS NULL AND employee_id = ?", request.EmployeeID).
-		Set("status = true")
-
-	_, err = q.Exec(ctx)
+		Set("status = true").
+		Exec(ctx)
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating user's status by phone when enter"), http.StatusBadRequest)
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating user's status by phone when entering"), http.StatusBadRequest)
 	}
 
 	return response, nil
@@ -466,52 +452,71 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Exit
 	var response ExitResponse
 	currentTime := time.Now()
 	workDay := currentTime.Format("2006-01-02")
-	// Create JSONB data for the periods column
-	timeString := currentTime.Format("15:04")
-	// Create JSONB data for the periods column
-	periodsData := map[string]string{
-		"end": timeString,
-	}
+	leaveTimeStr := currentTime.Format("15:04")
 
-	// Check if there is existing attendance data for the day with come_time
-	var existingAttendance CreateResponse
+	// Check if there is existing attendance data for the day
+	var existingAttendance ExitResponse
 	err = r.NewSelect().
 		Model(&existingAttendance).
 		Where("employee_id = ? AND work_day = ?", request.EmployeeID, workDay).
-		Where("come_time IS NOT NULL").
 		Limit(1).
 		Scan(ctx)
-
 	if err != nil {
-		return ExitResponse{}, web.NewRequestError(errors.New("no entry record found for today, cannot record exit"), http.StatusBadRequest)
+		return ExitResponse{}, web.NewRequestError(errors.New("please click the come button first"), http.StatusBadRequest)
 	}
 
-	if existingAttendance.LeaveTime != nil {
-		return ExitResponse{}, web.NewRequestError(errors.New("you have already recorded an exit for today"), http.StatusBadRequest)
+	// Case 1: If no come_time exists, prompt to click come button first
+	if existingAttendance.ComeTime == "" {
+		return ExitResponse{}, web.NewRequestError(errors.New("please click the come button first"), http.StatusBadRequest)
 	}
 
-	// Update the attendance record
-	q := r.NewUpdate().Table("attendance").
-		Where("deleted_at IS NULL AND employee_id = ? AND status = true", request.EmployeeID).
-		Set("leave_time = ?", timeString).
-		Set("periods=?", periodsData).
-		Set("status = ?", false).
-		Set("updated_at = ?", currentTime).
-		Set("updated_by = ?", claims.UserId)
+	// Case 2: If come_time exists but leave_time is nil, update the tables
+	if existingAttendance.ComeTime != "" && existingAttendance.LeaveTime == nil {
+		// Update attendance table
+		_, err = r.NewUpdate().
+			Table("attendance").
+			Where("deleted_at IS NULL AND id = ?", existingAttendance.ID).
+			Set("leave_time = ?", leaveTimeStr).
+			Set("updated_at = ?", currentTime).
+			Set("updated_by = ?", claims.UserId).
+			Set("status = ?", false).
+			Exec(ctx)
+		if err != nil {
+			return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance"), http.StatusBadRequest)
+		}
 
-	_, err = q.Exec(ctx)
-	if err != nil {
-		return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance by phone"), http.StatusBadRequest)
+		// Update attendance_period table
+		_, err = r.NewUpdate().
+			Table("attendance_period").
+			Where("updated_at is null and attendance_id = ? AND work_day = ?", existingAttendance.ID, workDay).
+			Set("leave_time = ?", leaveTimeStr).
+			Set("updated_at = ?", currentTime).
+			Exec(ctx)
+		if err != nil {
+			return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance_period"), http.StatusBadRequest)
+		}
+
+		// Update user's status to false
+		_, err = r.NewUpdate().
+			Table("users").
+			Where("deleted_at IS NULL AND employee_id = ?", request.EmployeeID).
+			Set("status = false").
+			Exec(ctx)
+		if err != nil {
+			return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating user's status by phone when exiting"), http.StatusBadRequest)
+		}
+
+		// Populate the response with updated data
+		response.ID = existingAttendance.ID
+		response.EmployeeID = existingAttendance.EmployeeID
+		response.WorkDay = workDay
+		response.ComeTime = existingAttendance.ComeTime
+		response.LeaveTime = &leaveTimeStr
 	}
 
-	// Update the user's status to false
-	userUpdate := r.NewUpdate().Table("users").
-		Where("deleted_at IS NULL AND employee_id = ?", request.EmployeeID).
-		Set("status = ?", false)
-
-	_, err = userUpdate.Exec(ctx)
-	if err != nil {
-		return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating user's status by phone when exit"), http.StatusBadRequest)
+	// Case 3: If both come_time and leave_time exist, prompt to click the come button first
+	if existingAttendance.ComeTime != "" && existingAttendance.LeaveTime != nil {
+		return ExitResponse{}, web.NewRequestError(errors.New("you have already recorded an exit for today. Please click the come button first"), http.StatusBadRequest)
 	}
 
 	return response, nil
@@ -527,14 +532,15 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 		return err
 	}
 
-	comeTime, err := time.Parse("15:04", request.ComeTime)
+	// Use a valid date for time parsing
+	comeTime, err := time.Parse("2006-01-02 15:04", "1970-01-01 "+request.ComeTime)
 	if err != nil {
 		return web.NewRequestError(errors.Wrap(err, "parsing come time"), http.StatusBadRequest)
 	}
 
 	var leaveTime *time.Time
 	if request.LeaveTime != "" {
-		t, err := time.Parse("15:04", request.LeaveTime)
+		t, err := time.Parse("2006-01-02 15:04", "1970-01-01 "+request.LeaveTime)
 		if err != nil {
 			return web.NewRequestError(errors.Wrap(err, "parsing leave time"), http.StatusBadRequest)
 		}
@@ -542,10 +548,11 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	}
 
 	q := r.NewUpdate().Table("attendance").Where("deleted_at IS NULL AND id = ?", request.ID)
-	q.Set("come_time=?", comeTime)
-	q.Set("leave_time=?", leaveTime)
+	q.Set("come_time=?", comeTime.Format("15:04:00"))
+	if leaveTime != nil {
+		q.Set("leave_time=?", leaveTime.Format("15:04:00"))
+	}
 	q.Set("work_day=?", request.WorkDay)
-	q.Set("status=?", request.Status)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
@@ -575,9 +582,10 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if request.LeaveTime != "" {
 		q.Set("leave_time = ?", request.LeaveTime)
 	}
-	if request.Status != nil {
-		q.Set("status = ?", request.Status)
+	if request.WorkDay != "" {
+		q.Set("work_day = ?", request.WorkDay)
 	}
+
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
@@ -597,13 +605,13 @@ func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, er
 	var response GetStatisticResponse
 
 	query := `
-	SELECT
-		(SELECT COUNT(DISTINCT employee_id) FROM users) AS total_employee,
-		(SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '09:00' AND come_time < '10:00') AS on_time,
-		(SELECT COUNT(employee_id) FROM users WHERE status = 'false') AS absent,
-		(SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00') AS late_arrival,
-		(SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00') AS early_departures,
-		(SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00') AS time_off
+SELECT
+    (SELECT COUNT(DISTINCT employee_id) FROM users WHERE deleted_at IS NULL) AS total_employee,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '09:00' AND come_time < '10:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS on_time,
+    (SELECT COUNT(u.employee_id) FROM users u LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.work_day = CURRENT_DATE WHERE u.status = 'false' AND u.deleted_at IS NULL AND a.employee_id IS NULL) AS absent,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS late_arrival,
+    (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_departures,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_come;
 	`
 
 	err := r.DB.QueryRowContext(ctx, query).Scan(
@@ -612,7 +620,7 @@ func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, er
 		&response.Absent,
 		&response.LateArrival,
 		&response.EarlyDepartures,
-		&response.TimeOff,
+		&response.EarlyCome,
 	)
 	if err != nil {
 		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "fetching statistics"), http.StatusBadRequest)
@@ -622,19 +630,20 @@ func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, er
 }
 func (r Repository) GetPieChartStatistic(ctx context.Context) (PieChartResponse, error) {
 	query := fmt.Sprintf(`
-    WITH today_attendance AS (
-        SELECT
-            COUNT(a.status = true ) AS come_count,
-            COUNT( u.status  = false ) AS absent_count,
-            COUNT(u.employee_id) AS total_count
-        FROM attendance a
-        JOIN users u ON a.employee_id = u.employee_id
-        WHERE a.work_day = CURRENT_DATE
-    )
+WITH today_attendance AS (
     SELECT
-        COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS come_percentage,
-        COALESCE(ROUND(100.0 * absent_count / GREATEST(1, total_count), 2), 0) AS absent_percentage
-    FROM today_attendance;
+        COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = CURRENT_DATE) AS come_count,
+        COUNT(DISTINCT u.employee_id) AS total_count,
+        COUNT(u.employee_id) FILTER (WHERE a.employee_id IS NULL) AS absent_count
+    FROM users u
+    LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.work_day = CURRENT_DATE
+    WHERE u.status = 'false' AND u.deleted_at IS NULL
+)
+SELECT
+    COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS come_percentage,
+    COALESCE(ROUND(100.0 * absent_count / GREATEST(1, total_count), 2), 0) AS absent_percentage
+FROM today_attendance;
+
 `)
 	//
 
@@ -660,21 +669,22 @@ func Int(i int) *int {
 func (r Repository) GetBarChartStatistic(ctx context.Context) ([]BarChartResponse, error) {
 	query := `
     WITH today_attendance AS (
-        SELECT
-            COUNT(CASE WHEN a.status =  true THEN 1 END) AS come_count,
-            COUNT(u.employee_id) AS total_count,
-            u.department_id,
-            d.name
-        FROM attendance a
-        JOIN users u ON a.employee_id = u.employee_id
-        JOIN department d ON d.id = u.department_id
-        GROUP BY u.department_id, d.name
-    )
     SELECT
-        d.name AS department,
-        COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
-    FROM today_attendance
-    JOIN department d ON d.id = today_attendance.department_id;
+    COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = CURRENT_DATE) AS come_count,
+    COUNT(DISTINCT u.employee_id) AS total_count,
+    u.department_id
+FROM department d
+LEFT JOIN users u ON d.id = u.department_id AND u.deleted_at IS NULL
+LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.deleted_at IS NULL
+WHERE d.deleted_at IS NULL
+GROUP BY u.department_id
+)
+SELECT
+    d.name AS department,
+    COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
+FROM department d
+LEFT JOIN today_attendance ON d.id = today_attendance.department_id
+WHERE d.deleted_at IS NULL;
 `
 
 	rows, err := r.QueryContext(ctx, query)
@@ -700,71 +710,82 @@ func (r Repository) GetBarChartStatistic(ctx context.Context) ([]BarChartRespons
 	return results, nil
 }
 func (r Repository) GetGraphStatistic(ctx context.Context, filter GraphRequest) ([]GraphResponse, error) {
-	// Determine the start and end days based on the interval
-	var startDay, endDay int
-	switch filter.Interval {
-	case 0:
-		startDay, endDay = 1, 10
-	case 1:
-		startDay, endDay = 11, 20
-	case 2:
-		startDay, endDay = 21, 31 // Adjust for months with fewer than 31 days later
-	default:
-		return nil, web.NewRequestError(errors.New("invalid interval"), http.StatusBadRequest)
-	}
+    var startDay, endDay int
+    switch filter.Interval {
+    case 0:
+        startDay, endDay = 1, 10
+    case 1:
+        startDay, endDay = 11, 20
+    case 2:
+        startDay, endDay = 21, 31 // Adjust for months with fewer than 31 days later
+    default:
+        return nil, web.NewRequestError(errors.New("invalid interval"), http.StatusBadRequest)
+    }
 
-	// Calculate start and end dates directly without string conversion
-	startDate := time.Date(filter.Month.Year(), filter.Month.Month(), startDay, 0, 0, 0, 0, time.UTC)
-	endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
+    startDate := time.Date(filter.Month.Year(), filter.Month.Month(), startDay, 0, 0, 0, 0, time.UTC)
+    endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
 
-	// Use parameterized query to avoid SQL injection vulnerabilities
-	query := `
-	WITH today_attendance AS (
-		SELECT
-			a.work_day,
-			COUNT(CASE WHEN a.status = true THEN 1 END) AS come_count,
-			COUNT(u.employee_id) AS total_count
-		FROM attendance a
-		JOIN users u ON a.employee_id = u.employee_id
-		WHERE a.deleted_at IS NULL
-		AND a.work_day BETWEEN $1 AND $2
-		GROUP BY a.work_day
-	)
-	SELECT
-		work_day,
-		COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
-	FROM today_attendance;
-	`
+    query := `
+    WITH today_attendance AS (
+        SELECT
+            a.work_day,  -- work_day is of type DATE in the database
+            COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = CURRENT_DATE) AS come_count,
+            (SELECT COUNT(DISTINCT employee_id) FROM users WHERE deleted_at IS NULL) AS total_count
+        FROM attendance a
+        LEFT JOIN users u ON a.employee_id = u.employee_id
+        WHERE a.deleted_at IS NULL
+            AND a.work_day BETWEEN $1 AND $2
+        GROUP BY a.work_day
+    )
+    SELECT
+        work_day,
+        COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
+    FROM today_attendance;
+    `
 
-	stmt, err := r.Prepare(query)
-	if err != nil {
-		return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "selecting attendance query "), http.StatusInternalServerError)
-	}
-	defer stmt.Close()
+    stmt, err := r.Prepare(query)
+    if err != nil {
+        return nil, web.NewRequestError(errors.Wrap(err, "selecting attendance query"), http.StatusInternalServerError)
+    }
+    defer stmt.Close()
 
-	rows, err := stmt.QueryContext(ctx, startDate, endDate)
-	if err != nil {
-		return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "selecting attendance filter"), http.StatusInternalServerError)
-	}
-	defer rows.Close()
+    rows, err := stmt.QueryContext(ctx, startDate, endDate)
+    if err != nil {
+        return nil, web.NewRequestError(errors.Wrap(err, "selecting attendance filter"), http.StatusInternalServerError)
+    }
+    defer rows.Close()
 
-	var list []GraphResponse
+    var list []GraphResponse
+    attendanceMap := make(map[string]float64)
 
-	for rows.Next() {
-		var detail GraphResponse
-		var workDayString string // Scan the work_day as a string
+    for rows.Next() {
+        var workDayString string
+        var percentage float64
+        if err = rows.Scan(&workDayString, &percentage); err != nil {
+            return nil, web.NewRequestError(errors.Wrap(err, "scanning Graph response"), http.StatusBadRequest)
+        }
 
-		if err = rows.Scan(&workDayString, &detail.Percentage); err != nil {
-			return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "scanning Graph response"), http.StatusBadRequest)
-		}
+    
 
-		workDay, err := date.ParseDate(workDayString) // Parse the string after scanning
-		if err != nil {
-			return []GraphResponse{}, web.NewRequestError(errors.Wrap(err, "converting work_day to date.Date"), http.StatusBadRequest)
-		}
-		detail.WorkDay = &workDay
-		list = append(list, detail)
-	}
+        attendanceMap[workDayString] = percentage
+    }
 
-	return list, nil
+    for day := startDay; day <= endDay; day++ {
+        workDay := time.Date(filter.Month.Year(), filter.Month.Month(), day, 0, 0, 0, 0, time.UTC)
+        workDayString := workDay.Format("2006-01-02")
+        percentage, exists := attendanceMap[workDayString]
+
+        if !exists {
+            percentage = 0
+        }
+
+        parsedWorkDay, _ := date.ParseDate(workDayString) // Convert to *date.Date
+
+        list = append(list, GraphResponse{
+            WorkDay:    &parsedWorkDay,
+            Percentage: percentage,
+        })
+    }
+
+    return list, nil
 }

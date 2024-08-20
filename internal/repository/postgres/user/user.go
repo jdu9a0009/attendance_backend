@@ -29,13 +29,13 @@ func NewRepository(database *postgresql.Database) *Repository {
 func (r Repository) GetByEmployeeID(ctx context.Context, employee_id string) (entity.User, error) {
 	var detail entity.User
 	err := r.NewSelect().Model(&detail).Where("employee_id = ? AND deleted_at IS NULL", employee_id).Scan(ctx)
+
 	if err != nil {
 		return entity.User{}, &web.Error{
 			Err:    errors.New("employee not found!"),
 			Status: http.StatusUnauthorized,
 		}
 	}
-
 	return detail, err
 
 }
@@ -57,6 +57,12 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 
 		whereQuery += fmt.Sprintf(` AND
 		u.employee_id ilike '%s' OR u.full_name ilike '%s'`, "%"+search+"%", "%"+search+"%")
+	}
+	if filter.DepartmentID != nil {
+		whereQuery += fmt.Sprintf(` AND u.department_id = %d`, *filter.DepartmentID)
+	}
+	if filter.PositionID != nil {
+		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
 	orderQuery := "ORDER BY u.created_at desc"
 
@@ -355,15 +361,19 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 	return r.DeleteRow(ctx, "users", id)
 }
 
-func (r Repository) GetMonthlyStatistics(ctx context.Context, filter StatisticRequest) (MonthlyStatisticResponse, error) {
+func (r Repository) GetMonthlyStatistics(ctx context.Context, request MonthlyStatisticRequest) (MonthlyStatisticResponse, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
 		return MonthlyStatisticResponse{}, web.NewRequestError(errors.New("error getting user by token"), http.StatusBadRequest)
 	}
 
-	// Calculate full month dates
-	monthStart := time.Date(filter.Month.Year(), filter.Month.Month(), 1, 0, 0, 0, 0, time.UTC)
-	monthEnd := time.Date(filter.Month.Year(), filter.Month.Month()+1, 0, 23, 59, 59, 999999999, time.UTC)
+	// Calculate the start and end dates of the month
+	startDate := request.Month
+	endDate := startDate.AddDate(0, 1, -1) // Last day of the month
+
+	// Convert dates to strings in the format 'YYYY-MM-DD'
+	startDateStr := startDate.Format("2006-01-02")
+	endDateStr := endDate.Format("2006-01-02")
 
 	// Query for monthly statistics
 	monthlyQuery := `
@@ -374,29 +384,23 @@ func (r Repository) GetMonthlyStatistics(ctx context.Context, filter StatisticRe
 			SUM(CASE WHEN a.come_time >= '10:00' THEN 1 ELSE 0 END) AS late
 		FROM attendance a
 		JOIN users u ON a.employee_id = u.employee_id
-		WHERE a.deleted_at IS NULL AND u.id = $1
+		WHERE a.deleted_at IS NULL
+		AND u.id = $1
 		AND a.work_day BETWEEN $2 AND $3;
 	`
 
-	// Execute monthly query
 	monthlyStmt, err := r.Prepare(monthlyQuery)
 	if err != nil {
 		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "preparing monthly query"), http.StatusInternalServerError)
 	}
 	defer monthlyStmt.Close()
 
-	// Execute interval query
-	Stmt, err := r.Prepare(monthlyQuery)
-	if err != nil {
-		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "preparing montly query"), http.StatusInternalServerError)
-	}
-	defer Stmt.Close()
-
-	rows, err := Stmt.QueryContext(ctx, claims.UserId, monthStart, monthEnd)
+	rows, err := monthlyStmt.QueryContext(ctx, claims.UserId, startDateStr, endDateStr)
 	if err != nil {
 		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "executing monthly query"), http.StatusInternalServerError)
 	}
 	defer rows.Close()
+
 	var list MonthlyStatisticResponse
 	for rows.Next() {
 		err := rows.Scan(
@@ -408,8 +412,8 @@ func (r Repository) GetMonthlyStatistics(ctx context.Context, filter StatisticRe
 		if err != nil {
 			return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "scanning monthly statistics"), http.StatusInternalServerError)
 		}
-
 	}
+
 	return list, nil
 }
 
@@ -435,22 +439,28 @@ func (r Repository) GetStatistics(ctx context.Context, filter StatisticRequest) 
 	// Calculate start and end dates for the interval
 	startDate := time.Date(filter.Month.Year(), filter.Month.Month(), startDay, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
-
+	// Generate all dates within the interval
+	var allDates []time.Time
+	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
+		allDates = append(allDates, d)
+	}
 	// Query for interval data
 	intervalQuery := `
-		SELECT
-			a.work_day,
-COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), NULL) AS come_time,
-			COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), NULL) AS leave_time,
-			CASE
-				WHEN a.come_time IS NOT NULL AND a.leave_time IS NOT NULL THEN TO_CHAR(a.leave_time - a.come_time, 'HH24:MI')
-				ELSE NULL
-			END AS total_hours
-		FROM attendance a
-		JOIN users u ON a.employee_id = u.employee_id
-		WHERE a.deleted_at IS NULL AND u.id = $1
-		AND a.work_day BETWEEN $2 AND $3
-		GROUP BY a.work_day, a.come_time, a.leave_time;
+			SELECT
+    a.work_day,
+    COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), '00:00') AS come_time,
+    COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), '00:00') AS leave_time,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60), 0) AS total_minutes
+FROM attendance a
+JOIN users u ON a.employee_id = u.employee_id
+LEFT JOIN attendance_period ap ON a.id = ap.attendance_id
+WHERE a.deleted_at IS NULL
+  AND u.id = $1
+  AND a.work_day BETWEEN $2 AND $3
+GROUP BY a.work_day, a.come_time, a.leave_time
+ORDER BY a.work_day;
+
+
 	`
 
 	// Execute interval query
@@ -469,6 +479,7 @@ COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), NULL) AS come_time,
 	var list []StatisticResponse
 	for rows.Next() {
 		var detail StatisticResponse
+		var totalMinutes float64
 		err := rows.Scan(
 			&detail.WorkDay,
 			&detail.ComeTime,
@@ -479,8 +490,14 @@ COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), NULL) AS come_time,
 			return nil, web.NewRequestError(errors.Wrap(err, "scanning interval statistics"), http.StatusInternalServerError)
 		}
 
+		// Convert total minutes to HH:MM
+		hours := int(totalMinutes) / 60
+		minutes := int(totalMinutes) % 60
+		detail.TotalHours = fmt.Sprintf("%02d:%02d", hours, minutes)
+
 		list = append(list, detail)
 	}
+
 	return list, nil
 }
 

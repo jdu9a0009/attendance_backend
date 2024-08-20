@@ -1,7 +1,6 @@
 package attendance
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/date"
@@ -44,8 +43,8 @@ type GetDetailByIdResponse struct {
 	Fullname     *string    `json:"full_name"`
 	Status       *bool      `json:"status"`
 	WorkDay      *date.Date `json:"work_day"`
-	ComeTime     *time.Time `json:"come_time,omitempty"`
-	LeaveTime    *time.Time `json:"leave_time,omitempty"`
+	ComeTime     *string    `json:"come_time,omitempty"`
+	LeaveTime    *string    `json:"leave_time,omitempty"`
 	TotalHours   string     `json:"total_hours"`
 }
 
@@ -56,28 +55,41 @@ type CreateRequest struct {
 type CreateResponse struct {
 	bun.BaseModel `bun:"table:attendance"`
 
-	ID         int                 `json:"id" bun:"-"`
-	EmployeeID *string             `json:"employee_id" bun:"employee_id"`
-	WorkDay    string              `json:"work_day" bun:"work_day"`
-	ComeTime   string              `json:"come_time" bun:"come_time"`
-	LeaveTime  *string             `json:"leave_time,omitempty" bun:"leave_time"`
-	Periods    []map[string]string `json:"-" bun:"periods,type:jsonb"`
-	CreatedAt  time.Time           `json:"-"          bun:"created_at"`
-	CreatedBy  int                 `json:"-"          bun:"created_by"`
+	ID         int       `json:"id" bun:"-"`
+	EmployeeID *string   `json:"employee_id" bun:"employee_id"`
+	WorkDay    string    `json:"work_day" bun:"work_day"`
+	ComeTime   string    `json:"come_time" bun:"come_time"`
+	LeaveTime  *string   `json:"leave_time,omitempty" bun:"leave_time"`
+	CreatedAt  time.Time `json:"-"          bun:"created_at"`
+	CreatedBy  int       `json:"-"          bun:"created_by"`
 }
+type PeriodsCreate struct {
+	bun.BaseModel `bun:"table:attendance_period"`
 
+	ID         int    `json:"id" bun:"-"`
+	Attendance int    `json:"attendance_id" bun:"attendance_id"`
+	WorkDay    string `json:"work_day" bun:"work_day"`
+	ComeTime   string `json:"come_time" bun:"come_time"`
+}
+type PeriodsUpdate struct {
+	bun.BaseModel `bun:"table:attendance_period"`
+
+	ID         int    `json:"id" bun:"-"`
+	Attendance int    `json:"attendance_id" bun:"attendance_id"`
+	WorkDay    string `json:"work_day" bun:"work_day"`
+	LeaveTime  string `json:"leave_time" bun:"leave_time"`
+}
 
 type ExitResponse struct {
 	bun.BaseModel `bun:"table:attendance"`
 
-	ID         int                 `json:"id" bun:"-"`
-	EmployeeID string              `json:"employee_id" bun:"employee_id"`
-	WorkDay    string              `json:"work_day" bun:"work_day"`
-	ComeTime   string              `json:"come_time" bun:"come_time"`
-	Periods    []map[string]string `json:"-" bun:"periods,type:jsonb"`
-	LeaveTime  *string             `json:"leave_time,omitempty" bun:"leave_time"`
-	UpdatedAt  time.Time           `json:"-"          bun:"updated_at"`
-	UpdatedBy  int                 `json:"-"          bun:"updated_by"`
+	ID         int       `json:"id" bun:"id"`
+	EmployeeID string    `json:"employee_id" bun:"employee_id"`
+	WorkDay    string    `json:"work_day" bun:"work_day"`
+	ComeTime   string    `json:"come_time" bun:"come_time"`
+	LeaveTime  *string   `json:"leave_time,omitempty" bun:"leave_time"`
+	UpdatedAt  time.Time `json:"-"          bun:"updated_at"`
+	UpdatedBy  int       `json:"-"          bun:"updated_by"`
 }
 type ExitByPhoneRequest struct {
 	EmployeeID *string `json:"employee_id" form:"employee_id"`
@@ -95,7 +107,6 @@ type UpdateRequest struct {
 	WorkDay   string `json:"work_day" form:"work_day"`
 	ComeTime  string `json:"come_time" form:"come_time"`
 	LeaveTime string `json:"leave_time" form:"leave_time"`
-	Status    *bool  `json:"status" form:"status"`
 }
 type GetStatisticResponse struct {
 	TotalEmployee   *int `json:"total_employee" bun:"total_employee"`
@@ -103,7 +114,7 @@ type GetStatisticResponse struct {
 	Absent          *int `json:"absent" bun:"absent"`
 	LateArrival     *int `json:"late_arrival" bun:"late_arrivale"`
 	EarlyDepartures *int `json:"early_departures" bun:"early_departures"`
-	TimeOff         *int `json:"time_off" bun:"time_off"`
+	EarlyCome       *int `json:"early_come" bun:"early_come"`
 }
 
 type PieChartResponse struct {
@@ -115,7 +126,7 @@ type GraphRequest struct {
 	Interval int
 }
 type GraphResponse struct {
-	Percentage *float64   `json:"percentage" bun:"percentage"`
+	Percentage float64   `json:"percentage" bun:"percentage"`
 	WorkDay    *date.Date `json:"work_day" bun:"work_day"`
 }
 type BarChartResponse struct {
@@ -123,20 +134,15 @@ type BarChartResponse struct {
 	Percentage *float64 `json:"percentage" bun:"percentage"`
 }
 type Attendance struct {
-	ID             int             `json:"id" bun:"id,pk,autoincrement"`
-	EmployeeID     *string         `json:"employee_id" bun:"employee_id"`
-	ComeTime       string          `json:"come_time,omitempty" bun:"come_time"`
-	LeaveTime      string          `json:"leave_time,omitempty" bun:"leave_time"`
-	Periods        json.RawMessage `json:"periods"`
-	Status         *bool           `json:"status,omitempty" bun:"status"`
-	ComeLatitude   *float64        `json:"come_latitude,omitempty" bun:"come_latitude"`
-	ComeLongitude  *float64        `json:"come_longitude,omitempty" bun:"come_longitude"`
-	LeaveLatitude  *float64        `json:"leave_latitude,omitempty" bun:"leave_latitude"`
-	LeaveLongitude *float64        `json:"leave_longitude,omitempty" bun:"leave_longitude"`
-	WorkDay        string          `json:"work_day" bun:"work_day"`
-	CreatedAt      time.Time       `json:"created_at" bun:"created_at"`
-	CreatedBy      int             `json:"created_by" bun:"created_by"`
-	UpdatedAt      time.Time       `json:"updated_at" bun:"updated_at"`
-	UpdatedBy      int             `json:"updated_by" bun:"updated_by"`
-	DeletedAt      *time.Time      `json:"deleted_at,omitempty" bun:"deleted_at"`
+	ID         int        `json:"id" bun:"id,pk,autoincrement"`
+	EmployeeID *string    `json:"employee_id" bun:"employee_id"`
+	ComeTime   string     `json:"come_time,omitempty" bun:"come_time"`
+	LeaveTime  string     `json:"leave_time,omitempty" bun:"leave_time"`
+	Status     *bool      `json:"status,omitempty" bun:"status"`
+	WorkDay    string     `json:"work_day" bun:"work_day"`
+	CreatedAt  time.Time  `json:"created_at" bun:"created_at"`
+	CreatedBy  int        `json:"created_by" bun:"created_by"`
+	UpdatedAt  time.Time  `json:"updated_at" bun:"updated_at"`
+	UpdatedBy  int        `json:"updated_by" bun:"updated_by"`
+	DeletedAt  *time.Time `json:"deleted_at,omitempty" bun:"deleted_at"`
 }

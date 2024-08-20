@@ -37,7 +37,12 @@ func (uc Controller) GetUserList(c *web.Context) error {
 	if search, ok := c.GetQueryFunc(reflect.String, "search").(*string); ok {
 		filter.Search = search
 	}
-
+	if departmentId, ok := c.GetQueryFunc(reflect.Int, "department_id").(*int); ok {
+		filter.DepartmentID = departmentId
+	}
+	if positionId, ok := c.GetQueryFunc(reflect.Int, "position_id").(*int); ok {
+		filter.PositionID = positionId
+	}
 	if err := c.ValidQuery(); err != nil {
 		return c.RespondError(err)
 	}
@@ -202,7 +207,7 @@ func (uc Controller) GetStatistics(c *web.Context) error {
 }
 
 func (uc Controller) GetMonthlyStatistics(c *web.Context) error {
-	var filter user.StatisticRequest
+	var filter user.MonthlyStatisticRequest
 	// Get the 'month' query parameter
 	monthStr := c.Query("month")
 	if monthStr == "" {
@@ -227,6 +232,7 @@ func (uc Controller) GetMonthlyStatistics(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
+
 func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 
 	if err := c.ValidParam(); err != nil {
