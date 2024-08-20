@@ -4,7 +4,7 @@ run:
 push:
 	git add .
 	git commit -m "update"
-	git push origin omadbek
+	git push origin main
 
 push-main:
 	git add .
