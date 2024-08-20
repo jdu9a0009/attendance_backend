@@ -375,13 +375,21 @@ func (r Repository) GetMonthlyStatistics(ctx context.Context, request MonthlySta
 	startDateStr := startDate.Format("2006-01-02")
 	endDateStr := endDate.Format("2006-01-02")
 
+	// Initialize the response with 0 values
+	list := MonthlyStatisticResponse{
+		EarlyCome:  new(int),
+		EarlyLeave: new(int),
+		Absent:     new(int),
+		Late:       new(int),
+	}
+
 	// Query for monthly statistics
 	monthlyQuery := `
 		SELECT
-			SUM(CASE WHEN a.come_time <= '09:00' THEN 1 ELSE 0 END) AS early_come,
-			SUM(CASE WHEN a.leave_time < '18:00' THEN 1 ELSE 0 END) AS early_leave,
-			SUM(CASE WHEN u.status = 'false' THEN 1 ELSE 0 END) AS absent,
-			SUM(CASE WHEN a.come_time >= '10:00' THEN 1 ELSE 0 END) AS late
+			COALESCE(SUM(CASE WHEN a.come_time <= '09:00' THEN 1 ELSE 0 END), 0) AS early_come,
+			COALESCE(SUM(CASE WHEN a.leave_time < '18:00' THEN 1 ELSE 0 END), 0) AS early_leave,
+			COALESCE(SUM(CASE WHEN u.status = 'false' THEN 1 ELSE 0 END), 0) AS absent,
+			COALESCE(SUM(CASE WHEN a.come_time >= '10:00' THEN 1 ELSE 0 END), 0) AS late
 		FROM attendance a
 		JOIN users u ON a.employee_id = u.employee_id
 		WHERE a.deleted_at IS NULL
@@ -395,27 +403,19 @@ func (r Repository) GetMonthlyStatistics(ctx context.Context, request MonthlySta
 	}
 	defer monthlyStmt.Close()
 
-	rows, err := monthlyStmt.QueryContext(ctx, claims.UserId, startDateStr, endDateStr)
+	err = monthlyStmt.QueryRowContext(ctx, claims.UserId, startDateStr, endDateStr).Scan(
+		list.EarlyCome,
+		list.EarlyLeave,
+		list.Absent,
+		list.Late,
+	)
 	if err != nil {
-		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "executing monthly query"), http.StatusInternalServerError)
-	}
-	defer rows.Close()
-
-	var list MonthlyStatisticResponse
-	for rows.Next() {
-		err := rows.Scan(
-			&list.EarlyCome,
-			&list.EarlyLeave,
-			&list.Absent,
-			&list.Late,
-		)
-		if err != nil {
-			return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "scanning monthly statistics"), http.StatusInternalServerError)
-		}
+		return MonthlyStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "scanning monthly statistics"), http.StatusInternalServerError)
 	}
 
 	return list, nil
 }
+
 
 func (r Repository) GetStatistics(ctx context.Context, filter StatisticRequest) ([]StatisticResponse, error) {
 	claims, err := r.CheckClaims(ctx)
@@ -439,28 +439,28 @@ func (r Repository) GetStatistics(ctx context.Context, filter StatisticRequest) 
 	// Calculate start and end dates for the interval
 	startDate := time.Date(filter.Month.Year(), filter.Month.Month(), startDay, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
+
 	// Generate all dates within the interval
 	var allDates []time.Time
 	for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
 		allDates = append(allDates, d)
 	}
+
 	// Query for interval data
 	intervalQuery := `
-			SELECT
-    a.work_day,
-    COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), '00:00') AS come_time,
-    COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), '00:00') AS leave_time,
-    COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60), 0) AS total_minutes
-FROM attendance a
-JOIN users u ON a.employee_id = u.employee_id
-LEFT JOIN attendance_period ap ON a.id = ap.attendance_id
-WHERE a.deleted_at IS NULL
-  AND u.id = $1
-  AND a.work_day BETWEEN $2 AND $3
-GROUP BY a.work_day, a.come_time, a.leave_time
-ORDER BY a.work_day;
-
-
+		SELECT
+			a.work_day,
+			COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), '00:00') AS come_time,
+			COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), '00:00') AS leave_time,
+			COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60), 0) AS total_minutes
+		FROM attendance a
+		JOIN users u ON a.employee_id = u.employee_id
+		LEFT JOIN attendance_period ap ON a.id = ap.attendance_id
+		WHERE a.deleted_at IS NULL
+			AND u.id = $1
+			AND a.work_day BETWEEN $2 AND $3
+		GROUP BY a.work_day, a.come_time, a.leave_time
+		ORDER BY a.work_day;
 	`
 
 	// Execute interval query
@@ -476,7 +476,8 @@ ORDER BY a.work_day;
 	}
 	defer rows.Close()
 
-	var list []StatisticResponse
+	// Map to store retrieved data by date
+	dataMap := make(map[string]StatisticResponse)
 	for rows.Next() {
 		var detail StatisticResponse
 		var totalMinutes float64
@@ -484,7 +485,7 @@ ORDER BY a.work_day;
 			&detail.WorkDay,
 			&detail.ComeTime,
 			&detail.LeaveTime,
-			&detail.TotalHours,
+			&totalMinutes,
 		)
 		if err != nil {
 			return nil, web.NewRequestError(errors.Wrap(err, "scanning interval statistics"), http.StatusInternalServerError)
@@ -494,12 +495,33 @@ ORDER BY a.work_day;
 		hours := int(totalMinutes) / 60
 		minutes := int(totalMinutes) % 60
 		detail.TotalHours = fmt.Sprintf("%02d:%02d", hours, minutes)
+		dataMap[*detail.WorkDay] = detail
+	}
 
-		list = append(list, detail)
+	// Generate the final list of responses, filling in missing dates with default values
+	var list []StatisticResponse
+	for _, date := range allDates {
+		dateStr := date.Format("2006-01-02")
+		if data, found := dataMap[dateStr]; found {
+			list = append(list, data)
+		} else {
+			list = append(list, StatisticResponse{
+				WorkDay:    &dateStr,
+				ComeTime:   ptr("00:00"),
+				LeaveTime:  ptr("00:00"),
+				TotalHours: "00:00",
+			})
+		}
 	}
 
 	return list, nil
 }
+
+// Utility function to return a pointer to a string
+func ptr(s string) *string {
+	return &s
+}
+
 
 func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse, error) {
 	claims, err := r.CheckClaims(ctx)

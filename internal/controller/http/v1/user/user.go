@@ -192,7 +192,6 @@ func (uc Controller) GetStatistics(c *web.Context) error {
 		return c.RespondError(web.NewRequestError(errors.New("invalid interval format"), http.StatusBadRequest))
 	}
 	filter.Interval = interval
-
 	list, err := uc.user.GetStatistics(c.Ctx, filter)
 	if err != nil {
 		return c.RespondError(err)
@@ -219,12 +218,11 @@ func (uc Controller) GetMonthlyStatistics(c *web.Context) error {
 		return c.RespondError(web.NewRequestError(errors.New("invalid date format"), http.StatusBadRequest))
 	}
 	filter.Month = parsedMonth
-
 	list, err := uc.user.GetMonthlyStatistics(c.Ctx, filter)
 	if err != nil {
 		return c.RespondError(err)
 	}
-
+	fmt.Println("Clist", list)
 	return c.Respond(map[string]interface{}{
 		"data": map[string]interface{}{
 			"results": list,
