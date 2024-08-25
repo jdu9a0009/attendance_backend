@@ -163,7 +163,17 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	if err := r.ValidateStruct(&request, "Name"); err != nil {
 		return CreateResponse{}, err
 	}
-
+	DepartmentName := true
+	if err := r.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT 
+    						CASE WHEN 
+    						(SELECT id FROM department WHERE name = '%s' AND deleted_at IS NULL) IS NOT NULL 
+    						THEN true ELSE false END`, *request.Name)).Scan(&DepartmentName); err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusInternalServerError)
+	}
+	if DepartmentName {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(errors.New(""), "Department Name is used"), http.StatusBadRequest)
+	}
 	var response CreateResponse
 
 	response.Name = request.Name
@@ -187,7 +197,19 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if err != nil {
 		return err
 	}
+	DepartmentName := true
+	if err := r.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT 
+    						CASE WHEN 
+    						(SELECT id FROM department WHERE name = '%s' AND deleted_at IS NULL) IS NOT NULL 
+    						THEN true ELSE false END`, *request.Name)).Scan(&DepartmentName); err != nil {
+		return web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusBadRequest)
 
+	}
+	if DepartmentName {
+		return web.NewRequestError(errors.Wrap(err, "Department Name is used"), http.StatusBadRequest)
+
+	}
 	q := r.NewUpdate().Table("department").Where("deleted_at IS NULL AND id = ?", request.ID)
 
 	q.Set("name = ?", request.Name)
@@ -211,7 +233,15 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if err != nil {
 		return err
 	}
+	DepartmentName := true
+	if err := r.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT 
+    						CASE WHEN 
+    						(SELECT id FROM department WHERE name = '%s' AND deleted_at IS NULL) IS NOT NULL 
+    						THEN true ELSE false END`, *request.Name)).Scan(&DepartmentName); err != nil {
+		return web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusBadRequest)
 
+	}
 	q := r.NewUpdate().Table("department").Where("deleted_at IS NULL AND id = ?", request.ID)
 
 	if request.Name != nil {

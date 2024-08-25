@@ -179,24 +179,7 @@ func (uc Controller) GetGraphStatistic(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-// func (uc Controller) GetGraphStatistic(c *web.Context) error {
-// 	var request attendance.GraphRequest
-// 	if err := c.BindFunc(&request, "month", "interval"); err != nil {
-// 		return c.RespondError(err)
-// 	}
-// 	fmt.Println("controllar request:", request)
-// 	response, err := uc.attendance.GetGraphStatistic(c.Ctx, request)
-// 	if err != nil {
-// 		return c.RespondError(err)
-// 	}
 
-// 	fmt.Println("controllar response:", response)
-// 	return c.Respond(map[string]interface{}{
-// 		"data":   response,
-// 		"status": true,
-// 	}, http.StatusOK)
-
-// }
 
 func (uc Controller) Create(c *web.Context) error {
 	var request attendance.CreateRequest

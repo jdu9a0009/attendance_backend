@@ -18,6 +18,7 @@ type Scheme struct {
 }
 
 var scheme = []Scheme{
+
 	{
 		Index:       1,
 		Description: "CREATE TYPE \"user_role\" AS ENUM",

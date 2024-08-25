@@ -27,9 +27,9 @@ type GetListResponse struct {
 	EmployeeID   *string    `json:"employee_id"`
 	Fullname     *string    `json:"full_name"`
 	Status       *bool      `json:"status"`
-	WorkDay      *date.Date `json:"work_day"`
-	ComeTime     *time.Time `json:"come_time,omitempty"`
-	LeaveTime    *time.Time `json:"leave_time,omitempty"`
+	WorkDay      *string `json:"work_day"`
+	ComeTime     *string    `json:"come_time,omitempty"`
+	LeaveTime    *string    `json:"leave_time,omitempty"`
 	TotalHours   string     `json:"total_hourse"`
 }
 
@@ -126,7 +126,7 @@ type GraphRequest struct {
 	Interval int
 }
 type GraphResponse struct {
-	Percentage float64   `json:"percentage" bun:"percentage"`
+	Percentage float64    `json:"percentage" bun:"percentage"`
 	WorkDay    *date.Date `json:"work_day" bun:"work_day"`
 }
 type BarChartResponse struct {
