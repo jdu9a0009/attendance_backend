@@ -181,23 +181,6 @@ func (uc Controller) GetGraphStatistic(c *web.Context) error {
 
 
 
-func (uc Controller) Create(c *web.Context) error {
-	var request attendance.CreateRequest
-	if err := c.BindFunc(&request, "Name"); err != nil {
-		return c.RespondError(err)
-	}
-
-	response, err := uc.attendance.Create(c.Ctx, request)
-	if err != nil {
-		return c.RespondError(err)
-	}
-
-	return c.Respond(map[string]interface{}{
-		"data":   response,
-		"status": true,
-	}, http.StatusOK)
-}
-
 func (uc Controller) UpdateAll(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
 
@@ -277,6 +260,26 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 
 	if distance <= OfficeRadius {
 		response, err := uc.attendance.CreateByPhone(c.Ctx, request)
+		if err != nil {
+			return c.RespondError(err)
+		}
+
+		return c.Respond(map[string]interface{}{
+			"data":   response,
+			"status": true,
+		}, http.StatusOK)
+	}
+	return c.RespondError(web.NewRequestError(errors.New("distance from office is greater than office radius"), http.StatusBadRequest))
+}
+func (uc Controller) CreateByQRCode(c *web.Context) error {
+	var request attendance.EnterRequest
+	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
+		return c.RespondError(err)
+	}
+	distance := CalculateDistance(request.Latitude, request.Longitude, OfficeLatitude, OfficeLongitude)
+
+	if distance <= OfficeRadius {
+		response, err := uc.attendance.CreateByQRCode(c.Ctx, request)
 		if err != nil {
 			return c.RespondError(err)
 		}
