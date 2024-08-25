@@ -21,7 +21,6 @@ type Repository struct {
 	*postgresql.Database
 }
 
-
 func NewRepository(database *postgresql.Database) *Repository {
 	return &Repository{Database: database}
 }
@@ -246,128 +245,83 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	if err != nil {
 		return CreateResponse{}, err
 	}
-
 	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
 		return CreateResponse{}, err
 	}
 
-	var response CreateResponse
-	currentTime := time.Now()
-	workDay := currentTime.Format("2006-01-02")
-
-	// Check if there is existing attendance data for the day
-	var existingAttendance ExitResponse
-	err = r.NewSelect().
-		Model(&existingAttendance).
-		Where("employee_id = ? AND work_day = ?", *request.EmployeeID, workDay).
-		Limit(1).
-		Scan(ctx)
-
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "checking attendance"), http.StatusBadRequest)
-	}
-
-	if existingAttendance.ComeTime != "" {
-		if existingAttendance.LeaveTime == nil {
-			return CreateResponse{}, web.NewRequestError(errors.New("you have already clicked the button, please click the leave button"), http.StatusBadRequest)
-		}
-
-		existingAttendance.LeaveTime = nil
-		existingAttendance.UpdatedAt = time.Now()
-		existingAttendance.UpdatedBy = claims.UserId
-
-		_, err = r.NewUpdate().
-			Model(&existingAttendance).
-			Where("id = ?", existingAttendance.ID).
-			Exec(ctx)
-
-		if err != nil {
-			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance by phone"), http.StatusBadRequest)
-		}
-
-		var periods PeriodsCreate
-		periods.Attendance = existingAttendance.ID
-		periods.WorkDay = workDay
-		periods.ComeTime = currentTime.Format("15:04")
-
-		_, err = r.NewInsert().Model(&periods).Returning("id").Exec(ctx, &periods.ID)
-		if err != nil {
-			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance_period by phone"), http.StatusBadRequest)
-		}
-
-		response.ID = existingAttendance.ID
-		response.EmployeeID = request.EmployeeID
-		response.ComeTime = &existingAttendance.ComeTime
-		response.WorkDay = &workDay
-	} else {
-		response.EmployeeID = request.EmployeeID
-		comeTime := currentTime.Format("15:04")
-		response.ComeTime = &comeTime
-		response.WorkDay = &workDay
-		response.CreatedAt = currentTime.Add(300 * time.Minute)
-		response.CreatedBy = claims.UserId
-
-		_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
-		if err != nil {
-			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance by phone"), http.StatusBadRequest)
-		}
-
-		var periods PeriodsCreate
-		periods.Attendance = response.ID
-		periods.WorkDay = workDay
-		periods.ComeTime = comeTime
-
-		_, err = r.NewInsert().Model(&periods).Returning("id").Exec(ctx, &periods.ID)
-		if err != nil {
-			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating attendance_period by phone"), http.StatusBadRequest)
-		}
-	}
-
-	_, err = r.NewUpdate().
-		Table("users").
-		Where("deleted_at IS NULL AND employee_id = ?", *request.EmployeeID).
-		Set("status = true").
-		Exec(ctx)
+	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID)
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating user's status by phone when entering"), http.StatusBadRequest)
+		return CreateResponse{}, err
+	}
+	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
+		return r.resetLeaveTimeAndCreatePeriod(ctx, claims, existingAttendance, request.EmployeeID)
 	}
 
-	return response, nil
+	if existingAttendance.ComeTime != nil {
+		return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Leave Button First"), http.StatusBadRequest)
+	}
+
+	return r.createNewAttendance(ctx, claims, request)
 }
+func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (CreateResponse, error) {
+	claims, err := r.CheckClaims(ctx)
+	if err != nil {
+		return CreateResponse{}, err
+	}
+	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
+		return CreateResponse{}, err
+	}
+
+	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID)
+	if err != nil {
+		return CreateResponse{}, err
+	}
+	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
+		return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Come Button First"), http.StatusBadRequest)
+	}
+
+	if existingAttendance.ComeTime != nil {
+		return r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
+	}
+
+	return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Leave Button First"), http.StatusBadRequest)
+}
+
 func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
 		return CreateResponse{}, err
 	}
-
 	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
 		return CreateResponse{}, err
 	}
 
-	currentTime := time.Now()
-	workDay := currentTime.Format("2006-01-02")
-
-	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID, workDay)
+	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID)
 	if err != nil {
 		return CreateResponse{}, err
 	}
+	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
+		return r.resetLeaveTimeAndCreatePeriod(ctx, claims, existingAttendance, request.EmployeeID)
+	}
 
 	if existingAttendance.ComeTime != nil {
-		return r.handleExistingAttendance(ctx, claims, existingAttendance, currentTime, workDay, request.EmployeeID)
+		return r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
 	}
 
-	return r.createNewAttendance(ctx, claims, request, currentTime, workDay)
+	return r.createNewAttendance(ctx, claims, request)
 }
 
-func (r Repository) handleExistingAttendance(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, currentTime time.Time, workDay string, employeeID *string) (CreateResponse, error) {
-	leaveTimeStr := currentTime.Format("15:04")
+func (r Repository) handleExistingAttendance(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
+
 	if existingAttendance.LeaveTime == nil {
-		return r.updateLeaveTime(ctx, claims, existingAttendance, leaveTimeStr, currentTime, employeeID)
+		return r.updateLeaveTime(ctx, claims, existingAttendance, employeeID)
 	}
-	return r.resetLeaveTimeAndCreatePeriod(ctx, claims, existingAttendance, currentTime, workDay, employeeID)
+	return CreateResponse{}, web.NewRequestError(errors.New("ERR on come_time dont hava data but leave_time has data"), http.StatusBadRequest)
 }
 
-func (r Repository) getExistingAttendance(ctx context.Context, employeeID *string, workDay string) (CreateResponse, error) {
+func (r Repository) getExistingAttendance(ctx context.Context, employeeID *string) (CreateResponse, error) {
+	workDay := time.Now().Format("2006-01-02")
+
 	var existingAttendance CreateResponse
 	err := r.NewSelect().
 		Model(&existingAttendance).
@@ -381,13 +335,14 @@ func (r Repository) getExistingAttendance(ctx context.Context, employeeID *strin
 
 	return existingAttendance, nil
 }
-func (r Repository) updateLeaveTime(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, leaveTimeStr string, currentTime time.Time, employeeID *string) (CreateResponse, error) {
-	err := r.updateAttendanceLeaveTime(ctx, existingAttendance.ID, leaveTimeStr, currentTime, claims.UserId)
+func (r Repository) updateLeaveTime(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
+
+	err := r.updateAttendanceLeaveTime(ctx, existingAttendance.ID, claims.UserId)
 	if err != nil {
 		return CreateResponse{}, err
 	}
 
-	err = r.updateAttendancePeriod(ctx, existingAttendance.ID, leaveTimeStr, currentTime)
+	err = r.updateAttendancePeriod(ctx, existingAttendance.ID)
 	if err != nil {
 		return CreateResponse{}, err
 	}
@@ -396,23 +351,31 @@ func (r Repository) updateLeaveTime(ctx context.Context, claims auth.Claims, exi
 	if err != nil {
 		return CreateResponse{}, err
 	}
-
+	currentTime := time.Now()
 	workDay := currentTime.Format("2006-01-02")
+
+	ExistingAttendance, err := r.getExistingAttendance(ctx, employeeID)
+	if err != nil {
+		return CreateResponse{}, err
+	}
 	return CreateResponse{
-		ID:         existingAttendance.ID,
+		ID:         ExistingAttendance.ID,
 		EmployeeID: employeeID,
-		ComeTime:   existingAttendance.ComeTime,
+		ComeTime:   ExistingAttendance.ComeTime,
+		LeaveTime:  ExistingAttendance.LeaveTime,
 		WorkDay:    &workDay,
 	}, nil
 }
 
-func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, currentTime time.Time, workDay string, employeeID *string) (CreateResponse, error) {
-	err := r.resetAttendanceLeaveTime(ctx, existingAttendance.ID, currentTime, claims.UserId)
+func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
+	currentTime := time.Now()
+	workDay := currentTime.Format("2006-01-02")
+	err := r.resetAttendanceLeaveTime(ctx, existingAttendance.ID, claims.UserId)
 	if err != nil {
 		return CreateResponse{}, err
 	}
 
-	_, err = r.createAttendancePeriod(ctx, existingAttendance.ID, workDay, currentTime)
+	_, err = r.createAttendancePeriod(ctx, existingAttendance.ID)
 	if err != nil {
 		return CreateResponse{}, err
 	}
@@ -421,7 +384,6 @@ func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims au
 	if err != nil {
 		return CreateResponse{}, err
 	}
-
 	return CreateResponse{
 		ID:         existingAttendance.ID,
 		EmployeeID: employeeID,
@@ -430,7 +392,9 @@ func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims au
 	}, nil
 }
 
-func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims, request EnterRequest, currentTime time.Time, workDay string) (CreateResponse, error) {
+func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims, request EnterRequest) (CreateResponse, error) {
+	currentTime := time.Now()
+	workDay := currentTime.Format("2006-01-02")
 	response := CreateResponse{
 		EmployeeID: request.EmployeeID,
 		ComeTime:   stringPointer(currentTime.Format("15:04")),
@@ -444,7 +408,7 @@ func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims,
 		return CreateResponse{}, err
 	}
 
-	_, err = r.createAttendancePeriod(ctx, response.ID, workDay, currentTime)
+	_, err = r.createAttendancePeriod(ctx, response.ID)
 	if err != nil {
 		return CreateResponse{}, err
 	}
@@ -458,7 +422,9 @@ func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims,
 }
 
 // Helper functions for database operations
-func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, leaveTimeStr string, currentTime time.Time, userId int) error {
+func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userId int) error {
+	currentTime := time.Now()
+	leaveTimeStr := currentTime.Format("15:04")
 	_, err := r.NewUpdate().
 		Table("attendance").
 		Where("deleted_at IS NULL AND id = ?", id).
@@ -469,7 +435,9 @@ func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, leave
 	return err
 }
 
-func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int, leaveTimeStr string, currentTime time.Time) error {
+func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int) error {
+	currentTime := time.Now()
+	leaveTimeStr := currentTime.Format("15:04")
 	_, err := r.NewUpdate().
 		Table("attendance_period").
 		Where("attendance_id = ? AND work_day = ?", attendanceID, currentTime.Format("2006-01-02")).
@@ -479,18 +447,20 @@ func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int
 	return err
 }
 
-func (r Repository) resetAttendanceLeaveTime(ctx context.Context, id int, currentTime time.Time, userId int) error {
+func (r Repository) resetAttendanceLeaveTime(ctx context.Context, id int, userId int) error {
 	_, err := r.NewUpdate().
 		Table("attendance").
 		Where("id = ?", id).
 		Set("leave_time = NULL").
-		Set("updated_at = ?", currentTime).
+		Set("updated_at = ?", time.Now()).
 		Set("updated_by = ?", userId).
 		Exec(ctx)
 	return err
 }
 
-func (r Repository) createAttendancePeriod(ctx context.Context, attendanceID int, workDay string, currentTime time.Time) (int, error) {
+func (r Repository) createAttendancePeriod(ctx context.Context, attendanceID int) (int, error) {
+	currentTime := time.Now()
+	workDay := currentTime.Format("2006-01-02")
 	var periods PeriodsCreate
 	periods.Attendance = attendanceID
 	periods.WorkDay = workDay
@@ -516,87 +486,6 @@ func (r Repository) updateUserStatus(ctx context.Context, employeeID *string, st
 
 func stringPointer(s string) *string {
 	return &s
-}
-func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (ExitResponse, error) {
-	claims, err := r.CheckClaims(ctx)
-	if err != nil {
-		return ExitResponse{}, err
-	}
-
-	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
-		return ExitResponse{}, err
-	}
-
-	var response ExitResponse
-	currentTime := time.Now()
-	workDay := currentTime.Format("2006-01-02")
-	leaveTimeStr := currentTime.Format("15:04")
-
-	// Check if there is existing attendance data for the day
-	var existingAttendance ExitResponse
-	err = r.NewSelect().
-		Model(&existingAttendance).
-		Where("employee_id = ? AND work_day = ?", request.EmployeeID, workDay).
-		Limit(1).
-		Scan(ctx)
-	if err != nil {
-		return ExitResponse{}, web.NewRequestError(errors.New("please click the come button first"), http.StatusBadRequest)
-	}
-
-	// Case 1: If no come_time exists, prompt to click come button first
-	if existingAttendance.ComeTime == "" {
-		return ExitResponse{}, web.NewRequestError(errors.New("please click the come button first"), http.StatusBadRequest)
-	}
-
-	// Case 2: If come_time exists but leave_time is nil, update the tables
-	if existingAttendance.ComeTime != "" && existingAttendance.LeaveTime == nil {
-		// Update attendance table
-		_, err = r.NewUpdate().
-			Table("attendance").
-			Where("deleted_at IS NULL AND id = ?", existingAttendance.ID).
-			Set("leave_time = ?", leaveTimeStr).
-			Set("updated_at = ?", currentTime.Add(300*time.Minute)).
-			Set("updated_by = ?", claims.UserId).
-			Exec(ctx)
-		if err != nil {
-			return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance"), http.StatusBadRequest)
-		}
-
-		// Update attendance_period table
-		_, err = r.NewUpdate().
-			Table("attendance_period").
-			Where("updated_at is null and attendance_id = ? AND work_day = ?", existingAttendance.ID, workDay).
-			Set("leave_time = ?", leaveTimeStr).
-			Set("updated_at = ?", currentTime).
-			Exec(ctx)
-		if err != nil {
-			return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating attendance_period"), http.StatusBadRequest)
-		}
-
-		// Update user's status to false
-		_, err = r.NewUpdate().
-			Table("users").
-			Where("deleted_at IS NULL AND employee_id = ?", request.EmployeeID).
-			Set("status = false").
-			Exec(ctx)
-		if err != nil {
-			return ExitResponse{}, web.NewRequestError(errors.Wrap(err, "updating user's status by phone when exiting"), http.StatusBadRequest)
-		}
-
-		// Populate the response with updated data
-		response.ID = existingAttendance.ID
-		response.EmployeeID = existingAttendance.EmployeeID
-		response.WorkDay = workDay
-		response.ComeTime = existingAttendance.ComeTime
-		response.LeaveTime = &leaveTimeStr
-	}
-
-	// Case 3: If both come_time and leave_time exist, prompt to click the come button first
-	if existingAttendance.ComeTime != "" && existingAttendance.LeaveTime != nil {
-		return ExitResponse{}, web.NewRequestError(errors.New("you have already recorded an exit for today. Please click the come button first"), http.StatusBadRequest)
-	}
-
-	return response, nil
 }
 
 func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {

@@ -18,5 +18,5 @@ type Attendance interface {
 
 	CreateByQRCode(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
 	CreateByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
-	ExitByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.ExitResponse, error)
+	ExitByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
 }
