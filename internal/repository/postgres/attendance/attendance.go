@@ -102,8 +102,8 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			p.name,
 			a.work_day,
 			a.status,
-			TO_CHAR(a.come_time, 'HH24:MI'),
-			TO_CHAR(a.leave_time, 'HH24:MI'),
+			TO_CHAR(a.come_time, 'HH24:MI:SS'),
+			TO_CHAR(a.leave_time, 'HH24:MI:SS'),
 		   COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
 		FROM attendance AS a
 		LEFT JOIN users u ON a.employee_id = u.employee_id
