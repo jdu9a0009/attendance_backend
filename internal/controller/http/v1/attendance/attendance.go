@@ -21,8 +21,8 @@ func NewController(attendance Attendance) *Controller {
 }
 
 const (
-	OfficeLatitude  = 41.3270016
-	OfficeLongitude = 69.2649984
+	OfficeLatitude  = 41.3333664
+	OfficeLongitude = 69.2534826
 	OfficeRadius    = 200 // in meters
 )
 
@@ -179,8 +179,6 @@ func (uc Controller) GetGraphStatistic(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-
-
 func (uc Controller) UpdateAll(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
 
@@ -279,14 +277,15 @@ func (uc Controller) CreateByQRCode(c *web.Context) error {
 	distance := CalculateDistance(request.Latitude, request.Longitude, OfficeLatitude, OfficeLongitude)
 
 	if distance <= OfficeRadius {
-		response, err := uc.attendance.CreateByQRCode(c.Ctx, request)
+		response, message, err := uc.attendance.CreateByQRCode(c.Ctx, request)
 		if err != nil {
 			return c.RespondError(err)
 		}
 
 		return c.Respond(map[string]interface{}{
-			"data":   response,
-			"status": true,
+			"data":    response,
+			"message": message,
+			"status":  true,
 		}, http.StatusOK)
 	}
 	return c.RespondError(web.NewRequestError(errors.New("distance from office is greater than office radius"), http.StatusBadRequest))

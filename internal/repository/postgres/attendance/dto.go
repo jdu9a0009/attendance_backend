@@ -55,7 +55,7 @@ type CreateRequest struct {
 type CreateResponse struct {
 	bun.BaseModel `bun:"table:attendance"`
 
-	ID         int       `json:"id" bun:"id"`
+	ID         int       `json:"id" bun:"id,autoincrement"` // Ensure auto-increment is understood
 	EmployeeID *string   `json:"employee_id" bun:"employee_id"`
 	WorkDay    *string   `json:"work_day" bun:"work_day"`
 	ComeTime   *string   `json:"come_time" bun:"come_time"`

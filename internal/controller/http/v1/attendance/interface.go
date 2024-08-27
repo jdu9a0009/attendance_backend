@@ -16,7 +16,7 @@ type Attendance interface {
 	GetBarChartStatistic(ctx context.Context) ([]attendance.BarChartResponse, error)
 	GetGraphStatistic(ctx context.Context, filter attendance.GraphRequest) ([]attendance.GraphResponse, error)
 
-	CreateByQRCode(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
+	CreateByQRCode(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, string,error)
 	CreateByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
 	ExitByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
 }

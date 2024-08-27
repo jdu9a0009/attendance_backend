@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
+	"log"
 	"net/http"
+
+	"github.com/pkg/errors"
+	"github.com/xuri/excelize/v2"
 )
 
 type ExcelData struct {
@@ -64,4 +67,58 @@ func ExcelDog(data ExcelData) (string, error) {
 	}
 
 	return res.Data.Excel, nil
+}
+
+type UserExcellData struct {
+	EmployeeID   string
+	Password     string
+	Role         string
+	FullName     string
+	DepartmentID int
+	PositionID   int
+	Phone        string
+	Email        string
+}
+
+func ExcelReader(filePath string) ([]UserExcellData, error) {
+	// sheetName := "Sheet1"
+	// Open the Excel file
+	f, err := excelize.OpenFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		// Close the file to release resources
+		if err := f.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// Read rows from the specified sheet
+	// rows, err := f.GetRows(sheetName)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	var users []UserExcellData
+
+	// Iterate through the rows, starting from the second row to skip headers
+	// for i, row := range rows {
+	// 	if i == 0 {
+	// 		// Skip the header row
+	// 		continue
+	// 	}
+
+	// 	// var user UserExcellData
+	// 	// for j, colCell := range row {
+	// 	// 	switch j {
+	// 	// 	case 0:
+	// 	// 	case 1:
+
+	// 	// 	}
+	// 	// }
+	// 	// users = append(users, user)
+	// }
+
+	return users, nil
 }

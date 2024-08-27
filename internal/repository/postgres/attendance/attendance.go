@@ -102,8 +102,8 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			p.name,
 			a.work_day,
 			a.status,
-			TO_CHAR(a.come_time, 'HH24:MI:SS'),
-			TO_CHAR(a.leave_time, 'HH24:MI:SS'),
+			TO_CHAR(a.come_time, 'HH24:MI'),
+			TO_CHAR(a.leave_time, 'HH24:MI'),
 		   COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
 		FROM attendance AS a
 		LEFT JOIN users u ON a.employee_id = u.employee_id
@@ -287,28 +287,32 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Crea
 	return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Leave Button First"), http.StatusBadRequest)
 }
 
-func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, error) {
+func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, string, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
-		return CreateResponse{}, err
+		return CreateResponse{}, "", err
 	}
 	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
-		return CreateResponse{}, err
+		return CreateResponse{}, "", err
 	}
 
 	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID)
 	if err != nil {
-		return CreateResponse{}, err
+		return CreateResponse{}, "", err
 	}
 	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
-		return r.resetLeaveTimeAndCreatePeriod(ctx, claims, existingAttendance, request.EmployeeID)
+		response, err := r.resetLeaveTimeAndCreatePeriod(ctx, claims, existingAttendance, request.EmployeeID)
+		return response, "ReWelcome Digital Knowledge", err
 	}
 
 	if existingAttendance.ComeTime != nil {
-		return r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
+
+		response, err := r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
+		return response, "Get home safely", err
 	}
 
-	return r.createNewAttendance(ctx, claims, request)
+	response, err := r.createNewAttendance(ctx, claims, request)
+	return response, "Welcome Digital Knowledge", err
 }
 
 func (r Repository) handleExistingAttendance(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
@@ -391,7 +395,6 @@ func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims au
 		WorkDay:    &workDay,
 	}, nil
 }
-
 func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims, request EnterRequest) (CreateResponse, error) {
 	currentTime := time.Now()
 	workDay := currentTime.Format("2006-01-02")
@@ -471,7 +474,11 @@ func (r Repository) createAttendancePeriod(ctx context.Context, attendanceID int
 }
 
 func (r Repository) insertAttendance(ctx context.Context, response *CreateResponse) error {
-	_, err := r.NewInsert().Model(response).Returning("id").Exec(ctx, &response.ID)
+	_, err := r.NewInsert().
+		Model(response).
+		Column("employee_id", "work_day", "come_time", "leave_time", "created_at", "created_by").
+		Returning("id").
+		Exec(ctx, &response.ID)
 	return err
 }
 
