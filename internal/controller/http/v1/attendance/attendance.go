@@ -21,8 +21,8 @@ func NewController(attendance Attendance) *Controller {
 }
 
 const (
-	OfficeLatitude  = 41.3270016
-	OfficeLongitude = 69.2649984
+	OfficeLatitude  = 41.3285017 
+	OfficeLongitude = 69.2824376
 	OfficeRadius    = 200 // in meters
 )
 

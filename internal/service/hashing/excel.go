@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/xuri/excelize/v2"
@@ -81,7 +82,7 @@ type UserExcellData struct {
 }
 
 func ExcelReader(filePath string) ([]UserExcellData, error) {
-	// sheetName := "Sheet1"
+	sheetName := "Sheet1"
 	// Open the Excel file
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -95,30 +96,51 @@ func ExcelReader(filePath string) ([]UserExcellData, error) {
 	}()
 
 	// Read rows from the specified sheet
-	// rows, err := f.GetRows(sheetName)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		return nil, err
+	}
 
 	var users []UserExcellData
 
 	// Iterate through the rows, starting from the second row to skip headers
-	// for i, row := range rows {
-	// 	if i == 0 {
-	// 		// Skip the header row
-	// 		continue
-	// 	}
+	for i, row := range rows {
+		if i == 0 {
+			// Skip the header row
+			continue
+		}
 
-	// 	// var user UserExcellData
-	// 	// for j, colCell := range row {
-	// 	// 	switch j {
-	// 	// 	case 0:
-	// 	// 	case 1:
-
-	// 	// 	}
-	// 	// }
-	// 	// users = append(users, user)
-	// }
+		var user UserExcellData
+		for j, colCell := range row {
+			switch j {
+			case 1:
+				user.EmployeeID = colCell
+			case 2:
+				user.Password = colCell
+			case 3:
+				user.Role = colCell
+			case 4:
+				user.FullName = colCell
+			case 5:
+				departmentID, err := strconv.Atoi(colCell)
+				if err != nil {
+					return nil, fmt.Errorf("invalid department ID in row %d: %v", i+1, err)
+				}
+				user.DepartmentID = departmentID
+			case 6:
+				positionID, err := strconv.Atoi(colCell)
+				if err != nil {
+					return nil, fmt.Errorf("invalid position ID in row %d: %v", i+1, err)
+				}
+				user.PositionID = positionID
+			case 7:
+				user.Phone = colCell
+			case 8:
+				user.Email = colCell
+			}
+		}
+		users = append(users, user)
+	}
 
 	return users, nil
 }

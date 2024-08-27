@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -15,11 +14,15 @@ import (
 	"university-backend/internal/repository/postgres"
 
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Repository struct {
 	*postgresql.Database
+}
+
+// Create implements user.User.
+func (r *Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
+	panic("unimplemented")
 }
 
 func NewRepository(database *postgresql.Database) *Repository {
@@ -201,61 +204,125 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 	return detail, nil
 }
 
-func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
-	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
-	if err != nil {
-		return CreateResponse{}, err
-	}
+// func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {
+// 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
+// 	if err != nil {
+// 		return CreateResponse{}, err
+// 	}
+// 	if err := r.ValidateStruct(&request); err != nil {
+// 		return CreateResponse{}, err
+// 	}
 
-	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "FullName"); err != nil {
-		return CreateResponse{}, err
-	}
-	rand.Seed(time.Now().UnixNano())
+// 	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "FullName"); err != nil {
+// 		return CreateResponse{}, err
+// 	}
+// 	rand.Seed(time.Now().UnixNano())
 
-	userIdStatus := true
-	if err := r.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT 
-    						CASE WHEN 
-    						(SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL) IS NOT NULL 
-    						THEN true ELSE false END`, *request.EmployeeID)).Scan(&userIdStatus); err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
-	}
-	if userIdStatus {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(errors.New(""), "employee_id is used"), http.StatusBadRequest)
-	}
+// 	userIdStatus := true
+// 	if err := r.QueryRowContext(ctx,
+// 		fmt.Sprintf(`SELECT
+//     						CASE WHEN
+//     						(SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL) IS NOT NULL
+//     						THEN true ELSE false END`, *request.EmployeeID)).Scan(&userIdStatus); err != nil {
+// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
+// 	}
+// 	if userIdStatus {
+// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(errors.New(""), "employee_id is used"), http.StatusBadRequest)
+// 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
-	}
-	hashedPassword := string(hash)
+// 	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
+// 	if err != nil {
+// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+// 	}
+// 	hashedPassword := string(hash)
 
-	var response CreateResponse
-	role := strings.ToUpper(*request.Role)
-	if (role != "EMPLOYEE") && (role != "ADMIN") {
-		return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
-	}
+// 	// var response CreateResponse
+// 	// role := strings.ToUpper(*request.Role)
+// 	// if (role != "EMPLOYEE") && (role != "ADMIN") {
+// 	// 	return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
+// 	// }
 
-	response.Role = &role
-	response.FullName = request.FullName
-	response.EmployeeID = request.EmployeeID
-	response.Password = &hashedPassword
-	response.DepartmentID = request.DepartmentID
-	response.PositionID = request.PositionID
-	response.Phone = request.Phone
-	response.Email = request.Email
-	response.CreatedAt = time.Now()
-	response.CreatedBy = claims.UserId
+// 	// response.Role = &role
+// 	// response.FullName = request.FullName
+// 	// response.EmployeeID = request.EmployeeID
+// 	// response.Password = &hashedPassword
+// 	// response.DepartmentID = request.DepartmentID
+// 	// response.PositionID = request.PositionID
+// 	// response.Phone = request.Phone
+// 	// response.Email = request.Email
+// 	// response.CreatedAt = time.Now()
+// 	// response.CreatedBy = claims.UserId
 
-	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
-	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
-	}
+// 	// Start transaction
+// 	tx, err := r.DB.Begin()
+// 	if err != nil {
+// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
+// 	}
+// 	defer func() {
+// 		if err != nil {
+// 			tx.Rollback()
+// 		}
+// 	}()
+// 	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
+// 	if err != nil {
+// 		tx.Rollback()
+// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
+// 	}
+// 	var excelData []hashing.UserExcellData
 
-	response.Password = nil
+// 	var fileUrl string
+// 	if request.Excell != nil {
+// 		fileUrl, _, _, err = commands.Upload(ctx, request.Excell, "user-create/excel")
+// 		if err != nil {
+// 			tx.Rollback()
+// 			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "upload excel"), http.StatusInternalServerError)
+// 		}
+// 	}
 
-	return response, nil
-}
+// 	dir, err := os.Getwd()
+// 	if err != nil {
+// 		tx.Rollback()
+// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "getting uploaded excel path"), http.StatusInternalServerError)
+// 	}
+
+// 	if fileUrl != "" {
+
+// 		excelData, err = hashing.ExcelReader(dir + fileUrl)
+// 		if err != nil {
+// 			tx.Rollback()
+// 			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusInternalServerError)
+// 		}
+
+// 		for _, data := range excelData {
+// 			var user entity.User
+
+// 			err := r.NewSelect().Model(&user).Where("employee_id = ?", data.EmployeeID).Scan(ctx)
+// 			if err != nil {
+// 				tx.Rollback()
+// 				return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "getting user detail by code"), http.StatusBadRequest)
+// 			}
+
+// 			q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ? ",  data.EmployeeID)
+
+// 			q.Set("updated_at = ?", time.Now())
+// 			q.Set("updated_by = ?", claims.UserId)
+
+// 			_, err = q.Exec(ctx)
+// 			if err != nil {
+// 				tx.Rollback()
+// 				return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
+// 			}
+
+// 		}
+// 	}
+// 	// Commit transaction
+// 	if err = tx.Commit(); err != nil {
+// 		tx.Rollback()
+// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "committing transaction"), http.StatusInternalServerError)
+// 	}
+
+// 	return response, nil
+// }
 
 func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
@@ -416,7 +483,6 @@ func (r Repository) GetMonthlyStatistics(ctx context.Context, request MonthlySta
 	return list, nil
 }
 
-
 func (r Repository) GetStatistics(ctx context.Context, filter StatisticRequest) ([]StatisticResponse, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
@@ -521,7 +587,6 @@ func (r Repository) GetStatistics(ctx context.Context, filter StatisticRequest) 
 func ptr(s string) *string {
 	return &s
 }
-
 
 func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse, error) {
 	claims, err := r.CheckClaims(ctx)

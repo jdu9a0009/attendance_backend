@@ -1,6 +1,7 @@
 package user
 
 import (
+	"mime/multipart"
 	"time"
 
 	"github.com/Azure/go-autorest/autorest/date"
@@ -55,6 +56,9 @@ type GetDetailByIdResponse struct {
 	Phone        *string `json:"phone"`
 	Email        *string `json:"email"`
 }
+type ExcellRequest struct {
+	Excell *multipart.FileHeader `json:"-" form:"excell"`
+}
 
 type CreateRequest struct {
 	EmployeeID   *string `json:"employee_id"   form:"employee_id"`
@@ -103,7 +107,7 @@ type StatisticResponse struct {
 	WorkDay    *string `json:"work_day" bun:"work_day"`
 	ComeTime   *string `json:"come_time" bun:"come_time"`
 	LeaveTime  *string `json:"leave_time,omitempty" bun:"leave_time"`
-	TotalHours string `json:"total_hours" bun:"total_hours"`
+	TotalHours string  `json:"total_hours" bun:"total_hours"`
 }
 type DashboardResponse struct {
 	ComeTime   *string `json:"come_time" bun:"come_time"`
