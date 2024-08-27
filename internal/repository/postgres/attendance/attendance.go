@@ -34,7 +34,7 @@ func (r Repository) GetById(ctx context.Context, id int) (entity.Attendance, err
 }
 
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
-	_, err := r.CheckClaims(ctx, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard)
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin, auth.RoleEmployee,auth.RoleDashboard)
 	if err != nil {
 		return []GetListResponse{}, 0, err
 	}
@@ -346,6 +346,7 @@ func (r Repository) getExistingAttendancePeriod(ctx context.Context, attendance_
 	err := r.NewSelect().
 		Model(&existingAttendancePeriod).
 		Where("attendance_id= ?  AND work_day = ?", attendance_id, workDay).
+		Order("come_time DESC"). // Order by come_time in descending order
 		Limit(1).
 		Scan(ctx)
 
