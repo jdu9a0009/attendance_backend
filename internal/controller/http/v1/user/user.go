@@ -80,9 +80,9 @@ func (uc Controller) GetUserDetailById(c *web.Context) error {
 }
 
 func (uc Controller) CreateUser(c *web.Context) error {
-	var request user.CreateRequest
+	var request user.ExcellRequest
 
-	if err := c.BindFunc(&request, "UserID", "Password", "Role"); err != nil {
+	if err := c.BindFunc(&request,); err != nil {
 		return c.RespondError(err)
 	}
 

@@ -179,6 +179,149 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	return list, count, nil
 }
 
+func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
+
+	whereQuery := fmt.Sprintf(`WHERE a.deleted_at IS NULL AND u.deleted_at IS NULL`)
+
+	if filter.Search != nil {
+		search := strings.Replace(*filter.Search, " ", "", -1)
+		search = strings.Replace(search, "'", "''", -1)
+		whereQuery += fmt.Sprintf(` AND (u.employee_id ILIKE '%s' OR u.full_name ILIKE '%s')`, "%"+search+"%", "%"+search+"%")
+	}
+
+	if filter.DepartmentID != nil {
+		whereQuery += fmt.Sprintf(` AND u.department_id = %d`, *filter.DepartmentID)
+	}
+
+	if filter.PositionID != nil {
+		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
+	}
+
+	if filter.Status != nil {
+		statusValue := "false"
+		if *filter.Status {
+			statusValue = "true"
+		}
+		whereQuery += fmt.Sprintf(" AND a.status = %s", statusValue)
+	}
+
+	if filter.Date != nil {
+		date, err := time.Parse("2006-01-02", *filter.Date)
+		if err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "date parse"), http.StatusBadRequest)
+		}
+		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", date.Format("2006-01-02"))
+	} else {
+		today := time.Now().Format("2006-01-02")
+		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", today)
+	}
+	groupByQuery := `GROUP BY a.id, a.employee_id, u.full_name, u.department_id, d.name, 
+	u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time`
+	orderQuery := "ORDER BY a.created_at DESC"
+	limitQuery, offsetQuery := "", ""
+
+	if filter.Page != nil && filter.Limit != nil {
+		offset := (*filter.Page - 1) * (*filter.Limit)
+		filter.Offset = &offset
+	}
+
+	if filter.Limit != nil {
+		limitQuery = fmt.Sprintf("LIMIT %d", *filter.Limit)
+	}
+
+	if filter.Offset != nil {
+		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+		    a.id,
+			a.employee_id,
+			u.full_name,
+			u.department_id,
+			d.name,
+			u.position_id,
+			p.name,
+			a.work_day,
+			a.status,
+			TO_CHAR(a.come_time, 'HH24:MI'),
+			TO_CHAR(a.leave_time, 'HH24:MI'),
+		   COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
+		FROM attendance AS a
+		LEFT JOIN users u ON a.employee_id = u.employee_id
+		LEFT JOIN department d ON u.department_id = d.id
+		LEFT JOIN position p ON u.position_id = p.id
+		LEFT JOIN  attendance_period as ap ON ap.attendance_id=a.id
+		%s %s %s %s %s
+	`, whereQuery, groupByQuery, orderQuery, limitQuery, offsetQuery)
+
+	rows, err := r.QueryContext(ctx, query)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusNotFound)
+		}
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting attendance"), http.StatusInternalServerError)
+	}
+	defer rows.Close()
+
+	var list []GetListResponse
+
+	for rows.Next() {
+		var detail GetListResponse
+		var totalMinutes int
+
+		err = rows.Scan(
+			&detail.ID,
+			&detail.EmployeeID,
+			&detail.Fullname,
+			&detail.DepartmentID,
+			&detail.Department,
+			&detail.PositionID,
+			&detail.Position,
+			&detail.WorkDay,
+			&detail.Status,
+			&detail.ComeTime,
+			&detail.LeaveTime,
+			&totalMinutes,
+		)
+		if err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance list"), http.StatusBadRequest)
+		}
+
+		hours := totalMinutes / 60
+		minutes := totalMinutes % 60
+		totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
+		detail.TotalHours = totalHours
+
+		list = append(list, detail)
+	}
+
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(a.id)
+		FROM attendance AS a
+		LEFT JOIN users u ON a.employee_id = u.employee_id
+		LEFT JOIN department d ON u.department_id = d.id
+		LEFT JOIN position p ON u.position_id = p.id
+		%s
+	`, whereQuery)
+
+	countRows, err := r.QueryContext(ctx, countQuery)
+	if err != nil {
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "counting attendance records"), http.StatusInternalServerError)
+	}
+	defer countRows.Close()
+
+	var count int
+	for countRows.Next() {
+		if err = countRows.Scan(&count); err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance count"), http.StatusInternalServerError)
+		}
+	}
+
+	return list, count, nil
+}
+
+
 func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdResponse, error) {
 	_, err := r.CheckClaims(ctx)
 	if err != nil {

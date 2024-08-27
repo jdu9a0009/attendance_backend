@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 	"university-backend/foundation/web"
@@ -12,17 +14,14 @@ import (
 	"university-backend/internal/entity"
 	"university-backend/internal/pkg/repository/postgresql"
 	"university-backend/internal/repository/postgres"
+	"university-backend/internal/service/hashing"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Repository struct {
 	*postgresql.Database
-}
-
-// Create implements user.User.
-func (r *Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
-	panic("unimplemented")
 }
 
 func NewRepository(database *postgresql.Database) *Repository {
@@ -202,6 +201,105 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 	}
 
 	return detail, nil
+}
+func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return CreateResponse{}, err
+	}
+
+	// Validate the ExcellRequest struct
+	if err := r.ValidateStruct(&request); err != nil {
+		return CreateResponse{}, err
+	}
+
+	file, err := request.Excell.Open()
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
+	}
+	defer file.Close()
+
+	file, err = request.Excell.Open()
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
+	}
+	defer file.Close()
+
+	// Create a temporary file to store the uploaded Excel file
+	tempFile, err := os.CreateTemp("", "excel-*.xlsx")
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
+	}
+	defer os.Remove(tempFile.Name()) // Remove the temporary file after use
+
+	// Copy the uploaded Excel file content to the temporary file
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "copying excel file to temporary file"), http.StatusInternalServerError)
+	}
+
+	// Read the Excel file and parse the data
+	excelData, err := hashing.ExcelReader(tempFile.Name()) // Pass the temporary file path
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
+	}
+	// Start a transaction
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			_ = tx.Commit()
+		}
+	}()
+
+	// Create a new user based on the data from the Excel file
+	for _, data := range excelData {
+		// Validate the data from the Excel file
+		if err := r.ValidateStruct(&data, "EmployeeID", "Password", "FullName"); err != nil {
+			return CreateResponse{}, err
+		}
+
+		// Hash the password
+		hash, err := bcrypt.GenerateFromPassword([]byte(data.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+		}
+		hashedPassword := string(hash)
+
+		// Create a new user object
+
+		user := CreateResponse{
+			EmployeeID:   &data.EmployeeID,
+			Password:     &hashedPassword,
+			Role:         strings.ToUpper(data.Role),
+			FullName:     &data.FullName,
+			DepartmentID: &data.DepartmentID,
+			PositionID:   &data.PositionID,
+			Phone:        &data.Phone,
+			Email:        &data.Email,
+			CreatedAt:    time.Now(),
+			CreatedBy:    claims.UserId,
+		}
+
+		// Validate the user object
+		if err := r.ValidateStruct(&user); err != nil {
+			return CreateResponse{}, err
+		}
+
+		// Save the new user to the database within the transaction
+		_, err = tx.NewInsert().Model(&user).Returning("id").Exec(ctx, &user.ID)
+		if err != nil {
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
+		}
+
+	}
+
+	// Return a success response
+	return CreateResponse{}, nil
 }
 
 // func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {

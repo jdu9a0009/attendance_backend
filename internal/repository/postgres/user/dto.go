@@ -59,7 +59,21 @@ type GetDetailByIdResponse struct {
 type ExcellRequest struct {
 	Excell *multipart.FileHeader `json:"-" form:"excell"`
 }
+type CreateResponse struct {
+	bun.BaseModel `bun:"table:users"`
 
+	ID           int       `json:"id" bun:"-"`
+	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
+	Password     *string   `json:"-"   bun:"password"`
+	Role         string   `json:"role" bun:"role"`
+	FullName     *string   `json:"full_name"  bun:"full_name"`
+	DepartmentID *int      `json:"department_id" bun:"department_id"`
+	PositionID   *int      `json:"position_id" bun:"position_id"`
+	Phone        *string   `json:"phone" bun:"phone"`
+	Email        *string   `json:"email" bun:"email"`
+	CreatedAt    time.Time `json:"-"          bun:"created_at"`
+	CreatedBy    int       `json:"-"          bun:"created_by"`
+}
 type CreateRequest struct {
 	EmployeeID   *string `json:"employee_id"   form:"employee_id"`
 	Password     *string `json:"password"   form:"password"`
@@ -71,21 +85,7 @@ type CreateRequest struct {
 	Email        *string `json:"email" form:"email"`
 }
 
-type CreateResponse struct {
-	bun.BaseModel `bun:"table:users"`
 
-	ID           int       `json:"id" bun:"-"`
-	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
-	Password     *string   `json:"-"   bun:"password"`
-	Role         *string   `json:"role" bun:"role"`
-	FullName     *string   `json:"full_name"  bun:"full_name"`
-	DepartmentID *int      `json:"department_id" bun:"department_id"`
-	PositionID   *int      `json:"position_id" bun:"position_id"`
-	Phone        *string   `json:"phone" bun:"phone"`
-	Email        *string   `json:"email" bun:"email"`
-	CreatedAt    time.Time `json:"-"          bun:"created_at"`
-	CreatedBy    int       `json:"-"          bun:"created_by"`
-}
 
 type UpdateRequest struct {
 	ID           int     `json:"id" form:"id"`
