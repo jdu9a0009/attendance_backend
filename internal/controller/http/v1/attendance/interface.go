@@ -7,8 +7,6 @@ import (
 
 type Attendance interface {
 	GetList(ctx context.Context, filter attendance.Filter) ([]attendance.GetListResponse, int, error)
-	GetDashboardList(ctx context.Context, filter attendance.Filter) ([]attendance.GetListResponse, int, error)
-
 	GetDetailById(ctx context.Context, id int) (attendance.GetDetailByIdResponse, error)
 	UpdateAll(ctx context.Context, request attendance.UpdateRequest) error
 	UpdateColumns(ctx context.Context, request attendance.UpdateRequest) error

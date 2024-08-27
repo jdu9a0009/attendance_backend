@@ -63,6 +63,12 @@ type CreateResponse struct {
 	CreatedAt  time.Time `json:"-"          bun:"created_at"`
 	CreatedBy  int       `json:"-"          bun:"created_by"`
 }
+type AttendancePeriod struct {
+	bun.BaseModel `bun:"table:attendance_period"`
+
+	ComeTime     *string `json:"come_time" bun:"come_time"`
+	AttendanceID *int    `json:"attendance_id" bun:"attendance_id"`
+}
 type PeriodsCreate struct {
 	bun.BaseModel `bun:"table:attendance_period"`
 

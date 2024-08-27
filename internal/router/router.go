@@ -116,8 +116,7 @@ func (r Router) Init() error {
 	r.Delete("/api/v1/position/:id", positionController.Delete, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
 	// #attendance
-	r.Get("/api/v1/attendance/dashboard", attendanceController.GetDashboardList)
-	r.Get("/api/v1/attendance/list", attendanceController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleEmployee))
+	r.Get("/api/v1/attendance/list", attendanceController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard))
 	r.Get("/api/v1/attendance/:id", attendanceController.GetDetailById, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Post("/api/v1/attendance/createbyphone", attendanceController.CreateByPhone, middleware.Authenticate(r.auth))
 	r.Post("/api/v1/attendance/createbyqrcode", attendanceController.CreateByQRCode, middleware.Authenticate(r.auth))

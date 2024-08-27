@@ -11,8 +11,10 @@ import (
 
 // These are the expected values for Claims.Roles.
 const (
-	RoleEmployee = "EMPLOYEE"
-	RoleAdmin    = "ADMIN"
+	RoleEmployee  = "EMPLOYEE"
+	RoleAdmin     = "ADMIN"
+	RoleQrCode    = "QRCODE"
+	RoleDashboard = "DASHBOARD"
 )
 
 // ctxKey represents the type of value for the context key.
@@ -32,10 +34,10 @@ type Claims struct {
 
 type ClaimsParse struct {
 	jwt.StandardClaims
-	UserId     string `json:"user_id"`
-	Role       string `json:"roles"`
-	EmployeeID string `json:"employee_id"`
-	Type *string `json:"type"`
+	UserId     string  `json:"user_id"`
+	Role       string  `json:"roles"`
+	EmployeeID string  `json:"employee_id"`
+	Type       *string `json:"type"`
 }
 
 // Authorized returns true if the claims has at least one of the provided roles.

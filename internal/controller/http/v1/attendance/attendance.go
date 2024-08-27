@@ -71,49 +71,6 @@ func (uc Controller) GetList(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
-func (uc Controller) GetDashboardList(c *web.Context) error {
-	var filter attendance.Filter
-
-	if limit, ok := c.GetQueryFunc(reflect.Int, "limit").(*int); ok {
-		filter.Limit = limit
-	}
-	if offset, ok := c.GetQueryFunc(reflect.Int, "offset").(*int); ok {
-		filter.Offset = offset
-	}
-	if page, ok := c.GetQueryFunc(reflect.Int, "page").(*int); ok {
-		filter.Page = page
-	}
-	if date, ok := c.GetQueryFunc(reflect.String, "date").(*string); ok {
-		filter.Date = date
-	}
-	if search, ok := c.GetQueryFunc(reflect.String, "search").(*string); ok {
-		filter.Search = search
-	}
-	if departmentId, ok := c.GetQueryFunc(reflect.Int, "department_id").(*int); ok {
-		filter.DepartmentID = departmentId
-	}
-	if positionId, ok := c.GetQueryFunc(reflect.Int, "position_id").(*int); ok {
-		filter.PositionID = positionId
-	}
-	if status, ok := c.GetQueryFunc(reflect.Bool, "status").(*bool); ok {
-		filter.Status = status
-	}
-	if err := c.ValidQuery(); err != nil {
-		return c.RespondError(err)
-	}
-	list, count, err := uc.attendance.GetDashboardList(c.Ctx, filter)
-	if err != nil {
-		return c.RespondError(err)
-	}
-
-	return c.Respond(map[string]interface{}{
-		"data": map[string]interface{}{
-			"results": list,
-			"count":   count,
-		},
-		"status": true,
-	}, http.StatusOK)
-}
 
 
 func (uc Controller) GetDetailById(c *web.Context) error {
