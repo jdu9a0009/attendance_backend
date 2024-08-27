@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -212,37 +213,32 @@ func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateRe
 	if err := r.ValidateStruct(&request); err != nil {
 		return CreateResponse{}, err
 	}
-
 	file, err := request.Excell.Open()
 	if err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
 	}
 	defer file.Close()
 
-	file, err = request.Excell.Open()
-	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
-	}
-	defer file.Close()
-
 	// Create a temporary file to store the uploaded Excel file
-	tempFile, err := os.CreateTemp("", "excel-*.xlsx")
+	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
 	if err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
 	}
-	defer os.Remove(tempFile.Name()) // Remove the temporary file after use
+	defer tempFile.Close()
+	defer os.Remove(tempFile.Name())
 
-	// Copy the uploaded Excel file content to the temporary file
-	_, err = io.Copy(tempFile, file)
+	// Copy the uploaded Excel file to the temporary file
+	_, err = io.Copy(tempFile, file) // Use the opened file as the reader
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "copying excel file to temporary file"), http.StatusInternalServerError)
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
 
 	// Read the Excel file and parse the data
-	excelData, err := hashing.ExcelReader(tempFile.Name()) // Pass the temporary file path
+	excelData, err := hashing.ExcelReader(tempFile.Name())
 	if err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
+
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
