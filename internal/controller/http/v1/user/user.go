@@ -81,7 +81,6 @@ func (uc Controller) GetUserDetailById(c *web.Context) error {
 
 func (uc Controller) CreateUser(c *web.Context) error {
 	var request user.ExcellRequest
-	fmt.Println("Reqest:", request)
 	if err := c.BindFunc(&request); err != nil {
 		return c.RespondError(err)
 	}
@@ -92,7 +91,7 @@ func (uc Controller) CreateUser(c *web.Context) error {
 	}
 
 	return c.Respond(map[string]interface{}{
-		"data":   response,
+		"created_data":   response,
 		"status": true,
 	}, http.StatusOK)
 }

@@ -203,26 +203,28 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 
 	return detail, nil
 }
-func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {
+
+// Create creates new users from an Excel file.
+func (r Repository) Create(ctx context.Context, request ExcellRequest) (int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
-		return CreateResponse{}, err
+		return 0, err
 	}
 
 	// Validate the ExcellRequest struct
 	if err := r.ValidateStruct(&request); err != nil {
-		return CreateResponse{}, err
+		return 0, err
 	}
 	file, err := request.Excell.Open()
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
+		return 0, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
 	}
 	defer file.Close()
 
 	// Create a temporary file to store the uploaded Excel file
 	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
+		return 0, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
 	}
 	defer tempFile.Close()
 	defer os.Remove(tempFile.Name())
@@ -230,48 +232,68 @@ func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateRe
 	// Copy the uploaded Excel file to the temporary file
 	_, err = io.Copy(tempFile, file) // Use the opened file as the reader
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
+		return 0, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
 
 	// Read the Excel file and parse the data
 	excelData, err := hashing.ExcelReader(tempFile.Name())
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
+		return 0, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
+	}
+
+	// Check if there are any data rows
+	if len(excelData) == 0 {
+		return 0, web.NewRequestError(errors.New("no data found in Excel file"), http.StatusBadRequest)
 	}
 
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
+		return 0, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
 	}
 	defer func() {
 		if err != nil {
-			_ = tx.Rollback()
+			_ = tx.Rollback() // Rollback the transaction if an error occurred
 		} else {
 			_ = tx.Commit()
 		}
 	}()
 
 	// Create a new user based on the data from the Excel file
+	createdCount := 0 // Initialize the count
 	for _, data := range excelData {
 		// Validate the data from the Excel file
-		if err := r.ValidateStruct(&data, "EmployeeID", "Password", "FullName"); err != nil {
-			return CreateResponse{}, err
+		if err := r.ValidateStruct(&data, "employee_id", "password", "full_name"); err != nil {
+			return 0, err
+		}
+
+		// Check for duplicate employee_id
+		var existingEmployee CreateResponse
+		err := tx.NewSelect().Model(&existingEmployee).Where("employee_id = ?", data.EmployeeID).Scan(ctx)
+		if err == nil { // Employee with the same ID exists
+			fmt.Println("Error: Duplicate employee_id:", data.EmployeeID)
+			return 0, web.NewRequestError(errors.New("Duplicate employee_id found"), http.StatusBadRequest) // Return an error
 		}
 
 		// Hash the password
 		hash, err := bcrypt.GenerateFromPassword([]byte(data.Password), bcrypt.DefaultCost)
 		if err != nil {
-			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+			return 0, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 		}
 		hashedPassword := string(hash)
 
+		if data.Role == "" {
+			// Option 1: Set a default value
+			data.Role = "EMPLOYEE" // Replace with your default role
+			// Option 2: Return an error
+			return 0, web.NewRequestError(errors.New("Role cannot be empty"), http.StatusBadRequest)
+		}
+		fmt.Println("Data:da", data)
 		// Create a new user object
-
 		user := CreateResponse{
 			EmployeeID:   &data.EmployeeID,
 			Password:     &hashedPassword,
-			Role:         strings.ToUpper(data.Role),
+			Role:         data.Role,
 			FullName:     &data.FullName,
 			DepartmentID: &data.DepartmentID,
 			PositionID:   &data.PositionID,
@@ -283,19 +305,21 @@ func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateRe
 
 		// Validate the user object
 		if err := r.ValidateStruct(&user); err != nil {
-			return CreateResponse{}, err
+			return 0, err
 		}
 
 		// Save the new user to the database within the transaction
 		_, err = tx.NewInsert().Model(&user).Returning("id").Exec(ctx, &user.ID)
 		if err != nil {
-			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
+			// If an error occurs during insertion, rollback the transaction
+			fmt.Printf("Error inserting employee: %v, Error: %v\n", data.EmployeeID, err) // Log the error and employee ID
+			return 0, web.NewRequestError(errors.Wrapf(err, "error inserting employee %s", data.EmployeeID), http.StatusBadRequest)
 		}
 
+		createdCount++
 	}
 
-	// Return a success response
-	return CreateResponse{}, nil
+	return createdCount, err
 }
 
 // func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {
@@ -689,20 +713,23 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 	}
 	var detail DashboardResponse
 	query := fmt.Sprintf(`
-        SELECT
-            COALESCE(TO_CHAR(a.come_time, 'HH24:MI'), NULL) AS come_time,
-			COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), NULL) AS leave_time,
-			CASE
-				WHEN a.come_time IS NOT NULL AND a.leave_time IS NOT NULL THEN TO_CHAR(a.leave_time - a.come_time, 'HH24:MI')
-				ELSE NULL
-			END AS total_hours
-        FROM
-            attendance as a
-			JOIN users u ON a.employee_id = u.employee_id
-
-        WHERE
-            a.deleted_at IS NULL
-            AND u.id = %d;
+SELECT
+    COALESCE(TO_CHAR(ap.come_time, 'HH24:MI'), NULL) AS come_time,
+    COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), NULL) AS leave_time,
+    CASE
+        WHEN a.come_time IS NOT NULL AND a.leave_time IS NOT NULL THEN TO_CHAR(a.leave_time - a.come_time, 'HH24:MI')
+        ELSE NULL
+    END AS total_hours
+FROM
+    attendance AS a
+JOIN users AS u ON a.employee_id = u.employee_id
+JOIN attendance_period AS ap ON ap.attendance_id = a.id
+WHERE
+    a.deleted_at IS NULL
+    AND u.id = %d
+ORDER BY
+    ap.come_time DESC
+LIMIT 1;
 	`, claims.UserId)
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ComeTime,

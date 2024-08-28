@@ -65,7 +65,7 @@ type CreateResponse struct {
 	ID           int       `json:"id" bun:"-"`
 	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
 	Password     *string   `json:"-"   bun:"password"`
-	Role         string   `json:"role" bun:"role"`
+	Role         string    `json:"role" bun:"role"`
 	FullName     *string   `json:"full_name"  bun:"full_name"`
 	DepartmentID *int      `json:"department_id" bun:"department_id"`
 	PositionID   *int      `json:"position_id" bun:"position_id"`
@@ -84,8 +84,6 @@ type CreateRequest struct {
 	Phone        *string `json:"phone" form:"phone"`
 	Email        *string `json:"email" form:"email"`
 }
-
-
 
 type UpdateRequest struct {
 	ID           int     `json:"id" form:"id"`
