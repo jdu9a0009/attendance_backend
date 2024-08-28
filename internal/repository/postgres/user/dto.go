@@ -110,7 +110,7 @@ type StatisticResponse struct {
 type DashboardResponse struct {
 	ComeTime   *string `json:"come_time" bun:"come_time"`
 	LeaveTime  *string `json:"leave_time" bun:"leave_time"`
-	TotalHours *string `json:"total_hours" bun:"total_hours"`
+	TotalHours string `json:"total_hours" bun:"total_hours"`
 }
 type MonthlyStatisticRequest struct {
 	Month date.Date

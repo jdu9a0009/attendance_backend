@@ -712,30 +712,34 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 		return DashboardResponse{}, err
 	}
 	var detail DashboardResponse
+	var totalMinutes int
 	query := fmt.Sprintf(`
-SELECT
-    COALESCE(TO_CHAR(ap.come_time, 'HH24:MI'), NULL) AS come_time,
-    COALESCE(TO_CHAR(a.leave_time, 'HH24:MI'), NULL) AS leave_time,
-    CASE
-        WHEN a.come_time IS NOT NULL AND a.leave_time IS NOT NULL THEN TO_CHAR(a.leave_time - a.come_time, 'HH24:MI')
-        ELSE NULL
-    END AS total_hours
-FROM
-    attendance AS a
-JOIN users AS u ON a.employee_id = u.employee_id
+        SELECT
+    MAX(ap.come_time) AS come_time,  -- Use MAX to get the latest come_time
+    MAX(a.leave_time) AS leave_time, -- Use MAX to get the latest leave_time
+    COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time))/ 60)::INT, 0)AS total_hours
+FROM attendance AS a
+JOIN users AS u ON u.employee_id = a.employee_id
 JOIN attendance_period AS ap ON ap.attendance_id = a.id
-WHERE
-    a.deleted_at IS NULL
-    AND u.id = %d
-ORDER BY
-    ap.come_time DESC
+WHERE a.work_day = CURRENT_DATE
+AND a.deleted_at IS NULL
+AND u.id = %d
+AND ap.work_day = CURRENT_DATE
+GROUP BY a.employee_id
+ORDER BY come_time DESC
 LIMIT 1;
+            
 	`, claims.UserId)
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ComeTime,
 		&detail.LeaveTime,
-		&detail.TotalHours,
+		&totalMinutes,
 	)
+
+	hours := totalMinutes / 60
+	minutes := totalMinutes % 60
+	totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
+	detail.TotalHours = totalHours
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return DashboardResponse{}, nil

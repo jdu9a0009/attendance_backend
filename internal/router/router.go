@@ -100,7 +100,7 @@ func (r Router) Init() error {
 	r.Get("/api/v1/user/dashboard", userController.GetEmployeeDashboard, middleware.Authenticate(r.auth))
 
 	// #department
-	r.Get("/api/v1/department/list", departmentController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Get("/api/v1/department/list", departmentController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleDashboard))
 	r.Get("/api/v1/department/:id", departmentController.GetDetailById, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Post("/api/v1/department/create", departmentController.Create, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Put("/api/v1/department/:id", departmentController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin))
@@ -108,7 +108,7 @@ func (r Router) Init() error {
 	r.Delete("/api/v1/department/:id", departmentController.Delete, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
 	// #position
-	r.Get("/api/v1/position/list", positionController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Get("/api/v1/position/list", positionController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleDashboard))
 	r.Get("/api/v1/position/:id", positionController.GetDetailById, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Post("/api/v1/position/create", positionController.Create, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Put("/api/v1/position/:id", positionController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin))
