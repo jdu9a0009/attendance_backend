@@ -34,18 +34,18 @@ type GetListResponse struct {
 }
 
 type GetDetailByIdResponse struct {
-	ID           int        `json:"id"`
-	DepartmentID *int       `json:"department_id"`
-	Department   *string    `json:"department"`
-	PositionID   *int       `json:"position_id"`
-	Position     *string    `json:"position"`
-	EmployeeID   *string    `json:"employee_id"`
-	Fullname     *string    `json:"full_name"`
-	Status       *bool      `json:"status"`
-	WorkDay      *date.Date `json:"work_day"`
-	ComeTime     *string    `json:"come_time,omitempty"`
-	LeaveTime    *string    `json:"leave_time,omitempty"`
-	TotalHours   string     `json:"total_hours"`
+	ID           int     `json:"id"`
+	DepartmentID *int    `json:"department_id"`
+	Department   *string `json:"department"`
+	PositionID   *int    `json:"position_id"`
+	Position     *string `json:"position"`
+	EmployeeID   *string `json:"employee_id"`
+	Fullname     *string `json:"full_name"`
+	Status       *bool   `json:"status"`
+	WorkDay      *string `json:"work_day"`
+	ComeTime     *string `json:"come_time,omitempty"`
+	LeaveTime    *string `json:"leave_time,omitempty"`
+	TotalHours   string  `json:"total_hours"`
 }
 
 type CreateRequest struct {

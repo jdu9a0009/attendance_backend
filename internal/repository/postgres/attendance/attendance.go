@@ -34,7 +34,7 @@ func (r Repository) GetById(ctx context.Context, id int) (entity.Attendance, err
 }
 
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
-	_, err := r.CheckClaims(ctx, auth.RoleAdmin, auth.RoleEmployee,auth.RoleDashboard)
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard)
 	if err != nil {
 		return []GetListResponse{}, 0, err
 	}

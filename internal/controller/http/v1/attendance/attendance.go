@@ -22,7 +22,7 @@ func NewController(attendance Attendance) *Controller {
 
 const (
 	OfficeLatitude  = 41.3270016
-	OfficeLongitude = 69.3436416
+	OfficeLongitude = 69.2584448
 	OfficeRadius    = 200 // in meters
 )
 
@@ -71,7 +71,6 @@ func (uc Controller) GetList(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
-
 
 func (uc Controller) GetDetailById(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
