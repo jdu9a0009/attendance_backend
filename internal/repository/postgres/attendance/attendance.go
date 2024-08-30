@@ -414,7 +414,6 @@ func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims au
 	if err != nil {
 		return CreateResponse{}, err
 	}
-	fmt.Println("Resp", ExistingAttendancePeriod.ComeTime)
 	return CreateResponse{
 		ID:         existingAttendance.ID,
 		EmployeeID: employeeID,
