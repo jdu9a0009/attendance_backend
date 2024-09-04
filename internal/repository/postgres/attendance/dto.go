@@ -69,6 +69,10 @@ type AttendancePeriod struct {
 	ComeTime     *string `json:"come_time" bun:"come_time"`
 	AttendanceID *int    `json:"attendance_id" bun:"attendance_id"`
 }
+type EmployeeResponse struct {
+	bun.BaseModel `bun:"table:users"`
+	Fullname      *string `json:"full_name" bun:"full_name"`
+}
 type PeriodsCreate struct {
 	bun.BaseModel `bun:"table:attendance_period"`
 
@@ -86,17 +90,6 @@ type PeriodsUpdate struct {
 	LeaveTime  string `json:"leave_time" bun:"leave_time"`
 }
 
-type ExitResponse struct {
-	bun.BaseModel `bun:"table:attendance"`
-
-	ID         int       `json:"id" bun:"id"`
-	EmployeeID string    `json:"employee_id" bun:"employee_id"`
-	WorkDay    string    `json:"work_day" bun:"work_day"`
-	ComeTime   string    `json:"come_time" bun:"come_time"`
-	LeaveTime  *string   `json:"leave_time,omitempty" bun:"leave_time"`
-	UpdatedAt  time.Time `json:"-"          bun:"updated_at"`
-	UpdatedBy  int       `json:"-"          bun:"updated_by"`
-}
 type ExitByPhoneRequest struct {
 	EmployeeID *string `json:"employee_id" form:"employee_id"`
 	Latitude   float64 `json:"latitude" form:"latitude"`
