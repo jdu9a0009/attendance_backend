@@ -24,7 +24,7 @@ const (
 	OfficeLatitude  = 41.330569
 	OfficeLongitude = 9.2519819
 
-	OfficeRadius    = 200 // in meters
+	OfficeRadius    = 2000 // in meters
 )
 
 //Attendance
