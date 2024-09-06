@@ -19,26 +19,28 @@ type Controller struct {
 func NewController(attendance Attendance) *Controller {
 	return &Controller{attendance}
 }
+
 type OfficeLocation struct {
 	Latitude  float64
 	Longitude float64
 	Radius    float64 // in meters
 }
+
 var OfficeLocations = []OfficeLocation{
 	{
 		Latitude:  41.3330625,
 		Longitude: 69.2550781,
-		Radius:    2000.0, 
+		Radius:    2000.0,
 	},
 	{
-		Latitude: 41.3171712, 
+		Latitude:  41.3171712,
 		Longitude: 69.3108736,
-		Radius:    1000.0, 
+		Radius:    2000.0,
 	},
 	{
-		Latitude:  41.319006, 
+		Latitude:  41.319006,
 		Longitude: 69.303411,
-		Radius:    1000.0, 
+		Radius:    2000.0,
 	},
 }
 
