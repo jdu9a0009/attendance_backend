@@ -20,12 +20,29 @@ func NewController(attendance Attendance) *Controller {
 	return &Controller{attendance}
 }
 
-const (
-	OfficeLatitude  = 41.3330625
-	OfficeLongitude = 69.2550781
+type OfficeLocation struct {
+	Latitude  float64
+	Longitude float64
+	Radius    float64 // in meters
+}
 
-	OfficeRadius    = 2000 // in meters
-)
+var OfficeLocations = []OfficeLocation{
+	{
+		Latitude:  41.3330625,
+		Longitude: 69.2550781,
+		Radius:    2000.0,
+	},
+	{
+		Latitude:  41.3171712,
+		Longitude: 69.3108736,
+		Radius:    1000.0,
+	},
+	{
+		Latitude:  41.319006,
+		Longitude: 69.303411,
+		Radius:    1000.0,
+	},
+}
 
 //Attendance
 
@@ -255,20 +272,24 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
 		return c.RespondError(err)
 	}
-	distance := CalculateDistance(request.Latitude, request.Longitude, OfficeLatitude, OfficeLongitude)
 
-	if distance <= OfficeRadius {
-		response, err := uc.attendance.CreateByPhone(c.Ctx, request)
-		if err != nil {
-			return c.RespondError(err)
+	// Check distance to each office
+	for _, office := range OfficeLocations {
+		distance := CalculateDistance(request.Latitude, request.Longitude, office.Latitude, office.Longitude)
+		if distance <= office.Radius {
+			response, err := uc.attendance.CreateByPhone(c.Ctx, request)
+			if err != nil {
+				return c.RespondError(err)
+			}
+
+			return c.Respond(map[string]interface{}{
+				"data":   response,
+				"status": true,
+			}, http.StatusOK)
 		}
-
-		return c.Respond(map[string]interface{}{
-			"data":   response,
-			"status": true,
-		}, http.StatusOK)
 	}
-	return c.RespondError(web.NewRequestError(errors.New("distance from office is greater than office radius"), http.StatusBadRequest))
+
+	return c.RespondError(web.NewRequestError(errors.New("distance from all offices is greater than office radius"), http.StatusBadRequest))
 }
 func (uc Controller) CreateByQRCode(c *web.Context) error {
 	var request attendance.EnterRequest

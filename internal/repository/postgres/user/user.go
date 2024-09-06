@@ -203,7 +203,6 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 
 	return detail, nil
 }
-
 // Create creates new users from an Excel file.
 func (r Repository) Create(ctx context.Context, request ExcellRequest) (int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
@@ -321,6 +320,7 @@ func (r Repository) Create(ctx context.Context, request ExcellRequest) (int, err
 
 	return createdCount, err
 }
+
 
 // func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {
 // 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
