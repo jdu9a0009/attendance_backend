@@ -74,6 +74,12 @@ type CreateResponse struct {
 	CreatedAt    time.Time `json:"-"          bun:"created_at"`
 	CreatedBy    int       `json:"-"          bun:"created_by"`
 }
+type GenEmployeeID struct {
+	bun.BaseModel `bun:"table:users"`
+
+	ID           int       `json:"id" bun:"-"`
+	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
+}
 type CreateRequest struct {
 	EmployeeID   *string `json:"employee_id"   form:"employee_id"`
 	Password     *string `json:"password"   form:"password"`

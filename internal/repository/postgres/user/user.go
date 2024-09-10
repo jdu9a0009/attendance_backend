@@ -203,9 +203,51 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 
 	return detail, nil
 }
+func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return CreateResponse{}, err
+	}
+
+	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "Role", "FullName"); err != nil {
+		return CreateResponse{}, err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+	}
+	hashedPassword := string(hash)
+
+	var response CreateResponse
+	role := strings.ToUpper(*request.Role)
+	if (role != "EMPLOYEE") && (role != "ADMIN") {
+		return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
+	}
+
+	response.Role = role
+	response.FullName = request.FullName
+	response.EmployeeID = request.EmployeeID
+	response.DepartmentID = request.DepartmentID
+	response.Password = &hashedPassword
+	response.PositionID = request.PositionID
+	response.Phone = request.Phone
+	response.Email = request.Email
+	response.CreatedAt = time.Now()
+	response.CreatedBy = claims.UserId
+
+	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
+	}
+
+	response.Password = nil
+
+	return response, nil
+}
 
 // Create creates new users from an Excel file.
-func (r Repository) Create(ctx context.Context, request ExcellRequest) (int, error) {
+func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return 0, err
@@ -465,6 +507,11 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if (role != "EMPLOYEE") && (role != "ADMIN") {
 		return web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
 	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+	}
+	hashedPassword := string(hash)
 
 	q.Set("employee_id = ?", request.EmployeeID)
 	q.Set("role = ?", role)
@@ -473,6 +520,7 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	q.Set("position_id=?", request.PositionID)
 	q.Set("phone=?", request.Phone)
 	q.Set("email=?", request.Email)
+	q.Set("password=?", hashedPassword)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
@@ -514,7 +562,11 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		}
 		q.Set("role = ?", role)
 	}
-
+	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+	}
+	hashedPassword := string(hash)
 	if request.FullName != nil {
 		q.Set("full_name = ?", request.FullName)
 	}
@@ -527,7 +579,9 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if request.Phone != nil {
 		q.Set("phone=?", request.Phone)
 	}
-
+	if request.Password != nil {
+		q.Set("password=?", hashedPassword)
+	}
 	if request.Email != nil {
 		q.Set("email=?", request.Email)
 	}
@@ -731,7 +785,7 @@ AND u.id = %d
 GROUP BY a.employee_id
 ORDER BY come_time DESC
 LIMIT 1;            
-	`, workDay,workDay,claims.UserId)
+	`, workDay, workDay, claims.UserId)
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ComeTime,
 		&detail.LeaveTime,

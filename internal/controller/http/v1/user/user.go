@@ -80,7 +80,7 @@ func (uc Controller) GetUserDetailById(c *web.Context) error {
 }
 
 func (uc Controller) CreateUser(c *web.Context) error {
-	var request user.ExcellRequest
+	var request user.CreateRequest
 	if err := c.BindFunc(&request); err != nil {
 		return c.RespondError(err)
 	}
@@ -91,8 +91,24 @@ func (uc Controller) CreateUser(c *web.Context) error {
 	}
 
 	return c.Respond(map[string]interface{}{
-		"created_data":   response,
-		"status": true,
+		"created_data": response,
+		"status":       true,
+	}, http.StatusOK)
+}
+func (uc Controller) CreateUserByExcell(c *web.Context) error {
+	var request user.ExcellRequest
+	if err := c.BindFunc(&request); err != nil {
+		return c.RespondError(err)
+	}
+
+	response, err := uc.user.CreateByExcell(c.Ctx, request)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return c.Respond(map[string]interface{}{
+		"created_data": response,
+		"status":       true,
 	}, http.StatusOK)
 }
 
