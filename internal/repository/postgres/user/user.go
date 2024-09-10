@@ -203,6 +203,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 
 	return detail, nil
 }
+
 // Create creates new users from an Excel file.
 func (r Repository) Create(ctx context.Context, request ExcellRequest) (int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
@@ -320,7 +321,6 @@ func (r Repository) Create(ctx context.Context, request ExcellRequest) (int, err
 
 	return createdCount, err
 }
-
 
 // func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {
 // 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
@@ -711,25 +711,28 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 	if err != nil {
 		return DashboardResponse{}, err
 	}
+	workDay := time.Now().Format("2006-01-02")
+
 	var detail DashboardResponse
 	var totalMinutes int
 	query := fmt.Sprintf(`
         SELECT
     MAX(ap.come_time) AS come_time,  -- Use MAX to get the latest come_time
     MAX(a.leave_time) AS leave_time, -- Use MAX to get the latest leave_time
-    COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time))/ 60)::INT, 0)AS total_hours
+    COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time))/ 60)::INT, 0) AS total_hours
 FROM attendance AS a
 JOIN users AS u ON u.employee_id = a.employee_id
 JOIN attendance_period AS ap ON ap.attendance_id = a.id
-WHERE a.work_day = CURRENT_DATE
+WHERE a.work_day= '%s'
+AND ap.work_day= '%s'
 AND a.deleted_at IS NULL
+AND u.deleted_at IS NULL
 AND u.id = %d
-AND ap.work_day = CURRENT_DATE
 GROUP BY a.employee_id
 ORDER BY come_time DESC
 LIMIT 1;
             
-	`, claims.UserId)
+	`, workDay,workDay,claims.UserId)
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ComeTime,
 		&detail.LeaveTime,
