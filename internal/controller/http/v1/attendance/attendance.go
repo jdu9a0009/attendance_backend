@@ -42,6 +42,11 @@ var OfficeLocations = []OfficeLocation{
 		Longitude: 69.303411,
 		Radius:    3000.0,
 	},
+	{
+		Latitude:  41.3335552,
+		Longitude: 69.3108736,
+		Radius:    3000.0,
+	},
 }
 
 //Attendance
