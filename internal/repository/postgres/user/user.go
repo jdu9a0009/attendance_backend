@@ -730,8 +730,7 @@ AND u.deleted_at IS NULL
 AND u.id = %d
 GROUP BY a.employee_id
 ORDER BY come_time DESC
-LIMIT 1;
-            
+LIMIT 1;            
 	`, workDay,workDay,claims.UserId)
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ComeTime,
