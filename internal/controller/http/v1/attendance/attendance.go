@@ -291,8 +291,10 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 	return c.Respond(map[string]interface{}{
 		"data":   response,
 		"status": true,
-	}, http.StatusOK)
-}
+	}, http.StatusOK) 
+	}
+
+
 func (uc Controller) CreateByQRCode(c *web.Context) error {
 	var request attendance.EnterRequest
 	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
