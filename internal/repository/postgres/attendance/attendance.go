@@ -286,7 +286,7 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Crea
 
 	return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Leave Button First"), http.StatusBadRequest)
 }
-
+  
 func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, string, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
