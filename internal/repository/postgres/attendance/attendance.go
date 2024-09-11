@@ -612,7 +612,7 @@ SELECT
     (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS late_arrival,
     (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_departures,
     (SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_come;
-	`
+	` 
 
 	err := r.DB.QueryRowContext(ctx, query).Scan(
 		&response.TotalEmployee,
