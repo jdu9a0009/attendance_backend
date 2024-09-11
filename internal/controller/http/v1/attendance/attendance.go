@@ -283,23 +283,15 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	// Check distance to each office
-	for _, office := range OfficeLocations {
-		distance := CalculateDistance(request.Latitude, request.Longitude, office.Latitude, office.Longitude)
-		if distance <= office.Radius {
-			response, err := uc.attendance.CreateByPhone(c.Ctx, request)
-			if err != nil {
-				return c.RespondError(err)
-			}
-
-			return c.Respond(map[string]interface{}{
-				"data":   response,
-				"status": true,
-			}, http.StatusOK)
-		}
+	response, err := uc.attendance.CreateByPhone(c.Ctx, request)
+	if err != nil {
+		return c.RespondError(err)
 	}
 
-	return c.RespondError(web.NewRequestError(errors.New("distance from all offices is greater than office radius"), http.StatusBadRequest))
+	return c.Respond(map[string]interface{}{
+		"data":   response,
+		"status": true,
+	}, http.StatusOK)
 }
 func (uc Controller) CreateByQRCode(c *web.Context) error {
 	var request attendance.EnterRequest
