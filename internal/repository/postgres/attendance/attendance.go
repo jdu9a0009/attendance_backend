@@ -605,10 +605,10 @@ func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, er
 
 	query := `
 SELECT
-    (SELECT COUNT(DISTINCT employee_id) FROM users WHERE deleted_at IS NULL) AS total_employee,
+    (SELECT COUNT(DISTINCT employee_id) FROM users WHERE role='EMPLOYEE' and deleted_at IS NULL) AS total_employee,
     (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '09:00' AND come_time < '10:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS on_time,
     (SELECT   count(distinct u.employee_id) FROM users u LEFT JOIN attendance a  ON u.employee_id = a.employee_id
-     AND a.work_day = current_date WHERE u.deleted_at IS NULL  AND a.employee_id IS NULL) AS absent,
+     AND a.work_day = current_date WHERE role='EMPLOYEE' and u.deleted_at IS NULL  AND a.employee_id IS NULL) AS absent,
     (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS late_arrival,
     (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_departures,
     (SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_come;
