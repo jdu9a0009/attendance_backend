@@ -79,6 +79,8 @@ type GenEmployeeID struct {
 
 	ID           int       `json:"id" bun:"-"`
 	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
+	FullName     *string   `json:"full_name"  bun:"full_name"`
+
 }
 type CreateRequest struct {
 	EmployeeID   *string `json:"employee_id"   form:"employee_id"`

@@ -805,3 +805,18 @@ LIMIT 1;
 	}
 	return detail, nil
 }
+func (r Repository) getExistingAttendance(ctx context.Context, employeeID *string) (GenEmployeeID, error) {
+
+	var existingAttendance GenEmployeeID
+	err := r.NewSelect().
+		Model(&existingAttendance).
+		Where("employee_id = ? ", employeeID).
+		Limit(1).
+		Scan(ctx)
+
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return GenEmployeeID{}, web.NewRequestError(errors.Wrap(err, "checking attendance"), http.StatusBadRequest)
+	}
+
+	return existingAttendance, nil
+}
