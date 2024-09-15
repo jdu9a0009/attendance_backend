@@ -39,7 +39,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		return []GetListResponse{}, 0, err
 	}
 
-	whereQuery := fmt.Sprintf(`WHERE a.deleted_at IS NULL AND u.deleted_at IS NULL`)
+	whereQuery := fmt.Sprintf(`WHERE a.deleted_at IS NULL `)
 
 	if filter.Search != nil {
 		search := strings.Replace(*filter.Search, " ", "", -1)
@@ -55,12 +55,13 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
 
+	// Add status filter for users
 	if filter.Status != nil {
 		statusValue := "false"
 		if *filter.Status {
 			statusValue = "true"
 		}
-		whereQuery += fmt.Sprintf(" AND a.status = %s", statusValue)
+		whereQuery += fmt.Sprintf(" AND u.status = %s", statusValue)
 	}
 
 	if filter.Date != nil {
@@ -258,7 +259,7 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	}
 
 	if existingAttendance.ComeTime != nil {
-		return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Leave Button First"), http.StatusBadRequest)
+		return CreateResponse{}, web.NewRequestError(errors.New("まず退勤してください"), http.StatusBadRequest)
 	}
 
 	return r.createNewAttendance(ctx, claims, request)
@@ -277,16 +278,16 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Crea
 		return CreateResponse{}, err
 	}
 	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
-		return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Come Button First"), http.StatusBadRequest)
+		return CreateResponse{}, web.NewRequestError(errors.New("まず退勤してください"), http.StatusBadRequest)
 	}
 
 	if existingAttendance.ComeTime != nil {
 		return r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
 	}
 
-	return CreateResponse{}, web.NewRequestError(errors.New("Please Click The Leave Button First"), http.StatusBadRequest)
+	return CreateResponse{}, web.NewRequestError(errors.New("まず退勤してください"), http.StatusBadRequest)
 }
-  
+
 func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, string, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
@@ -302,17 +303,17 @@ func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (C
 	}
 	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
 		response, err := r.resetLeaveTimeAndCreatePeriod(ctx, claims, existingAttendance, request.EmployeeID)
-		return response, "ReWelcome Digital Knowledge", err
+		return response, "仕事へようこそ", err
 	}
 
 	if existingAttendance.ComeTime != nil {
 
 		response, err := r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
-		return response, "Get home safely", err
+		return response, "無事に帰宅", err
 	}
 
 	response, err := r.createNewAttendance(ctx, claims, request)
-	return response, "Welcome Digital Knowledge", err
+	return response, "仕事へようこそ", err
 }
 
 func (r Repository) handleExistingAttendance(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
@@ -602,19 +603,20 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 
 func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, error) {
 	var response GetStatisticResponse
+	workDay := time.Now().Format("2006-01-02")
 
 	query := `
 SELECT
-    (SELECT COUNT(DISTINCT employee_id) FROM users WHERE role='EMPLOYEE' and deleted_at IS NULL) AS total_employee,
-    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '09:00' AND come_time < '10:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS on_time,
-    (SELECT   count(distinct u.employee_id) FROM users u LEFT JOIN attendance a  ON u.employee_id = a.employee_id
-     AND a.work_day = current_date WHERE role='EMPLOYEE' and u.deleted_at IS NULL  AND a.employee_id IS NULL) AS absent,
-    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS late_arrival,
-    (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_departures,
-    (SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00' AND deleted_at IS NULL AND work_day = CURRENT_DATE) AS early_come;
-	` 
+    (SELECT COUNT(DISTINCT employee_id) FROM users WHERE role='EMPLOYEE' AND deleted_at IS NULL) AS total_employee,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '09:00' AND come_time < '10:00' AND deleted_at IS NULL AND work_day = ?) AS on_time,
+    (SELECT COUNT(DISTINCT u.employee_id) FROM users u LEFT JOIN attendance a ON u.employee_id = a.employee_id
+     AND a.work_day = ? WHERE role='EMPLOYEE' AND u.deleted_at IS NULL AND a.employee_id IS NULL) AS absent,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00' AND deleted_at IS NULL AND work_day =?) AS late_arrival,
+    (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00' AND deleted_at IS NULL AND work_day = ?) AS early_departures,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00' AND deleted_at IS NULL AND work_day = ?) AS early_come;
+	`
 
-	err := r.DB.QueryRowContext(ctx, query).Scan(
+	err := r.DB.QueryRowContext(ctx, query, workDay, workDay, workDay, workDay, workDay).Scan(
 		&response.TotalEmployee,
 		&response.OnTime,
 		&response.Absent,
@@ -629,28 +631,28 @@ SELECT
 	return response, nil
 }
 func (r Repository) GetPieChartStatistic(ctx context.Context) (PieChartResponse, error) {
-	query := fmt.Sprintf(`
+	workDay := time.Now().Format("2006-01-02")
+
+	query := `
 WITH today_attendance AS (
     SELECT
-        COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = CURRENT_DATE) AS come_count,
+        COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = ?) AS come_count,
         COUNT(DISTINCT u.employee_id) AS total_count,
         COUNT(u.employee_id) FILTER (WHERE a.employee_id IS NULL) AS absent_count
     FROM users u
-    LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.work_day = CURRENT_DATE
+    LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.work_day = ?
     WHERE u.status = 'false' AND u.deleted_at IS NULL
 )
 SELECT
     COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS come_percentage,
     COALESCE(ROUND(100.0 * absent_count / GREATEST(1, total_count), 2), 0) AS absent_percentage
 FROM today_attendance;
-
-`)
-	//
+`
 
 	var detail PieChartResponse
-
-	row := r.QueryRowContext(ctx, query)
 	var comePercentage, absentPercentage float64
+
+	row := r.QueryRowContext(ctx, query, workDay, workDay)
 	err := row.Scan(&comePercentage, &absentPercentage)
 	if err != nil {
 		return PieChartResponse{}, web.NewRequestError(errors.Wrap(err, "response pie chart data not found"), http.StatusBadRequest)
@@ -667,27 +669,29 @@ func Int(i int) *int {
 }
 
 func (r Repository) GetBarChartStatistic(ctx context.Context) ([]BarChartResponse, error) {
+	workDay := time.Now().Format("2006-01-02")
+	fmt.Println("Workday:", workDay)
 	query := `
     WITH today_attendance AS (
+        SELECT
+            COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = ?) AS come_count,
+            COUNT(DISTINCT u.employee_id) AS total_count,
+            u.department_id
+        FROM department d
+        LEFT JOIN users u ON d.id = u.department_id AND u.deleted_at IS NULL
+        LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.deleted_at IS NULL
+        WHERE d.deleted_at IS NULL
+        GROUP BY u.department_id
+    )
     SELECT
-    COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = CURRENT_DATE) AS come_count,
-    COUNT(DISTINCT u.employee_id) AS total_count,
-    u.department_id
-FROM department d
-LEFT JOIN users u ON d.id = u.department_id AND u.deleted_at IS NULL
-LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.deleted_at IS NULL
-WHERE d.deleted_at IS NULL
-GROUP BY u.department_id
-)
-SELECT
-    d.name AS department,
-    COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
-FROM department d
-LEFT JOIN today_attendance ON d.id = today_attendance.department_id
-WHERE d.deleted_at IS NULL;
-`
+        d.name AS department,
+        COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
+    FROM department d
+    LEFT JOIN today_attendance ON d.id = today_attendance.department_id
+    WHERE d.deleted_at IS NULL;
+    `
 
-	rows, err := r.QueryContext(ctx, query)
+	rows, err := r.DB.QueryContext(ctx, query, workDay)
 	if err != nil {
 		return nil, err
 	}
@@ -726,21 +730,21 @@ func (r Repository) GetGraphStatistic(ctx context.Context, filter GraphRequest) 
 	endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
 
 	query := `
-    WITH today_attendance AS (
-        SELECT
-            a.work_day,  -- work_day is of type DATE in the database
-            COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = CURRENT_DATE) AS come_count,
-            (SELECT COUNT(DISTINCT employee_id) FROM users WHERE deleted_at IS NULL) AS total_count
-        FROM attendance a
-        LEFT JOIN users u ON a.employee_id = u.employee_id
-        WHERE a.deleted_at IS NULL
-            AND a.work_day BETWEEN $1 AND $2
-        GROUP BY a.work_day
-    )
+WITH today_attendance AS (
     SELECT
-        work_day,
-        COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
-    FROM today_attendance;
+        a.work_day,  -- work_day is of type DATE in the database
+        COUNT(DISTINCT a.employee_id) AS come_count,
+        (SELECT COUNT(DISTINCT employee_id) FROM users WHERE deleted_at IS NULL) AS total_count
+    FROM attendance a
+    LEFT JOIN users u ON a.employee_id = u.employee_id
+    WHERE a.deleted_at IS NULL
+        AND a.work_day BETWEEN $1 AND $2
+    GROUP BY a.work_day
+)
+SELECT
+    work_day,
+    COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
+FROM today_attendance;
     `
 
 	stmt, err := r.Prepare(query)

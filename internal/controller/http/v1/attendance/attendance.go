@@ -319,24 +319,17 @@ func (uc Controller) ExitByPhone(c *web.Context) error {
 	  return c.RespondError(err)
 	}
   
-	// Check distance to each office
-	for _, office := range OfficeLocations {
-	  distance := CalculateDistance(request.Latitude, request.Longitude, office.Latitude, office.Longitude)
-	  if distance <= office.Radius {
-		response,  err := uc.attendance.ExitByPhone(c.Ctx, request)
-		if err != nil {
-		  return c.RespondError(err)
-		}
-  
-		return c.Respond(map[string]interface{}{
-		  "data":    response,
-		  "status":  true,
-		}, http.StatusOK)
-	  }
+	response,  err := uc.attendance.ExitByPhone(c.Ctx, request)
+	if err != nil {
+	  return c.RespondError(err)
 	}
-	return c.RespondError(web.NewRequestError(errors.New("正常ないちではないためチェックインできません"), http.StatusBadRequest))
 
-}
+	return c.Respond(map[string]interface{}{
+	  "data":    response,
+	  "status":  true,
+	}, http.StatusOK)
+  }
+
 
 func CalculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
 	// Haversine formula to calculate the great-circle distance between two points
