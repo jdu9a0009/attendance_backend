@@ -9,7 +9,6 @@ import (
 	"time"
 	"university-backend/foundation/web"
 	"university-backend/internal/auth"
-	"university-backend/internal/entity"
 	"university-backend/internal/pkg/repository/postgresql"
 	"university-backend/internal/repository/postgres"
 
@@ -23,14 +22,6 @@ type Repository struct {
 
 func NewRepository(database *postgresql.Database) *Repository {
 	return &Repository{Database: database}
-}
-
-func (r Repository) GetById(ctx context.Context, id int) (entity.Attendance, error) {
-	var detail entity.Attendance
-
-	err := r.NewSelect().Model(&detail).Where("id = ?", id).Scan(ctx)
-
-	return detail, err
 }
 
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
@@ -55,14 +46,6 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
 
-	// Add status filter for users
-	if filter.Status != nil {
-		statusValue := "false"
-		if *filter.Status {
-			statusValue = "true"
-		}
-		whereQuery += fmt.Sprintf(" AND u.status = %s", statusValue)
-	}
 
 	if filter.Date != nil {
 		date, err := time.Parse("2006-01-02", *filter.Date)
