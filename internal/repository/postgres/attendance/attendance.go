@@ -30,7 +30,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		return []GetListResponse{}, 0, err
 	}
 
-	whereQuery := fmt.Sprintf(`WHERE a.deleted_at IS NULL `)
+	whereQuery := `WHERE u.deleted_at IS NULL and u.role='EMPLOYEE'  ` // Ensure we only get active users
 
 	if filter.Search != nil {
 		search := strings.Replace(*filter.Search, " ", "", -1)
@@ -45,21 +45,26 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	if filter.PositionID != nil {
 		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
-
+	if filter.Status != nil {
+		if *filter.Status {
+			whereQuery += " AND a.status = TRUE"
+		} else {
+			whereQuery += " AND a.status = FALSE"
+		}
+	}
+	var dateCondition string
 
 	if filter.Date != nil {
 		date, err := time.Parse("2006-01-02", *filter.Date)
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "date parse"), http.StatusBadRequest)
 		}
-		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", date.Format("2006-01-02"))
+		dateCondition = fmt.Sprintf("'%s'", date.Format("2006-01-02"))
 	} else {
 		today := time.Now().Format("2006-01-02")
-		whereQuery += fmt.Sprintf(" AND a.work_day = '%s'", today)
+		dateCondition = fmt.Sprintf("'%s'", today)
 	}
-	groupByQuery := `GROUP BY a.id, a.employee_id, u.full_name, u.department_id, d.name, 
-	u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time`
-	orderQuery := "ORDER BY a.created_at DESC"
+
 	limitQuery, offsetQuery := "", ""
 
 	if filter.Page != nil && filter.Limit != nil {
@@ -71,31 +76,36 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		limitQuery = fmt.Sprintf("LIMIT %d", *filter.Limit)
 	}
 
+	groupByQuery := `GROUP BY u.employee_id, u.full_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time`
+	orderQuery := "ORDER BY u.full_name" // Order by user's name or any other field
+
 	if filter.Offset != nil {
 		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset)
 	}
+	// today := time.Now().Format("2006-01-02")
 
-	query := fmt.Sprintf(`
-		SELECT
-		    a.id,
-			a.employee_id,
-			u.full_name,
-			u.department_id,
-			d.name,
-			u.position_id,
-			p.name,
-			a.work_day,
-			a.status,
-			TO_CHAR(a.come_time, 'HH24:MI'),
-			TO_CHAR(a.leave_time, 'HH24:MI'),
-		   COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
-		FROM attendance AS a
-		LEFT JOIN users u ON a.employee_id = u.employee_id
-		LEFT JOIN department d ON u.department_id = d.id
-		LEFT JOIN position p ON u.position_id = p.id
-		LEFT JOIN  attendance_period as ap ON ap.attendance_id=a.id
-		%s %s %s %s %s
-	`, whereQuery, groupByQuery, orderQuery, limitQuery, offsetQuery)
+	query := fmt.Sprintf(`SELECT
+
+    u.employee_id,
+    u.full_name,
+    u.department_id,
+    d.name AS department_name,
+    u.position_id,
+    p.name AS position_name,
+    a.work_day,
+    a.status,
+    TO_CHAR(a.come_time, 'HH24:MI') AS come_time,
+    TO_CHAR(a.leave_time, 'HH24:MI') AS leave_time,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
+FROM users u
+LEFT JOIN attendance a ON u.employee_id = a.employee_id AND a.work_day = %s AND a.deleted_at IS NULL
+LEFT JOIN department d ON u.department_id = d.id
+LEFT JOIN position p ON u.position_id = p.id
+LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
+
+
+		%s %s %s%s%s
+	`, dateCondition, whereQuery, groupByQuery, orderQuery, limitQuery, offsetQuery)
 
 	rows, err := r.QueryContext(ctx, query)
 	if err != nil {
@@ -113,7 +123,6 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		var totalMinutes int
 
 		err = rows.Scan(
-			&detail.ID,
 			&detail.EmployeeID,
 			&detail.Fullname,
 			&detail.DepartmentID,
@@ -139,13 +148,13 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	}
 
 	countQuery := fmt.Sprintf(`
-		SELECT COUNT(a.id)
-		FROM attendance AS a
-		LEFT JOIN users u ON a.employee_id = u.employee_id
-		LEFT JOIN department d ON u.department_id = d.id
-		LEFT JOIN position p ON u.position_id = p.id
-		%s
-	`, whereQuery)
+		SELECT COUNT(DISTINCT u.employee_id)
+           FROM users AS u
+        LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.work_day = %s AND a.deleted_at IS NULL
+        LEFT JOIN department d ON u.department_id = d.id
+        LEFT JOIN position p ON u.position_id = p.id
+          %s
+	   `, dateCondition, whereQuery)
 
 	countRows, err := r.QueryContext(ctx, countQuery)
 	if err != nil {
