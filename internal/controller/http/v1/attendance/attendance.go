@@ -42,6 +42,11 @@ var OfficeLocations = []OfficeLocation{
 		Longitude: 139.7745439,
 		Radius:    3000.0,
 	},
+	{
+		Latitude:  41.2844032,
+		Longitude: 69.2322304,
+		Radius:    3000.0,
+	},
 }
 
 func (uc Controller) GetList(c *web.Context) error {
@@ -316,20 +321,19 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 func (uc Controller) ExitByPhone(c *web.Context) error {
 	var request attendance.EnterRequest
 	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
-	  return c.RespondError(err)
+		return c.RespondError(err)
 	}
-  
-	response,  err := uc.attendance.ExitByPhone(c.Ctx, request)
+
+	response, err := uc.attendance.ExitByPhone(c.Ctx, request)
 	if err != nil {
-	  return c.RespondError(err)
+		return c.RespondError(err)
 	}
 
 	return c.Respond(map[string]interface{}{
-	  "data":    response,
-	  "status":  true,
+		"data":   response,
+		"status": true,
 	}, http.StatusOK)
-  }
-
+}
 
 func CalculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
 	// Haversine formula to calculate the great-circle distance between two points
