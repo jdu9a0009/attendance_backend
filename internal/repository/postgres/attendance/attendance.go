@@ -121,7 +121,7 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 	for rows.Next() {
 		var detail GetListResponse
 		var totalMinutes int
-
+		var status sql.NullBool
 		err = rows.Scan(
 			&detail.EmployeeID,
 			&detail.Fullname,
@@ -130,7 +130,7 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 			&detail.PositionID,
 			&detail.Position,
 			&detail.WorkDay,
-			&detail.Status,
+			&status,
 			&detail.ComeTime,
 			&detail.LeaveTime,
 			&totalMinutes,
@@ -138,6 +138,14 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance list"), http.StatusBadRequest)
 		}
+
+		var statusValue bool = false
+		if status.Valid {
+			statusValue = status.Bool
+		}
+
+		// Assign the address of statusValue to detail.Status
+		detail.Status = &statusValue
 
 		hours := totalMinutes / 60
 		minutes := totalMinutes % 60
@@ -585,6 +593,7 @@ func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userI
 		Table("attendance").
 		Where("deleted_at IS NULL AND id = ?", id).
 		Set("leave_time = ?", leaveTimeStr).
+		Set("status = ?", false).
 		Set("updated_at = ?", currentTime).
 		Set("updated_by = ?", userId).
 		Exec(ctx)
@@ -607,6 +616,7 @@ func (r Repository) resetAttendanceLeaveTime(ctx context.Context, id int, userId
 	_, err := r.NewUpdate().
 		Table("attendance").
 		Where("id = ?", id).
+		Set("come_time = ?", time.Now().Format("15:04")).
 		Set("leave_time = NULL").
 		Set("updated_at = ?", time.Now()).
 		Set("updated_by = ?", userId).

@@ -84,7 +84,6 @@ func (uc Controller) GetList(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-
 	return c.Respond(map[string]interface{}{
 		"data": map[string]interface{}{
 			"results": list,
