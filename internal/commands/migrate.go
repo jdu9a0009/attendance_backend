@@ -133,7 +133,7 @@ var scheme = []Scheme{
         );`,
 	},
 	{
-		Index:       10,
+		Index:       13,
 		Description: "Create table: company_info.",
 		Query: `
         CREATE TABLE company_info (
@@ -153,6 +153,36 @@ var scheme = []Scheme{
 			deleted_at TIMESTAMP,
             deleted_by INT REFERENCES users(id)
         );`,
+	},
+	{
+		Index:       14,
+		Description: "Insert data fortable: company_info.",
+		Query: `
+        INSERT INTO company_info (
+        id,
+        company_name,
+        url,
+        latitude,
+        longitude,
+        start_time,
+        end_time,
+        late_time,
+        over_end_time,
+        created_by,
+        updated_by
+    ) VALUES (
+        1,
+        'Digital Knowledge',
+        'statics/company_info/2024-09-24T20:49:17+05:00-Screenshot from 2024-09-24 13-55-14.png',
+        41.319006,
+        41.319006,
+        '09:00:00',
+        '18:00:00',
+        '09:20:00',
+        '22:30:00',
+        1,
+        1
+);`,
 	},
 }
 

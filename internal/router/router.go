@@ -120,9 +120,8 @@ func (r Router) Init() error {
 	r.Patch("/api/v1/position/:id", positionController.UpdateColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Delete("/api/v1/position/:id", positionController.Delete, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	// #companyInfo
-	r.Post("/api/v1/company_info/create", companyInfoController.Create, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/company_info/list", companyInfoController.GetInfo, middleware.Authenticate(r.auth, auth.RoleAdmin))
-	r.Patch("/api/v1/company_info/:id", companyInfoController.UpdateColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Put("/api/v1/company_info/:id", companyInfoController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
 	// #attendance
 	r.Get("/api/v1/attendance/list", attendanceController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard))
