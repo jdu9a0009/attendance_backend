@@ -132,6 +132,28 @@ var scheme = []Scheme{
             work_day DATE NOT NULL
         );`,
 	},
+	{
+		Index:       10,
+		Description: "Create table: company_info.",
+		Query: `
+        CREATE TABLE company_info (
+            id SERIAL PRIMARY KEY,
+            company_name VARCHAR(250) NOT NULL,
+			url VARCHAR(100) NOT NULL,
+			latitude FLOAT NOT NULL,
+			longitude FLOAT NOT NULL,
+            start_time TIME,
+			end_time TIME,
+			late_time TIME,
+			over_end_time TIME,
+            created_at TIMESTAMP DEFAULT NOW(),
+            created_by INT REFERENCES users(id),
+            updated_at TIMESTAMP,
+            updated_by INT REFERENCES users(id),
+			deleted_at TIMESTAMP,
+            deleted_by INT REFERENCES users(id)
+        );`,
+	},
 }
 
 // Migrate creates the scheme in the database.

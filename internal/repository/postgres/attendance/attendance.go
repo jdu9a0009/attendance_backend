@@ -11,6 +11,7 @@ import (
 	"university-backend/internal/auth"
 	"university-backend/internal/pkg/repository/postgresql"
 	"university-backend/internal/repository/postgres"
+	"university-backend/internal/repository/postgres/companyInfo"
 
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
@@ -323,57 +324,6 @@ func (r Repository) GetHistoryById(ctx context.Context, employeeID string, date 
 
 	return list, count, nil
 }
-
-// func (r Repository) GetHistoryById(ctx context.Context, employee_id string, date date.Date) ([]GetHistoryByIdResponse, error) {
-// 	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
-// 	if err != nil {
-// 		return []GetHistoryByIdResponse{}, err
-// 	}
-// 	fmt.Println("Employee_id repo", employee_id)
-// 	query := `
-// 		SELECT
-// 			a.employee_id,
-// 			u.full_name,
-// 			a.status,
-// 			a.work_day,
-// 			TO_CHAR(ap.come_time, 'HH24:MI'),
-// 			TO_CHAR(ap.leave_time, 'HH24:MI'),
-// 			COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
-// 		FROM attendance a
-// 		LEFT JOIN users u ON a.employee_id = u.employee_id
-// 		LEFT JOIN attendance_period as ap ON ap.attendance_id = a.id
-// 		WHERE u.deleted_at is null and a.deleted_at IS NULL AND a.employee_id = ? AND ap.work_day = ?
-// 		GROUP BY a.employee_id, u.full_name, a.status, a.work_day, ap.come_time, ap.leave_time
-// 		ORDER BY ap.come_time, ap.leave_time
-// 	`
-
-// 	var detail GetHistoryByIdResponse
-
-// 	var totalMinutes int
-// 	err = r.QueryRowContext(ctx, query, employee_id, date).Scan(
-// 		&detail.EmployeeID,
-// 		&detail.Fullname,
-// 		&detail.Status,
-// 		&detail.WorkDay,
-// 		&detail.ComeTime,
-// 		&detail.LeaveTime,
-// 		&totalMinutes,
-// 	)
-// 	if errors.Is(err, sql.ErrNoRows) {
-// 		return []GetHistoryByIdResponse{}, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-// 	}
-// 	if err != nil {
-// 		return []GetHistoryByIdResponse{}, errors.Wrap(err, "scanning attendance History details")
-// 	}
-// 	var list []GetHistoryByIdResponse
-// 	hours := totalMinutes / 60
-// 	minutes := totalMinutes % 60
-// 	totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
-// 	detail.TotalHours = totalHours
-// 	list = append(list, detail)
-// 	return list, nil
-
-// }
 
 func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (CreateResponse, error) {
 	claims, err := r.CheckClaims(ctx)
@@ -740,25 +690,43 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, error) {
 	var response GetStatisticResponse
 	workDay := time.Now().Format("2006-01-02")
+	timeNow := time.Now().Format("15:04")
+	// Create an instance of companyInfo.Repository
+	companyRepo := companyInfo.NewRepository(r.Database)
+
+	// Call the GetInfo method
+	companyInfoResponse, err := companyRepo.GetInfo(ctx)
+
+	if err != nil {
+		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "fetching company info"), http.StatusBadRequest)
+	}
+
+	// Extract timing values from companyInfoResponse
+	startTime := companyInfoResponse.StartTime
+	endTime := companyInfoResponse.EndTime
+	lateTime := companyInfoResponse.LateTime
+	overEndTime := companyInfoResponse.OverEndTime
 
 	query := `
-SELECT
+   SELECT
     (SELECT COUNT(DISTINCT employee_id) FROM users WHERE role='EMPLOYEE' AND deleted_at IS NULL) AS total_employee,
-    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '09:00' AND come_time < '10:00' AND deleted_at IS NULL AND work_day = ?) AS on_time,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= ? AND come_time < ? AND deleted_at IS NULL AND work_day = ?) AS on_time,
     (SELECT COUNT(DISTINCT u.employee_id) FROM users u LEFT JOIN attendance a ON u.employee_id = a.employee_id
      AND a.work_day = ? WHERE role='EMPLOYEE' AND u.deleted_at IS NULL AND a.employee_id IS NULL) AS absent,
-    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= '10:00' AND deleted_at IS NULL AND work_day =?) AS late_arrival,
-    (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < '18:00' AND deleted_at IS NULL AND work_day = ?) AS early_departures,
-    (SELECT COUNT(employee_id) FROM attendance WHERE come_time < '09:00' AND deleted_at IS NULL AND work_day = ?) AS early_come;
-	`
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= ? AND deleted_at IS NULL AND work_day =?) AS late_arrival,
+    (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < ? AND deleted_at IS NULL AND work_day = ?) AS early_departures,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time < ? AND deleted_at IS NULL AND work_day = ?) AS early_come,
+    (SELECT COUNT(employee_id) FROM attendance WHERE (leave_time IS NOT NULL AND ? < ? AND work_day = ?) OR (leave_time < ? AND work_day = ?)) AS over_time;
+ 	`
 
-	err := r.DB.QueryRowContext(ctx, query, workDay, workDay, workDay, workDay, workDay).Scan(
+	err = r.DB.QueryRowContext(ctx, query, startTime, lateTime, workDay, workDay, lateTime, workDay, endTime, workDay, startTime, workDay, endTime, timeNow, workDay, overEndTime, workDay).Scan(
 		&response.TotalEmployee,
 		&response.OnTime,
 		&response.Absent,
 		&response.LateArrival,
 		&response.EarlyDepartures,
 		&response.EarlyCome,
+		&response.OverTime,
 	)
 	if err != nil {
 		return GetStatisticResponse{}, web.NewRequestError(errors.Wrap(err, "fetching statistics"), http.StatusBadRequest)
@@ -766,11 +734,12 @@ SELECT
 
 	return response, nil
 }
+
 func (r Repository) GetPieChartStatistic(ctx context.Context) (PieChartResponse, error) {
 	workDay := time.Now().Format("2006-01-02")
 
 	query := `
-WITH today_attendance AS (
+  WITH today_attendance AS (
     SELECT
         COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = ?) AS come_count,
         COUNT(DISTINCT u.employee_id) AS total_count,
@@ -778,12 +747,12 @@ WITH today_attendance AS (
     FROM users u
     LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.work_day = ?
     WHERE u.status = 'false' AND u.deleted_at IS NULL
-)
-SELECT
+ )
+ SELECT
     COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS come_percentage,
     COALESCE(ROUND(100.0 * absent_count / GREATEST(1, total_count), 2), 0) AS absent_percentage
-FROM today_attendance;
-`
+ FROM today_attendance;
+ `
 
 	var detail PieChartResponse
 	var comePercentage, absentPercentage float64
@@ -866,7 +835,7 @@ func (r Repository) GetGraphStatistic(ctx context.Context, filter GraphRequest) 
 	endDate := time.Date(filter.Month.Year(), filter.Month.Month(), endDay, 23, 59, 59, 999999999, time.UTC)
 
 	query := `
-WITH today_attendance AS (
+ WITH today_attendance AS (
     SELECT
         a.work_day,  -- work_day is of type DATE in the database
         COUNT(DISTINCT a.employee_id) AS come_count,
@@ -876,11 +845,11 @@ WITH today_attendance AS (
     WHERE a.deleted_at IS NULL
         AND a.work_day BETWEEN $1 AND $2
     GROUP BY a.work_day
-)
-SELECT
+ )
+ SELECT
     work_day,
     COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS percentage
-FROM today_attendance;
+ FROM today_attendance;
     `
 
 	stmt, err := r.Prepare(query)

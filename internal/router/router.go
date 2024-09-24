@@ -6,6 +6,7 @@ import (
 	"university-backend/internal/auth"
 	"university-backend/internal/controller/http/v1/file"
 	"university-backend/internal/repository/postgres/attendance"
+	"university-backend/internal/repository/postgres/companyInfo"
 	"university-backend/internal/repository/postgres/department"
 	"university-backend/internal/repository/postgres/position"
 
@@ -19,6 +20,7 @@ import (
 
 	attendance_controller "university-backend/internal/controller/http/v1/attendance"
 	auth_controller "university-backend/internal/controller/http/v1/auth"
+	companyInfo_controller "university-backend/internal/controller/http/v1/companyInfo"
 	department_controller "university-backend/internal/controller/http/v1/department"
 	position_controller "university-backend/internal/controller/http/v1/position"
 	user_controller "university-backend/internal/controller/http/v1/user"
@@ -70,6 +72,7 @@ func (r Router) Init() error {
 	userPostgres := user.NewRepository(r.postgresDB)
 	departmentPostgres := department.NewRepository(r.postgresDB)
 	positionPostgres := position.NewRepository(r.postgresDB)
+	companyInfoPostgres := companyInfo.NewRepository(r.postgresDB)
 	attendancePostgres := attendance.NewRepository(r.postgresDB)
 
 	// controller
@@ -77,6 +80,8 @@ func (r Router) Init() error {
 	authController := auth_controller.NewController(userPostgres)
 	departmentController := department_controller.NewController(departmentPostgres)
 	positionController := position_controller.NewController(positionPostgres)
+	companyInfoController := companyInfo_controller.NewController(companyInfoPostgres)
+
 	attendanceController := attendance_controller.NewController(attendancePostgres)
 
 	fileC := file.NewController(r.App, r.fileServerBasePath)
@@ -114,6 +119,10 @@ func (r Router) Init() error {
 	r.Put("/api/v1/position/:id", positionController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Patch("/api/v1/position/:id", positionController.UpdateColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Delete("/api/v1/position/:id", positionController.Delete, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	// #companyInfo
+	r.Post("/api/v1/company_info/create", companyInfoController.Create, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Get("/api/v1/company_info/list", companyInfoController.GetInfo, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Patch("/api/v1/company_info/:id", companyInfoController.UpdateColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
 	// #attendance
 	r.Get("/api/v1/attendance/list", attendanceController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard))
