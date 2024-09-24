@@ -118,6 +118,7 @@ func (r Router) Init() error {
 	// #attendance
 	r.Get("/api/v1/attendance/list", attendanceController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard))
 	r.Get("/api/v1/attendance/:id", attendanceController.GetDetailById, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Get("/api/v1/attendance/history", attendanceController.GetHistoryById, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Post("/api/v1/attendance/createbyphone", attendanceController.CreateByPhone, middleware.Authenticate(r.auth))
 	r.Post("/api/v1/attendance/createbyqrcode", attendanceController.CreateByQRCode, middleware.Authenticate(r.auth))
 	r.Patch("/api/v1/attendance/exitbyphone", attendanceController.ExitByPhone, middleware.Authenticate(r.auth))

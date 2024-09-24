@@ -47,6 +47,19 @@ type GetDetailByIdResponse struct {
 	LeaveTime    *string `json:"leave_time,omitempty"`
 	TotalHours   string  `json:"total_hours"`
 }
+type GetHistoryByIdResponse struct {
+	EmployeeID *string `json:"employee_id"`
+	Fullname   *string `json:"full_name"`
+	Status     *bool   `json:"status"`
+	WorkDay    *string `json:"work_day"`
+	ComeTime   *string `json:"come_time,omitempty"`
+	LeaveTime  *string `json:"leave_time,omitempty"`
+	TotalHours string  `json:"total_hours"`
+}
+type GetHistoryByIdRequest struct {
+	EmployeeID string     `json:"employee_id"`
+	Date       *date.Date `json:"date"`
+}
 
 type CreateRequest struct {
 	EmployeeID *string `json:"employee_id" form:"employee_id"`
@@ -62,7 +75,7 @@ type CreateResponse struct {
 	LeaveTime  *string   `json:"leave_time" bun:"leave_time"`
 	CreatedAt  time.Time `json:"-"          bun:"created_at"`
 	CreatedBy  int       `json:"-"          bun:"created_by"`
-} 
+}
 type AttendancePeriod struct {
 	bun.BaseModel `bun:"table:attendance_period"`
 

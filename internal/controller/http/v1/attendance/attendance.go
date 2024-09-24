@@ -2,6 +2,7 @@ package attendance
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"reflect"
@@ -111,6 +112,36 @@ func (uc Controller) GetDetailById(c *web.Context) error {
 	}, http.StatusOK)
 }
 
+func (uc Controller) GetHistoryById(c *web.Context) error {
+	// Get the 'month' query parameter
+	datestr := c.Query("date")
+	if datestr == "" {
+		return c.RespondError(web.NewRequestError(errors.New("date parameter is required"), http.StatusBadRequest))
+	}
+	parsedDate, err := date.ParseDate(datestr)
+	if err != nil {
+		return c.RespondError(web.NewRequestError(errors.New("invalid date format"), http.StatusBadRequest))
+	}
+
+	// Get the 'employee_id' query parameter
+	employee_id := c.Query("employee_id")
+	if employee_id == "" {
+		return c.RespondError(web.NewRequestError(errors.New("employee_id parameter is required"), http.StatusBadRequest))
+	}
+	fmt.Println("Controlller employe_id", employee_id)
+	list, count, err := uc.attendance.GetHistoryById(c.Ctx, employee_id, parsedDate)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return c.Respond(map[string]interface{}{
+		"data": map[string]interface{}{
+			"results": list,
+			"count":   count,
+		},
+		"status": true,
+	}, http.StatusOK)
+}
 func (uc Controller) GetStatistics(c *web.Context) error {
 
 	if err := c.ValidParam(); err != nil {

@@ -233,6 +233,140 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 	return detail, nil
 }
 
+func (r Repository) GetHistoryById(ctx context.Context, employeeID string, date date.Date) ([]GetHistoryByIdResponse, int, error) {
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return []GetHistoryByIdResponse{}, 0, err
+	}
+
+	query := `
+		SELECT
+			a.employee_id,
+			u.full_name,
+			a.status,
+			a.work_day,
+			TO_CHAR(ap.come_time, 'HH24:MI') as come_time,
+			TO_CHAR(ap.leave_time, 'HH24:MI') as leave_time,
+			COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
+		FROM attendance a
+		LEFT JOIN users u ON a.employee_id = u.employee_id 
+		LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
+		WHERE u.deleted_at IS NULL AND a.deleted_at IS NULL AND u.role = 'EMPLOYEE' AND a.employee_id = ? AND ap.work_day = ?
+		GROUP BY a.employee_id, u.full_name, a.status, a.work_day, ap.come_time, ap.leave_time
+		ORDER BY ap.come_time, ap.leave_time
+	`
+
+	rows, err := r.QueryContext(ctx, query, employeeID, date)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusNotFound)
+		}
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting attendance history"), http.StatusInternalServerError)
+	}
+	defer rows.Close()
+
+	var list []GetHistoryByIdResponse
+
+	for rows.Next() {
+		var detail GetHistoryByIdResponse
+		var totalMinutes int
+
+		err = rows.Scan(
+			&detail.EmployeeID,
+			&detail.Fullname,
+			&detail.Status,
+			&detail.WorkDay,
+			&detail.ComeTime,
+			&detail.LeaveTime,
+			&totalMinutes,
+		)
+		if err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance history list"), http.StatusBadRequest)
+		}
+
+		hours := totalMinutes / 60
+		minutes := totalMinutes % 60
+		totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
+		detail.TotalHours = totalHours
+
+		list = append(list, detail)
+	}
+
+	countQuery := `
+		SELECT COUNT(ap.attendance_id)
+		FROM attendance_period ap
+		LEFT JOIN attendance a ON a.id = ap.attendance_id 
+		LEFT JOIN users u ON u.employee_id = a.employee_id  
+		WHERE u.deleted_at IS NULL AND a.deleted_at IS NULL AND u.role = 'EMPLOYEE' AND a.employee_id = ? AND ap.work_day = ?
+	`
+
+	countRows, err := r.QueryContext(ctx, countQuery, employeeID, date)
+	if err != nil {
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "counting attendance history records"), http.StatusInternalServerError)
+	}
+	defer countRows.Close()
+
+	var count int
+	for countRows.Next() {
+		if err = countRows.Scan(&count); err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning attendance history count"), http.StatusInternalServerError)
+		}
+	}
+
+	return list, count, nil
+}
+
+// func (r Repository) GetHistoryById(ctx context.Context, employee_id string, date date.Date) ([]GetHistoryByIdResponse, error) {
+// 	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
+// 	if err != nil {
+// 		return []GetHistoryByIdResponse{}, err
+// 	}
+// 	fmt.Println("Employee_id repo", employee_id)
+// 	query := `
+// 		SELECT
+// 			a.employee_id,
+// 			u.full_name,
+// 			a.status,
+// 			a.work_day,
+// 			TO_CHAR(ap.come_time, 'HH24:MI'),
+// 			TO_CHAR(ap.leave_time, 'HH24:MI'),
+// 			COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
+// 		FROM attendance a
+// 		LEFT JOIN users u ON a.employee_id = u.employee_id
+// 		LEFT JOIN attendance_period as ap ON ap.attendance_id = a.id
+// 		WHERE u.deleted_at is null and a.deleted_at IS NULL AND a.employee_id = ? AND ap.work_day = ?
+// 		GROUP BY a.employee_id, u.full_name, a.status, a.work_day, ap.come_time, ap.leave_time
+// 		ORDER BY ap.come_time, ap.leave_time
+// 	`
+
+// 	var detail GetHistoryByIdResponse
+
+// 	var totalMinutes int
+// 	err = r.QueryRowContext(ctx, query, employee_id, date).Scan(
+// 		&detail.EmployeeID,
+// 		&detail.Fullname,
+// 		&detail.Status,
+// 		&detail.WorkDay,
+// 		&detail.ComeTime,
+// 		&detail.LeaveTime,
+// 		&totalMinutes,
+// 	)
+// 	if errors.Is(err, sql.ErrNoRows) {
+// 		return []GetHistoryByIdResponse{}, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+// 	}
+// 	if err != nil {
+// 		return []GetHistoryByIdResponse{}, errors.Wrap(err, "scanning attendance History details")
+// 	}
+// 	var list []GetHistoryByIdResponse
+// 	hours := totalMinutes / 60
+// 	minutes := totalMinutes % 60
+// 	totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
+// 	detail.TotalHours = totalHours
+// 	list = append(list, detail)
+// 	return list, nil
+
+// }
+
 func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (CreateResponse, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
