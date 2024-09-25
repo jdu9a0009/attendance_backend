@@ -713,13 +713,13 @@ func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, er
     (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= ? AND come_time < ? AND deleted_at IS NULL AND work_day = ?) AS on_time,
     (SELECT COUNT(DISTINCT u.employee_id) FROM users u LEFT JOIN attendance a ON u.employee_id = a.employee_id
      AND a.work_day = ? WHERE role='EMPLOYEE' AND u.deleted_at IS NULL AND a.employee_id IS NULL) AS absent,
-    (SELECT COUNT(employee_id) FROM attendance WHERE come_time >= ? AND deleted_at IS NULL AND work_day =?) AS late_arrival,
+    (SELECT COUNT(employee_id) FROM attendance WHERE come_time > ? AND deleted_at IS NULL AND work_day =?) AS late_arrival,
     (SELECT COUNT(employee_id) FROM attendance WHERE leave_time < ? AND deleted_at IS NULL AND work_day = ?) AS early_departures,
     (SELECT COUNT(employee_id) FROM attendance WHERE come_time < ? AND deleted_at IS NULL AND work_day = ?) AS early_come,
-    (SELECT COUNT(employee_id) FROM attendance WHERE (leave_time IS NOT NULL AND ? < ? AND work_day = ?) OR (leave_time < ? AND work_day = ?)) AS over_time;
+    (SELECT COUNT(employee_id) FROM attendance WHERE (leave_time IS NOT NULL AND ? < ? AND work_day = ?) OR (leave_time > ? AND work_day = ?)) AS over_time;
  	`
 
-	err = r.DB.QueryRowContext(ctx, query, startTime, lateTime, workDay, workDay, lateTime, workDay, endTime, workDay, startTime, workDay, endTime, timeNow, workDay, overEndTime, workDay).Scan(
+	err = r.DB.QueryRowContext(ctx, query, startTime, lateTime, workDay, workDay, startTime, workDay, endTime, workDay, startTime, workDay, endTime, timeNow, workDay, overEndTime, workDay).Scan(
 		&response.TotalEmployee,
 		&response.OnTime,
 		&response.Absent,
