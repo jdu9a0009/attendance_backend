@@ -78,13 +78,45 @@ func (uc Controller) GetUserDetailById(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
+func (uc Controller) GetQrCodeByEmployeeId(c *web.Context) error {
+	// Get the 'month' query parameter
+	employeeID := c.Query("employee_id")
+	if employeeID == "" {
+		return c.RespondError(web.NewRequestError(errors.New("month parameter is required"), http.StatusBadRequest))
+	}
 
+	// Call the repository method to get the QR code
+	response, err := uc.user.GetQrCodeByEmployeeID(c.Ctx, employeeID)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	// Return the response
+	return c.Respond(map[string]interface{}{
+		"data":   response,
+		"status": true,
+	}, http.StatusOK)
+}
+
+func (uc Controller) GetQrCodeList(c *web.Context) error {
+
+	response, err := uc.user.GetQrCodeList(c.Ctx)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	// Return the response
+	return c.Respond(map[string]interface{}{
+		"data":   response,
+		"status": true,
+	}, http.StatusOK)
+}
 func (uc Controller) CreateUser(c *web.Context) error {
 	var request user.CreateRequest
 	if err := c.BindFunc(&request); err != nil {
 		return c.RespondError(err)
 	}
-
+	fmt.Println("contro", request)
 	response, err := uc.user.Create(c.Ctx, request)
 	if err != nil {
 		return c.RespondError(err)

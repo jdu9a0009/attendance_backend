@@ -9,14 +9,17 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-contrib/cors v1.7.0
 	github.com/gin-gonic/gin v1.9.1
+	github.com/jung-kurt/gofpdf/v2 v2.17.3
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.5.1
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/uptrace/bun v1.1.17
 	github.com/uptrace/bun/dialect/pgdialect v1.1.17
 	github.com/uptrace/bun/driver/pgdriver v1.1.17
 	github.com/uptrace/bun/extra/bundebug v1.1.17
 	github.com/xuri/excelize/v2 v2.8.1
 	golang.org/x/crypto v0.21.0
+	golang.org/x/image v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

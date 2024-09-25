@@ -4,10 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
+	"log"
+	"os"
+	"path/filepath"
+
+	"github.com/jung-kurt/gofpdf/v2"
+
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
+
 	"strings"
 	"time"
 	"university-backend/foundation/web"
@@ -18,7 +28,11 @@ import (
 	"university-backend/internal/service/hashing"
 
 	"github.com/pkg/errors"
+	"github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
 )
 
 type Repository struct {
@@ -209,7 +223,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
-	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "Role", "FullName"); err != nil {
+	if err := r.ValidateStruct(&request, "Password", "Role", "FullName"); err != nil {
 		return CreateResponse{}, err
 	}
 
@@ -225,9 +239,15 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
 	}
 
+	// Generate unique EmployeeID
+	employeeID, err := r.GenerateUniqueEmployeeID(ctx)
+	if err != nil {
+		return CreateResponse{}, err
+	}
+
 	response.Role = role
 	response.FullName = request.FullName
-	response.EmployeeID = request.EmployeeID
+	response.EmployeeID = employeeID
 	response.DepartmentID = request.DepartmentID
 	response.Password = &hashedPassword
 	response.PositionID = request.PositionID
@@ -244,6 +264,33 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	response.Password = nil
 
 	return response, nil
+}
+
+func (r Repository) GenerateUniqueEmployeeID(ctx context.Context) (*string, error) {
+	var existingIDs []string
+
+	// Using a raw SQL query to fetch existing employee IDs
+	query := `SELECT employee_id FROM users`
+	err := r.NewRaw(query).Scan(ctx, &existingIDs)
+	if err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "fetching existing employee IDs"), http.StatusInternalServerError)
+	}
+
+	// Create a set of existing IDs for quick lookup
+	existingIDSet := make(map[string]struct{})
+	for _, id := range existingIDs {
+		existingIDSet[id] = struct{}{}
+	}
+
+	var newID string
+	for i := 1; i <= 9999; i++ {
+		newID = fmt.Sprintf("DK%04d", i)
+		if _, exists := existingIDSet[newID]; !exists {
+			return &newID, nil
+		}
+	}
+
+	return nil, errors.New("no available EmployeeID")
 }
 
 // Create creates new users from an Excel file.
@@ -364,126 +411,145 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	return createdCount, err
 }
 
-// func (r Repository) Create(ctx context.Context, request ExcellRequest) (CreateResponse, error) {
-// 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
-// 	if err != nil {
-// 		return CreateResponse{}, err
-// 	}
-// 	if err := r.ValidateStruct(&request); err != nil {
-// 		return CreateResponse{}, err
-// 	}
 
-// 	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "FullName"); err != nil {
-// 		return CreateResponse{}, err
-// 	}
-// 	rand.Seed(time.Now().UnixNano())
 
-// 	userIdStatus := true
-// 	if err := r.QueryRowContext(ctx,
-// 		fmt.Sprintf(`SELECT
-//     						CASE WHEN
-//     						(SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL) IS NOT NULL
-//     						THEN true ELSE false END`, *request.EmployeeID)).Scan(&userIdStatus); err != nil {
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
-// 	}
-// 	if userIdStatus {
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(errors.New(""), "employee_id is used"), http.StatusBadRequest)
-// 	}
+func GenerateQRCode(employeeID string, filename string) error {
+	// Generate the QR code
+	qrCode, err := qrcode.New(employeeID, qrcode.Medium)
+	if err != nil {
+		return fmt.Errorf("could not generate QR code for %s: %v", employeeID, err)
+	}
 
-// 	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
-// 	if err != nil {
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
-// 	}
-// 	hashedPassword := string(hash)
+	// Create an image with space for the text
+	qrImage := qrCode.Image(512)
+	textHeight := 5
+	finalImage := image.NewRGBA(image.Rect(0, 0, qrImage.Bounds().Max.X, qrImage.Bounds().Max.Y+textHeight))
 
-// 	// var response CreateResponse
-// 	// role := strings.ToUpper(*request.Role)
-// 	// if (role != "EMPLOYEE") && (role != "ADMIN") {
-// 	// 	return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
-// 	// }
+	// Draw the QR code
+	draw.Draw(finalImage, qrImage.Bounds(), qrImage, image.Point{0, 0}, draw.Over)
 
-// 	// response.Role = &role
-// 	// response.FullName = request.FullName
-// 	// response.EmployeeID = request.EmployeeID
-// 	// response.Password = &hashedPassword
-// 	// response.DepartmentID = request.DepartmentID
-// 	// response.PositionID = request.PositionID
-// 	// response.Phone = request.Phone
-// 	// response.Email = request.Email
-// 	// response.CreatedAt = time.Now()
-// 	// response.CreatedBy = claims.UserId
+	// Draw the employee ID text
+	addLabel(finalImage, employeeID, qrImage.Bounds().Max.Y)
 
-// 	// Start transaction
-// 	tx, err := r.DB.Begin()
-// 	if err != nil {
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
-// 	}
-// 	defer func() {
-// 		if err != nil {
-// 			tx.Rollback()
-// 		}
-// 	}()
-// 	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
-// 	if err != nil {
-// 		tx.Rollback()
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
-// 	}
-// 	var excelData []hashing.UserExcellData
+	// Save the final image to file
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("could not create file %s: %v", filename, err)
+	}
+	defer file.Close()
 
-// 	var fileUrl string
-// 	if request.Excell != nil {
-// 		fileUrl, _, _, err = commands.Upload(ctx, request.Excell, "user-create/excel")
-// 		if err != nil {
-// 			tx.Rollback()
-// 			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "upload excel"), http.StatusInternalServerError)
-// 		}
-// 	}
+	if err := png.Encode(file, finalImage); err != nil {
+		return fmt.Errorf("could not encode PNG: %v", err)
+	}
 
-// 	dir, err := os.Getwd()
-// 	if err != nil {
-// 		tx.Rollback()
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "getting uploaded excel path"), http.StatusInternalServerError)
-// 	}
+	return nil
+}
 
-// 	if fileUrl != "" {
+func addLabel(img *image.RGBA, text string, yOffset int) {
+	// Create a font drawer to measure the text width
+	d := &font.Drawer{
+		Dst:  img,
+		Src:  image.NewUniform(color.Black),
+		Face: basicfont.Face7x13,
+	}
 
-// 		excelData, err = hashing.ExcelReader(dir + fileUrl)
-// 		if err != nil {
-// 			tx.Rollback()
-// 			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusInternalServerError)
-// 		}
+	// Measure the width of the text
+	textWidth := d.MeasureString(text).Ceil()
 
-// 		for _, data := range excelData {
-// 			var user entity.User
+	// Set the position for the text (centered)
+	pt := fixed.Point26_6{
+		X: fixed.Int26_6((img.Bounds().Max.X - textWidth) / 2 << 6), // Centered X position
+		Y: fixed.Int26_6((yOffset - 10) << 6),                       // Adjust Y position (raising the text)
+	}
 
-// 			err := r.NewSelect().Model(&user).Where("employee_id = ?", data.EmployeeID).Scan(ctx)
-// 			if err != nil {
-// 				tx.Rollback()
-// 				return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "getting user detail by code"), http.StatusBadRequest)
-// 			}
+	// Draw the text
+	d.Dot = pt
+	d.DrawString(text)
+}
 
-// 			q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ? ",  data.EmployeeID)
+// CreatePDF creates a PDF from a list of QR codes and numbers.
+func CreatePDF(employeeIDs []string, pdfFilename string) error {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.SetFont("Arial", "", 8)
 
-// 			q.Set("updated_at = ?", time.Now())
-// 			q.Set("updated_by = ?", claims.UserId)
+	for _, employeeID := range employeeIDs {
+		// Add employee ID text
+		pdf.CellFormat(0, 5, employeeID, "", 1, "L", false, 0, "")
 
-// 			_, err = q.Exec(ctx)
-// 			if err != nil {
-// 				tx.Rollback()
-// 				return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
-// 			}
+		// Add QR code image
+		imagePath := fmt.Sprintf("qr_codes/%s.png", employeeID)
+		pdf.ImageOptions(imagePath, 5, pdf.GetY(), 30, 30, false, gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}, 0, "")
+		pdf.Ln(45)
+	}
 
-// 		}
-// 	}
-// 	// Commit transaction
-// 	if err = tx.Commit(); err != nil {
-// 		tx.Rollback()
-// 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "committing transaction"), http.StatusInternalServerError)
-// 	}
+	err := pdf.OutputFileAndClose(pdfFilename)
+	if err != nil {
+		return fmt.Errorf("could not create PDF: %v", err)
+	}
 
-// 	return response, nil
-// }
+	return nil
+}
 
+func (r *Repository) GetQrCodeByEmployeeID(ctx context.Context, employeeID string) (string, error) {
+	fmt.Println("Employee", employeeID)
+
+	// Define the directory and filename
+	dir := "qr_codes"
+	filename := filepath.Join(dir, fmt.Sprintf("%s.png", employeeID))
+
+	// Check if the directory exists, create if it doesn't
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return "", fmt.Errorf("could not create directory %s: %v", dir, err)
+	}
+
+	// Generate the QR code
+	if err := GenerateQRCode(employeeID, filename); err != nil {
+		return "", err
+	}
+
+	fmt.Printf("QR code for employee ID %s saved to %s\n", employeeID, filename)
+	return filename, nil
+}
+
+// GetListQrCode generates a PDF containing QR codes for all employees from the database.
+func (r *Repository) GetQrCodeList(ctx context.Context) (string, error) {
+	// Query to fetch employee IDs
+	rows, err := r.Query("SELECT employee_id FROM users where deleted_at is  null and role='EMPLOYEE'")
+	if err != nil {
+		return "", fmt.Errorf("failed to query employee IDs: %v", err)
+	}
+	defer rows.Close()
+
+	var employeeIDs []string
+	for rows.Next() {
+		var employeeID string
+		if err := rows.Scan(&employeeID); err != nil {
+			return "", fmt.Errorf("failed to scan employee ID: %v", err)
+		}
+		employeeIDs = append(employeeIDs, employeeID)
+	}
+
+	if err := os.MkdirAll("qr_codes", os.ModePerm); err != nil {
+		log.Fatalf("Failed to create directory: %v", err)
+	}
+
+	for _, employeeID := range employeeIDs {
+		filename := fmt.Sprintf("qr_codes/%s.png", employeeID)
+		if err := GenerateQRCode(employeeID, filename); err != nil {
+			log.Printf("Error generating QR code for %s: %v", employeeID, err)
+		} else {
+			fmt.Printf("QR code for %s saved to %s\n", employeeID, filename)
+		}
+	}
+
+	pdfFilename := "qr_employees.pdf"
+	if err := CreatePDF(employeeIDs, pdfFilename); err != nil {
+		log.Fatalf("Failed to create PDF: %v", err)
+	}
+
+	return pdfFilename, nil
+}
 func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
