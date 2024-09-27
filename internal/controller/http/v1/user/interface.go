@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"university-backend/internal/entity"
 	"university-backend/internal/repository/postgres/user"
 )
 
@@ -11,9 +12,9 @@ type User interface {
 	GetMonthlyStatistics(ctx context.Context, filter user.MonthlyStatisticRequest) (user.MonthlyStatisticResponse, error)
 	GetEmployeeDashboard(ctx context.Context) (user.DashboardResponse, error)
 	GetDetailById(ctx context.Context, id int) (user.GetDetailByIdResponse, error)
-	GetQrCodeByEmployeeID(ctx context.Context, emloyee_id string) (string,error)
-	GetQrCodeList(ctx context.Context) (string,error)
-
+	GetQrCodeByEmployeeID(ctx context.Context, emloyee_id string) (string, error)
+	GetQrCodeList(ctx context.Context) (string, error)
+	GetByEmployeeID(ctx context.Context, employee_id string) (entity.User, error)
 
 	Create(ctx context.Context, request user.CreateRequest) (user.CreateResponse, error)
 	CreateByExcell(ctx context.Context, request user.ExcellRequest) (int, error)

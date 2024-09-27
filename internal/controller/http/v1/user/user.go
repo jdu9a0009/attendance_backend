@@ -3,7 +3,10 @@ package user
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"university-backend/foundation/web"
@@ -79,37 +82,74 @@ func (uc Controller) GetUserDetailById(c *web.Context) error {
 	}, http.StatusOK)
 }
 func (uc Controller) GetQrCodeByEmployeeId(c *web.Context) error {
-	// Get the 'month' query parameter
+	// Get the 'employee_id' query parameter
 	employeeID := c.Query("employee_id")
 	if employeeID == "" {
-		return c.RespondError(web.NewRequestError(errors.New("month parameter is required"), http.StatusBadRequest))
+		return c.RespondError(web.NewRequestError(errors.New("employee_id parameter is required"), http.StatusBadRequest))
+	}
+	detail, err := uc.user.GetByEmployeeID(c.Ctx, employeeID)
+	if err != nil {
+		return c.RespondError(&web.Error{
+			Err:    errors.New("user retrieval failed"),
+			Status: http.StatusInternalServerError,
+		})
+	}
+	if employeeID != *detail.EmployeeID {
+		return c.RespondError(web.NewRequestError(errors.New("this employee not found"), http.StatusBadRequest))
+
 	}
 
-	// Call the repository method to get the QR code
-	response, err := uc.user.GetQrCodeByEmployeeID(c.Ctx, employeeID)
+	// Call the repository method to get the QR code filepath
+	qrCodeFilePath, err := uc.user.GetQrCodeByEmployeeID(c.Ctx, employeeID)
 	if err != nil {
 		return c.RespondError(err)
 	}
 
-	// Return the response
-	return c.Respond(map[string]interface{}{
-		"data":   response,
-		"status": true,
-	}, http.StatusOK)
+	// Open the image file
+	file, err := os.Open(qrCodeFilePath)
+	if err != nil {
+		return c.RespondError(err)
+	}
+	defer file.Close()
+
+	// Set the appropriate headers
+	c.Header("Content-Type", "image/png")
+	c.Header("Content-Disposition", "inline; filename="+filepath.Base(qrCodeFilePath))
+
+	// Write the image data to the response
+	c.Status(http.StatusOK)
+	_, err = io.Copy(c.Writer, file)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return nil
 }
-
 func (uc Controller) GetQrCodeList(c *web.Context) error {
-
-	response, err := uc.user.GetQrCodeList(c.Ctx)
+	// Generate the PDF containing QR codes for all employees
+	pdfFilename, err := uc.user.GetQrCodeList(c.Ctx)
 	if err != nil {
 		return c.RespondError(err)
 	}
 
-	// Return the response
-	return c.Respond(map[string]interface{}{
-		"data":   response,
-		"status": true,
-	}, http.StatusOK)
+	// Open the generated PDF file
+	file, err := os.Open(pdfFilename)
+	if err != nil {
+		return c.RespondError(err)
+	}
+	defer file.Close()
+
+	// Set the content type to PDF
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Disposition", "attachment; filename=\"qr_employees.pdf\"")
+
+	// Write the PDF to the response
+	_, err = io.Copy(c.Writer, file)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return nil
 }
 func (uc Controller) CreateUser(c *web.Context) error {
 	var request user.CreateRequest
