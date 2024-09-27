@@ -741,17 +741,17 @@ func (r Repository) GetPieChartStatistic(ctx context.Context) (PieChartResponse,
 	query := `
   WITH today_attendance AS (
     SELECT
-        COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = ?) AS come_count,
-        COUNT(DISTINCT u.employee_id) AS total_count,
-        COUNT(u.employee_id) FILTER (WHERE a.employee_id IS NULL) AS absent_count
+        COUNT(DISTINCT a.employee_id) FILTER (WHERE a.work_day = ? AND u.role = 'EMPLOYEE') AS come_count,
+        COUNT(DISTINCT u.employee_id) FILTER (WHERE u.role = 'EMPLOYEE') AS total_count,
+        COUNT(u.employee_id) FILTER (WHERE a.employee_id IS NULL AND u.deleted_at IS NULL AND u.role = 'EMPLOYEE') AS absent_count
     FROM users u
     LEFT JOIN attendance a ON a.employee_id = u.employee_id AND a.work_day = ?
-    WHERE u.status = 'false' AND u.deleted_at IS NULL
- )
- SELECT
+    WHERE u.deleted_at IS NULL
+)
+SELECT
     COALESCE(ROUND(100.0 * come_count / GREATEST(1, total_count), 2), 0) AS come_percentage,
     COALESCE(ROUND(100.0 * absent_count / GREATEST(1, total_count), 2), 0) AS absent_percentage
- FROM today_attendance;
+FROM today_attendance;
  `
 
 	var detail PieChartResponse

@@ -125,6 +125,7 @@ type GetStatisticResponse struct {
 	OnTime          *int `json:"ontime" bun:"ontime"`
 	Absent          *int `json:"absent" bun:"absent"`
 	LateArrival     *int `json:"late_arrival" bun:"late_arrivale"`
+	
 	EarlyDepartures *int `json:"early_departures" bun:"early_departures"`
 	EarlyCome       *int `json:"early_come" bun:"early_come"`
 	OverTime        *int `json:"over_time" bun:"over_time"`
