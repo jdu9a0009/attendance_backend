@@ -53,15 +53,19 @@ func NewRouter(
 	}
 }
 
+
 func (r Router) Init() error {
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"}, // Specify allowed origins
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+	AllowOrigins: []string{""}, // Add other origins if needed
+	AllowMethods: []string{""},
+	AllowHeaders: []string{""},
+	ExposeHeaders: []string{""},
+	AllowCredentials: true,
+	AllowOriginFunc: func(origin string) bool {
+	return true
+	},
+	MaxAge: 12 * time.Hour,
 	}))
 
 	// repositories:

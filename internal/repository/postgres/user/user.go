@@ -411,8 +411,6 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	return createdCount, err
 }
 
-
-
 func GenerateQRCode(employeeID string, filename string) error {
 	// Generate the QR code
 	qrCode, err := qrcode.New(employeeID, qrcode.Medium)
@@ -492,8 +490,10 @@ func CreatePDF(employeeIDs []string, pdfFilename string) error {
 }
 
 func (r *Repository) GetQrCodeByEmployeeID(ctx context.Context, employeeID string) (string, error) {
-	fmt.Println("Employee", employeeID)
-
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return "",  err
+	}
 	// Define the directory and filename
 	dir := "qr_codes"
 	filename := filepath.Join(dir, fmt.Sprintf("%s.png", employeeID))
@@ -514,7 +514,11 @@ func (r *Repository) GetQrCodeByEmployeeID(ctx context.Context, employeeID strin
 
 // GetListQrCode generates a PDF containing QR codes for all employees from the database.
 func (r *Repository) GetQrCodeList(ctx context.Context) (string, error) {
-	// Query to fetch employee IDs
+	
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return "",  err
+	}// Query to fetch employee IDs
 	rows, err := r.Query("SELECT employee_id FROM users where deleted_at is  null and role='EMPLOYEE'")
 	if err != nil {
 		return "", fmt.Errorf("failed to query employee IDs: %v", err)
