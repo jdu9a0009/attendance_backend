@@ -57,16 +57,16 @@ func (r Router) Init() error {
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins: []string{""}, // Add other origins if needed
-		AllowMethods: []string{""},
-		AllowHeaders: []string{""},
-		ExposeHeaders: []string{""},
+		AllowOrigins:     []string{"*"},                                       // Allow all origins or specify your allowed origins
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, // Specify allowed methods
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"}, // Specify allowed headers
+		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
-		return true
+			return true
 		},
 		MaxAge: 12 * time.Hour,
-		}))	// - postgresql
+	})) // - postgresql
 	userPostgres := user.NewRepository(r.postgresDB)
 	departmentPostgres := department.NewRepository(r.postgresDB)
 	positionPostgres := position.NewRepository(r.postgresDB)
