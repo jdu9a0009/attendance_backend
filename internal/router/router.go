@@ -57,16 +57,16 @@ func (r Router) Init() error {
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://attendance-admin.netlify.app", "http://localhost:3000"}, // Replace with your allowed origins
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                                        // Add necessary methods
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},                            // Add necessary headers
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowOrigins: []string{""}, // Add other origins if needed
+		AllowMethods: []string{""},
+		AllowHeaders: []string{""},
+		ExposeHeaders: []string{""},
 		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
-
-	// repositories:
-	// - postgresql
+		AllowOriginFunc: func(origin string) bool {
+		return true
+		},
+		MaxAge: 12 * time.Hour,
+		}))	// - postgresql
 	userPostgres := user.NewRepository(r.postgresDB)
 	departmentPostgres := department.NewRepository(r.postgresDB)
 	positionPostgres := position.NewRepository(r.postgresDB)
