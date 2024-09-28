@@ -54,11 +54,10 @@ func NewRouter(
 }
 
 func (r Router) Init() error {
-	// Configure CORS
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://attendance-admin.netlify.app", "https://attendance-admin.netlify.app"}, // Replace with your allowed origins
+		AllowOrigins:     []string{"https://attendance-admin.netlify.app", "http://localhost:3000"}, // Replace with your allowed origins
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                                        // Add necessary methods
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},                            // Add necessary headers
 		ExposeHeaders:    []string{"Content-Length"},
