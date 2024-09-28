@@ -46,7 +46,7 @@ func run(log *log.Logger) error {
 
 	var cfg struct {
 		conf.Version
-		ServerBaseUrl string `conf:"default:https://attendance-backend-24xu.onrender.com"`
+		ServerBaseUrl string `conf:"default:http://university.uz"`
 		DefaultLang   string `conf:"default:uz"`
 		ServerPort    string `conf:"default:8080"`
 		Web           struct {
