@@ -492,7 +492,7 @@ func CreatePDF(employeeIDs []string, pdfFilename string) error {
 func (r *Repository) GetQrCodeByEmployeeID(ctx context.Context, employeeID string) (string, error) {
 	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
-		return "",  err
+		return "", err
 	}
 	// Define the directory and filename
 	dir := "qr_codes"
@@ -514,12 +514,8 @@ func (r *Repository) GetQrCodeByEmployeeID(ctx context.Context, employeeID strin
 
 // GetListQrCode generates a PDF containing QR codes for all employees from the database.
 func (r *Repository) GetQrCodeList(ctx context.Context) (string, error) {
-	
-	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
-	if err != nil {
-		return "",  err
-	}// Query to fetch employee IDs
-	rows, err := r.Query("SELECT employee_id FROM users where deleted_at is  null and role='EMPLOYEE'")
+	// Query to fetch employee IDs
+	rows, err := r.Query("SELECT employee_id FROM users WHERE deleted_at IS NULL AND role='EMPLOYEE'")
 	if err != nil {
 		return "", fmt.Errorf("failed to query employee IDs: %v", err)
 	}
@@ -535,21 +531,19 @@ func (r *Repository) GetQrCodeList(ctx context.Context) (string, error) {
 	}
 
 	if err := os.MkdirAll("qr_codes", os.ModePerm); err != nil {
-		log.Fatalf("Failed to create directory: %v", err)
+		return "", fmt.Errorf("failed to create directory: %v", err)
 	}
 
 	for _, employeeID := range employeeIDs {
 		filename := fmt.Sprintf("qr_codes/%s.png", employeeID)
 		if err := GenerateQRCode(employeeID, filename); err != nil {
 			log.Printf("Error generating QR code for %s: %v", employeeID, err)
-		} else {
-			fmt.Printf("QR code for %s saved to %s\n", employeeID, filename)
 		}
 	}
 
 	pdfFilename := "qr_employees.pdf"
 	if err := CreatePDF(employeeIDs, pdfFilename); err != nil {
-		log.Fatalf("Failed to create PDF: %v", err)
+		return "", fmt.Errorf("failed to create PDF: %v", err)
 	}
 
 	return pdfFilename, nil
