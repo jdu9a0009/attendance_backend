@@ -11,6 +11,7 @@ import (
 	"university-backend/internal/repository/postgres/position"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
 	"university-backend/internal/middleware"
@@ -64,6 +65,12 @@ func (r Router) Init() error {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
+	r.OPTIONS("/api/v1/user/qrcode", func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "http://localhost:3000") // Update to your allowed origins
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
+		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		c.Status(204) // No content for preflight
+	})
 
 	// - postgresql
 	userPostgres := user.NewRepository(r.postgresDB)
