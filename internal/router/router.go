@@ -66,7 +66,7 @@ func (r Router) Init() error {
 		MaxAge:           12 * time.Hour,
 	}))
 	r.OPTIONS("/api/v1/user/qrcode", func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "http://localhost:3000") // Update to your allowed origins
+		c.Header("Access-Control-Allow-Origin", "https://attendance-admin.netlify.app") // Update to your allowed origins
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
 		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		c.Status(204) // No content for preflight
