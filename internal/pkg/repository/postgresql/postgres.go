@@ -1,6 +1,9 @@
 package postgresql
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
+	"attendance/backend/internal/pkg/config"
 	"context"
 	"database/sql"
 	"fmt"
@@ -9,9 +12,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/auth"
-	"university-backend/internal/pkg/config"
 
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"

@@ -2,7 +2,7 @@ package companyInfo
 
 import (
 	"context"
-	"university-backend/internal/repository/postgres/companyInfo"
+	"attendance/backend/internal/repository/postgres/companyInfo"
 )
 
 type CompanyInfo interface {

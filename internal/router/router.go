@@ -2,29 +2,29 @@ package router
 
 import (
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/auth"
-	"university-backend/internal/controller/http/v1/file"
-	"university-backend/internal/repository/postgres/attendance"
-	"university-backend/internal/repository/postgres/companyInfo"
-	"university-backend/internal/repository/postgres/department"
-	"university-backend/internal/repository/postgres/position"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
+	"attendance/backend/internal/controller/http/v1/file"
+	"attendance/backend/internal/repository/postgres/attendance"
+	"attendance/backend/internal/repository/postgres/companyInfo"
+	"attendance/backend/internal/repository/postgres/department"
+	"attendance/backend/internal/repository/postgres/position"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
-	"university-backend/internal/middleware"
-	"university-backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/middleware"
+	"attendance/backend/internal/pkg/repository/postgresql"
 
-	"university-backend/internal/repository/postgres/user"
+	"attendance/backend/internal/repository/postgres/user"
 
-	attendance_controller "university-backend/internal/controller/http/v1/attendance"
-	auth_controller "university-backend/internal/controller/http/v1/auth"
-	companyInfo_controller "university-backend/internal/controller/http/v1/companyInfo"
-	department_controller "university-backend/internal/controller/http/v1/department"
-	position_controller "university-backend/internal/controller/http/v1/position"
-	user_controller "university-backend/internal/controller/http/v1/user"
+	attendance_controller "attendance/backend/internal/controller/http/v1/attendance"
+	auth_controller "attendance/backend/internal/controller/http/v1/auth"
+	companyInfo_controller "attendance/backend/internal/controller/http/v1/companyInfo"
+	department_controller "attendance/backend/internal/controller/http/v1/department"
+	position_controller "attendance/backend/internal/controller/http/v1/position"
+	user_controller "attendance/backend/internal/controller/http/v1/user"
 )
 
 type Router struct {

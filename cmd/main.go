@@ -1,18 +1,18 @@
 package main
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
+	"attendance/backend/internal/commands"
+	"attendance/backend/internal/pkg/config"
+	"attendance/backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/router"
 	"crypto/rsa"
 	"expvar"
 	"fmt"
 	"log"
 	"os"
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/auth"
-	"university-backend/internal/commands"
-	"university-backend/internal/pkg/config"
-	"university-backend/internal/pkg/repository/postgresql"
-	"university-backend/internal/router"
 
 	"github.com/ardanlabs/conf"
 	"github.com/dgrijalva/jwt-go"
@@ -149,6 +149,7 @@ func run(log *log.Logger) error {
 	// Start Database: postgresql
 
 	log.Println("main: Initializing database support")
+
 	yamlConfig, err := config.NewConfig() // Call the exported function
 	if err != nil {
 		fmt.Print("Error loading configuration: %v", err)

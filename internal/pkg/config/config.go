@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -13,11 +14,12 @@ type Config struct {
 	DBUsername    string   `yaml:"db_username"`
 	DBPassword    string   `yaml:"db_password"`
 	DBHost        string   `yaml:"db_host"`
-	DBPort        string   `yaml:"port"`
-	DBName        string   `yaml:"db_name"`
-	DisableTLS    bool     `yaml:"disable_tls"`
-	BaseUrl       string   `yaml:"base_url"`
-	JWTKey        string   `yaml:"jwt_key"`
+
+	DBPort     string `yaml:"port"`
+	DBName     string `yaml:"db_name"`
+	DisableTLS bool   `yaml:"disable_tls"`
+	BaseUrl    string `yaml:"base_url"`
+	JWTKey     string `yaml:"jwt_key"`
 }
 
 func NewConfig() (*Config, error) {

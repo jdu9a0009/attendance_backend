@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 	"log"
-	"university-backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/pkg/repository/postgresql"
 
 	"github.com/pkg/errors"
 )

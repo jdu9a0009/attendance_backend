@@ -2,7 +2,7 @@ package attendance
 
 import (
 	"context"
-	"university-backend/internal/repository/postgres/attendance"
+	"attendance/backend/internal/repository/postgres/attendance"
 
 	"github.com/Azure/go-autorest/autorest/date"
 )

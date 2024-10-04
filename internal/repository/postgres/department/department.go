@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/entity"
-	"university-backend/internal/pkg/repository/postgresql"
-	"university-backend/internal/repository/postgres"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/entity"
+	"attendance/backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/repository/postgres"
 
 	"github.com/pkg/errors"
 )

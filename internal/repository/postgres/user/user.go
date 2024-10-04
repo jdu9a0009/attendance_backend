@@ -20,12 +20,12 @@ import (
 
 	"strings"
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/auth"
-	"university-backend/internal/entity"
-	"university-backend/internal/pkg/repository/postgresql"
-	"university-backend/internal/repository/postgres"
-	"university-backend/internal/service/hashing"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
+	"attendance/backend/internal/entity"
+	"attendance/backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/repository/postgres"
+	"attendance/backend/internal/service/hashing"
 
 	"github.com/pkg/errors"
 	"github.com/skip2/go-qrcode"

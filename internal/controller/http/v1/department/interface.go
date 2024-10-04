@@ -2,7 +2,7 @@ package department
 
 import (
 	"context"
-	"university-backend/internal/repository/postgres/department"
+	"attendance/backend/internal/repository/postgres/department"
 )
 
 type Department interface {

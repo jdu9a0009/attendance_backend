@@ -1,7 +1,9 @@
 ERROR_BOT_TOKEN: "your_bot_token"
 ERROR_CHAT_ID:
+
   - "chat_id_1"
   - "chat_id_2"
+
 db_username: "postgres"
 db_password: "password1"
 db_host: "104.248.251.150"
@@ -10,4 +12,5 @@ default_lang: "uz"
 port: 5432
 disable_tls: true
 base_url: ""
+
 jwt_key: "attendancePanel"

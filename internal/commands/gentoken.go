@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"os"
 	"time"
-	"university-backend/internal/auth"
-	user_service "university-backend/internal/repository/postgres/user"
+	"attendance/backend/internal/auth"
+	user_service "attendance/backend/internal/repository/postgres/user"
 )
 
 // GenToken generates a JWT for the specified area.

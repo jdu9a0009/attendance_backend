@@ -2,7 +2,7 @@ package user
 
 import (
 	"context"
-	"university-backend/internal/repository/postgres/user"
+	"attendance/backend/internal/repository/postgres/user"
 )
 
 type User interface {

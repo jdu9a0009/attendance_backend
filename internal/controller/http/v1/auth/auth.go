@@ -3,9 +3,9 @@ package auth
 import (
 	"fmt"
 	"net/http"
-	"university-backend/foundation/web"
-	"university-backend/internal/commands"
-	"university-backend/internal/repository/postgres/user"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/commands"
+	"attendance/backend/internal/repository/postgres/user"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"

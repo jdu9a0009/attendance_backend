@@ -2,7 +2,7 @@ package position
 
 import (
 	"context"
-	"university-backend/internal/repository/postgres/position"
+	"attendance/backend/internal/repository/postgres/position"
 )
 
 type Position interface {
