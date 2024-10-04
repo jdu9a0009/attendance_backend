@@ -51,7 +51,7 @@ type Database struct {
 func NewDB(cfg Config) *Database {
 	yamlConfig, err := config.NewConfig() // Call the exported function
 	if err != nil {
-		fmt.Print("Error loading configuration: %v", err)
+		fmt.Printf("error loading configuration: %v", err)
 	}
 
 	dsn := fmt.Sprintf("postgres://%v:%v@%v:%v/%v?sslmode=disable", yamlConfig.DBUsername, yamlConfig.DBPassword, yamlConfig.DBHost, yamlConfig.DBPort, yamlConfig.DBName)
