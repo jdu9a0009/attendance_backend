@@ -10,6 +10,7 @@ import (
 	"university-backend/foundation/web"
 	"university-backend/internal/auth"
 	"university-backend/internal/commands"
+	"university-backend/internal/pkg/config"
 	"university-backend/internal/pkg/repository/postgresql"
 	"university-backend/internal/router"
 
@@ -148,14 +149,18 @@ func run(log *log.Logger) error {
 	// Start Database: postgresql
 
 	log.Println("main: Initializing database support")
+	yamlConfig, err := config.NewConfig() // Call the exported function
+	if err != nil {
+		fmt.Print("Error loading configuration: %v", err)
+	}
 
 	postgresDB := postgresql.NewDB(postgresql.Config{
-		User:          cfg.Postgres.User,
-		Password:      cfg.Postgres.Password,
-		Host:          cfg.Postgres.Host,
-		Name:          cfg.Postgres.Name,
-		DisableTLS:    cfg.Postgres.DisableTLS,
-		ServerBaseUrl: cfg.ServerBaseUrl,
+		User:          yamlConfig.DBUsername,
+		Password:      yamlConfig.DBPassword,
+		Host:          yamlConfig.DBHost,
+		Name:          yamlConfig.DBName,
+		DisableTLS:    yamlConfig.DisableTLS,
+		ServerBaseUrl: yamlConfig.BaseUrl,
 		DefaultLang:   cfg.DefaultLang,
 	})
 	if err != nil {

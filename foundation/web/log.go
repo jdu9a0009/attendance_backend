@@ -88,7 +88,10 @@ func (l *Logger) WriteLog(ctx *Context, data interface{}) error {
 }
 
 func (l *Logger) SendBotMsg(recordBuffer []string) error {
-	cfg := config.NewConfig()
+	cfg, err := config.NewConfig()
+	if err != nil {
+		fmt.Print("Error loading configuration: %v", err)
+	}
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", cfg.ErrorBotToken)
 
 	for _, v := range cfg.ErrorChatID {
