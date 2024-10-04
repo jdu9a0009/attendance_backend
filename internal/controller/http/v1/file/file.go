@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/service/hashing"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/service/hashing"
 )
 
 type Controller struct {

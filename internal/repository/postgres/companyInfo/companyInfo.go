@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/pkg/repository/postgresql"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/pkg/repository/postgresql"
 
 	"github.com/pkg/errors"
 )

@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 	"time"
-	"university-backend/internal/pkg/config"
+	"attendance/backend/internal/pkg/config"
 
 	"github.com/pkg/errors"
 )

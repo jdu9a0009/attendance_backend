@@ -1,6 +1,9 @@
 package postgresql
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
+	"attendance/backend/internal/pkg/config"
 	"context"
 	"database/sql"
 	"fmt"
@@ -9,8 +12,6 @@ import (
 	"reflect"
 	"strings"
 	"time"
-	"university-backend/foundation/web"
-	"university-backend/internal/auth"
 
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
@@ -48,7 +49,9 @@ type Database struct {
 }
 
 func NewDB(cfg Config) *Database {
-	dsn := fmt.Sprintf("postgres://%v:%v@138.197.189.140:5432/%v?sslmode=disable", cfg.User, cfg.Password, cfg.Name)
+	yamlConfig := config.NewConfig() // Call the exported function
+
+	dsn := fmt.Sprintf("postgres://%v:%v@%v:%v/%v?sslmode=disable", yamlConfig.DBUsername, yamlConfig.DBPassword, yamlConfig.DBHost, yamlConfig.DBPort, yamlConfig.DBName)
 
 	sqlDB := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 
@@ -59,7 +62,7 @@ func NewDB(cfg Config) *Database {
 		bundebug.FromEnv("BUNDEBUG"),
 	))
 
-	return &Database{DB: db, DBName: cfg.Name, DBPassword: cfg.Password, DBUser: cfg.User, ServerBaseUrl: cfg.ServerBaseUrl, DefaultLang: cfg.DefaultLang}
+	return &Database{DB: db, DBName: yamlConfig.DBName, DBPassword: yamlConfig.DBPassword, DBUser: yamlConfig.DBUsername, ServerBaseUrl: yamlConfig.BaseUrl, DefaultLang: cfg.DefaultLang}
 }
 
 func (d Database) DeleteRow(ctx context.Context, table string, id int) error {

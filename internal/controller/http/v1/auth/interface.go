@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"university-backend/internal/entity"
+	"attendance/backend/internal/entity"
 )
 
 type User interface {

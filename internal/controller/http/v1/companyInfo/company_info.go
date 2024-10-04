@@ -3,9 +3,9 @@ package companyInfo
 import (
 	"net/http"
 	"reflect"
-	"university-backend/foundation/web"
-	"university-backend/internal/repository/postgres/companyInfo"
-	"university-backend/internal/service"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/repository/postgres/companyInfo"
+	"attendance/backend/internal/service"
 )
 
 type Controller struct {
@@ -59,24 +59,23 @@ func (uc Controller) UpdateAll(c *web.Context) error {
 
 	var request companyInfo.UpdateRequest
 
-	if err := c.BindFunc(&request,"company_name","logo","latitude","longitude"); err != nil {
+	if err := c.BindFunc(&request, "company_name", "logo", "latitude", "longitude"); err != nil {
 		return c.RespondError(err)
 	}
 
 	request.ID = id
-		// Log path initialization
-		var logPath string
-		logPath = logPath + "->Create"
-	
-		// Check if image exists in the request
-		if request.Logo != nil {
-			path, err := service.Upload(request.Logo, companyDir)
-			if err != nil {
-				return c.RespondError(err)
-			}
-			request.Url = path
+	// Log path initialization
+	var logPath string
+	logPath = logPath + "->Create"
+
+	// Check if image exists in the request
+	if request.Logo != nil {
+		path, err := service.Upload(request.Logo, companyDir)
+		if err != nil {
+			return c.RespondError(err)
 		}
-	
+		request.Url = path
+	}
 
 	err := uc.companyInfo.UpdateAll(c.Ctx, request)
 	if err != nil {
@@ -90,12 +89,11 @@ func (uc Controller) UpdateAll(c *web.Context) error {
 }
 func (uc Controller) GetInfo(c *web.Context) error {
 
-
 	if err := c.ValidQuery(); err != nil {
 		return c.RespondError(err)
 	}
 
-	response,  err := uc.companyInfo.GetInfo(c.Ctx, )
+	response, err := uc.companyInfo.GetInfo(c.Ctx)
 	if err != nil {
 		return c.RespondError(err)
 	}

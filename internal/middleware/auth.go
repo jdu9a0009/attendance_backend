@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"university-backend/foundation/web"
-	"university-backend/internal/auth"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
 )
 
 func Authenticate(a *auth.Auth, role ...string) web.Middleware {

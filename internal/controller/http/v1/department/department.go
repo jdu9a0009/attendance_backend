@@ -3,8 +3,8 @@ package department
 import (
 	"net/http"
 	"reflect"
-	"university-backend/foundation/web"
-	"university-backend/internal/repository/postgres/department"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/repository/postgres/department"
 )
 
 type Controller struct {

@@ -3,8 +3,8 @@ package position
 import (
 	"net/http"
 	"reflect"
-	"university-backend/foundation/web"
-	"university-backend/internal/repository/postgres/position"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/repository/postgres/position"
 )
 
 type Controller struct {

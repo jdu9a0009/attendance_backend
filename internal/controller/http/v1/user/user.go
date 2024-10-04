@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
-	"university-backend/foundation/web"
-	"university-backend/internal/repository/postgres/user"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/repository/postgres/user"
 
 	"github.com/Azure/go-autorest/autorest/date"
 )

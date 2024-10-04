@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
-	"university-backend/foundation/web"
-	"university-backend/internal/repository/postgres/attendance"
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/repository/postgres/attendance"
 
 	"github.com/Azure/go-autorest/autorest/date"
 )
