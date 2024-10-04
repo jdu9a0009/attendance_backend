@@ -1,7 +1,6 @@
 package router
 
 import (
-	"time"
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/auth"
 	"attendance/backend/internal/controller/http/v1/file"
@@ -9,6 +8,7 @@ import (
 	"attendance/backend/internal/repository/postgres/companyInfo"
 	"attendance/backend/internal/repository/postgres/department"
 	"attendance/backend/internal/repository/postgres/position"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -58,15 +58,15 @@ func (r Router) Init() error {
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://attendance-admin.netlify.app", "http://localhost:3000"}, // Explicitly allow your frontend URL
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                         // Only the methods you're using
+		AllowOrigins:     []string{"https://attendance.eduflow.uz", "https://api.eduflow.uz"}, // Explicitly allow your frontend URL
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                   // Only the methods you're using
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Disposition"}, // Expose any custom headers like file download
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 	r.OPTIONS("/api/v1/user/qrcode", func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "https://attendance-admin.netlify.app") // Update to your allowed origins
+		c.Header("Access-Control-Allow-Origin", "https://attendance.eduflow.uz") // Update to your allowed origins
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
 		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
 		c.Status(204) // No content for preflight
