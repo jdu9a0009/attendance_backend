@@ -1,5 +1,5 @@
 run:
-	go run cmd/main.go
+	@swag init -g cmd/main.go && go run cmd/main.go
 
 push:
 	git add .
@@ -10,3 +10,6 @@ push-main:
 	git add .
 	git commit -m "update"
 	git push origin main
+
+deploy:
+	@./scripts/deploy.sh
