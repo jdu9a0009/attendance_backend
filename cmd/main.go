@@ -30,6 +30,16 @@ symbols in profiles: https://github.com/golang/go/issues/23376 / https://github.
 // build is the git version of this hard_skill. It is set using build flags in the makefile.
 var build = "develop"
 
+// @title Attendance API
+// @version 1.0
+// @description API Server for Application
+
+// @host localhost:8080
+// @BasePath /
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 func main() {
 	logger := log.New(os.Stdout, "SALES : ", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 

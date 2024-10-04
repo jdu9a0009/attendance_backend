@@ -1,0 +1,79 @@
+basePath: /
+definitions:
+  user.SignInRequest:
+    properties:
+      employee_id:
+        type: string
+      password:
+        type: string
+    type: object
+  web.ErrorResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      fields:
+        items:
+          $ref: '#/definitions/web.FieldError'
+        type: array
+      status:
+        type: boolean
+    type: object
+  web.FieldError:
+    properties:
+      error:
+        type: string
+      field:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API Server for Application
+  title: Attendance API
+  version: "1.0"
+paths:
+  /api/v1/sign-in:
+    post:
+      consumes:
+      - application/json
+      description: SignIn User
+      parameters:
+      - description: Sign In
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/user.SignInRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/web.ErrorResponse'
+      summary: SignIn User
+      tags:
+      - Auth
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

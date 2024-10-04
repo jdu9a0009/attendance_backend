@@ -2,12 +2,17 @@ package web
 
 import (
 	"context"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
+
+	"attendance/backend/docs"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // ctxKey represents the type of value for the context key.
@@ -59,6 +64,16 @@ func NewApp(shutdown chan os.Signal, defaultLang string, mw ...Middleware) *App 
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+
+	//swagger settings
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
+
+	engine.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler), func(c *gin.Context) {
+		docs.SwaggerInfo.Host = c.Request.Host
+		if c.Request.TLS != nil {
+			docs.SwaggerInfo.Schemes = []string{"https"}
+		}
+	})
 
 	//engine.Static("/media", "./media")
 

@@ -1,18 +1,20 @@
 package auth
 
 import (
-	"fmt"
-	"net/http"
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/commands"
 	"attendance/backend/internal/repository/postgres/user"
+	"fmt"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // build is the git version of this hard_skill. It is set using build flags in the makefile.
-var build = "develop"
+var (
+	errIncorrectEmployeeIdOrPassword = errors.New("incorrect employee id or password")
+)
 
 type Controller struct {
 	user User
@@ -22,6 +24,15 @@ func NewController(user User) *Controller {
 	return &Controller{user: user}
 }
 
+// @Description SignIn User
+// @Summary SignIn User
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param login body user.SignInRequest true "Sign In"
+// @Success 200 {object} web.ErrorResponse
+// @Failure 400,404,500,401 {object} web.ErrorResponse
+// @Router /api/v1/sign-in [post]
 func (uc Controller) SignIn(c *web.Context) error {
 	var data user.SignInRequest
 	err := c.BindFunc(&data, "EmployeeID", "Password")
@@ -37,15 +48,15 @@ func (uc Controller) SignIn(c *web.Context) error {
 	if err != nil {
 		fmt.Println("Error retrieving user by EmployeeID:", err)
 		return c.RespondError(&web.Error{
-			Err:    errors.New("user retrieval failed"),
-			Status: http.StatusInternalServerError,
+			Err:    errIncorrectEmployeeIdOrPassword,
+			Status: http.StatusUnauthorized,
 		})
 	}
 
 	if detail.Password == nil {
 		fmt.Println("User not found for EmployeeID:", data.EmployeeID)
 		return c.RespondError(&web.Error{
-			Err:    errors.New("user not found"),
+			Err:    errIncorrectEmployeeIdOrPassword,
 			Status: http.StatusNotFound,
 		})
 	}
@@ -53,8 +64,8 @@ func (uc Controller) SignIn(c *web.Context) error {
 	if err = bcrypt.CompareHashAndPassword([]byte(*detail.Password), []byte(data.Password)); err != nil {
 		fmt.Println("Incorrect password for EmployeeID:", data.EmployeeID)
 		return c.RespondError(&web.Error{
-			Err:    errors.New("incorrect password"),
-			Status: http.StatusForbidden, // Changed to 403 to reflect forbidden access
+			Err:    errIncorrectEmployeeIdOrPassword,
+			Status: http.StatusUnauthorized, // Changed to 403 to reflect forbidden access
 		})
 	}
 
