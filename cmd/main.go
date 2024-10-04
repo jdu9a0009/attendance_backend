@@ -152,7 +152,7 @@ func run(log *log.Logger) error {
 
 	yamlConfig, err := config.NewConfig() // Call the exported function
 	if err != nil {
-		fmt.Print("Error loading configuration: %v", err)
+		fmt.Printf("Error loading configuration: %v", err)
 	}
 
 	postgresDB := postgresql.NewDB(postgresql.Config{

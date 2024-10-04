@@ -25,7 +25,7 @@ type Config struct {
 func NewConfig() (*Config, error) {
 	var c Config
 
-	yamlFile, err := os.ReadFile("config.yaml")
+	yamlFile, err := os.ReadFile(".config.yaml")
 	if err != nil {
 		return nil, err // Return error if file read fails
 	}
