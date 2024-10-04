@@ -1,0 +1,16 @@
+version: '3'
+services:
+  backend:
+     build: "./"
+     restart: always
+     container_name: attendance-app
+     labels:
+       logging: "promtail"
+       logging_jobname: "containerlogs"
+     ports:
+        - "8080:8080"
+     networks:
+       - app
+networks:
+  app:
+    external: true
