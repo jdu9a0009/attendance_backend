@@ -1,8 +1,8 @@
 package user
 
 import (
-	"context"
 	"attendance/backend/internal/repository/postgres/user"
+	"context"
 )
 
 type User interface {
@@ -11,9 +11,9 @@ type User interface {
 	GetMonthlyStatistics(ctx context.Context, filter user.MonthlyStatisticRequest) (user.MonthlyStatisticResponse, error)
 	GetEmployeeDashboard(ctx context.Context) (user.DashboardResponse, error)
 	GetDetailById(ctx context.Context, id int) (user.GetDetailByIdResponse, error)
-	GetQrCodeByEmployeeID(ctx context.Context, emloyee_id string) (string,error)
-	GetQrCodeList(ctx context.Context) (string,error)
-
+	GetQrCodeByEmployeeID(ctx context.Context, emloyee_id string) (string, error)
+	GetQrCodeList(ctx context.Context) (string, error)
+	GetDashboardList(ctx context.Context, filter user.Filter) ([]user.GetDashboardlist, int, error)
 
 	Create(ctx context.Context, request user.CreateRequest) (user.CreateResponse, error)
 	CreateByExcell(ctx context.Context, request user.ExcellRequest) (int, error)
