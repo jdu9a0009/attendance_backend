@@ -58,8 +58,8 @@ func (r Router) Init() error {
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://attendance.eduflow.uz", "https://api.eduflow.uz","http://localhost:3000"}, // Explicitly allow your frontend URL
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                   // Only the methods you're using
+		AllowOrigins:     []string{"https://attendance.eduflow.uz", "https://api.eduflow.uz", "http://localhost:3000"}, // Explicitly allow your frontend URL
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                                            // Only the methods you're using
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Disposition"}, // Expose any custom headers like file download
 		AllowCredentials: true,
@@ -109,6 +109,7 @@ func (r Router) Init() error {
 	r.Get("/api/v1/user/statistics", userController.GetStatistics, middleware.Authenticate(r.auth))
 	r.Get("/api/v1/user/monthly", userController.GetMonthlyStatistics, middleware.Authenticate(r.auth))
 	r.Get("/api/v1/user/dashboard", userController.GetEmployeeDashboard, middleware.Authenticate(r.auth))
+	r.Get("/api/v1/user/dashboardlist", userController.GetDashboardList, middleware.Authenticate(r.auth))
 
 	// #department
 	r.Get("/api/v1/department/list", departmentController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleDashboard))

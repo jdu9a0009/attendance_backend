@@ -869,18 +869,111 @@ LIMIT 1;
 	}
 	return detail, nil
 }
-func (r Repository) getExistingAttendance(ctx context.Context, employeeID *string) (GenEmployeeID, error) {
 
-	var existingAttendance GenEmployeeID
-	err := r.NewSelect().
-		Model(&existingAttendance).
-		Where("employee_id = ? ", employeeID).
-		Limit(1).
-		Scan(ctx)
+func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetDashboardlist, int, error) {
+	_, err := r.CheckClaims(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	var limitQuery, offsetQuery string
 
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return GenEmployeeID{}, web.NewRequestError(errors.Wrap(err, "checking attendance"), http.StatusBadRequest)
+	if filter.Page != nil && filter.Limit != nil {
+		offset := (*filter.Page - 1) * (*filter.Limit)
+		filter.Offset = &offset
 	}
 
-	return existingAttendance, nil
+	if filter.Limit != nil {
+		limitQuery = fmt.Sprintf(" LIMIT %d", *filter.Limit)
+	}
+	if filter.Offset != nil {
+		offsetQuery = fmt.Sprintf(" OFFSET %d", *filter.Offset)
+	}
+
+	workDay := time.Now().Format("2006-01-02")
+	query := fmt.Sprintf(`
+		SELECT
+			u.id,
+			u.employee_id,
+			u.full_name,
+			a.status,
+			d.name AS department_name,
+			(SELECT COUNT(u2.employee_id)
+			 FROM users AS u2
+			 WHERE u2.department_id = u.department_id AND u2.role = 'EMPLOYEE') AS employee_count
+		FROM
+			users AS u
+		LEFT JOIN
+			attendance AS a ON a.employee_id = u.employee_id AND a.work_day = '%s'
+		LEFT JOIN
+			department AS d ON d.id = u.department_id
+		WHERE
+			u.role = 'EMPLOYEE'
+		ORDER BY employee_count,department_name %s %s`, workDay, limitQuery, offsetQuery)
+
+	rows, err := r.QueryContext(ctx, query)
+	if err != nil {
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "querying employee dashboard list"), http.StatusBadRequest)
+	}
+	defer rows.Close()
+
+	var list []GetDashboardlist
+
+	for rows.Next() {
+		var detail GetDashboardlist
+		var status sql.NullBool
+
+		err = rows.Scan(
+			&detail.ID,
+			&detail.EmployeeID,
+			&detail.FullName,
+			&status,
+			&detail.DepartmentName,
+			&detail.EmployeeCount,
+		)
+		if err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
+		}
+
+		var statusValue bool = false
+		if status.Valid {
+			statusValue = status.Bool
+		}
+		detail.Status = &statusValue
+
+		list = append(list, detail) // Append each detail to the list
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "iterating over rows"), http.StatusBadRequest)
+	}
+
+	countQuery := fmt.Sprintf(`
+		SELECT
+  		  count(u.employee_id)
+		FROM
+  		  users AS u
+		LEFT JOIN
+  		  attendance AS a ON a.employee_id = u.employee_id AND a.work_day = '%s'
+		WHERE
+  		  u.deleted_at IS NULL AND
+  		  u.role = 'EMPLOYEE'; 	`, workDay)
+
+	countRows, err := r.QueryContext(ctx, countQuery)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		}
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting users"), http.StatusBadRequest)
+	}
+	defer countRows.Close()
+
+	count := 0
+
+	for countRows.Next() {
+		if err = countRows.Scan(&count); err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning user count"), http.StatusBadRequest)
+		}
+	}
+
+	return list, count, nil
 }

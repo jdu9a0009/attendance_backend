@@ -56,6 +56,15 @@ type GetDetailByIdResponse struct {
 	Phone        *string `json:"phone"`
 	Email        *string `json:"email"`
 }
+type GetDashboardlist struct {
+	ID             int     `json:"id"`
+	EmployeeID     *string `json:"employee_id"`
+	DepartmentName *string `json:"department"`
+	EmployeeCount  *string `json:"employee_count"`
+	FullName       *string `json:"full_name"`
+	Status         *bool   `json:"status"`
+}
+
 type ExcellRequest struct {
 	Excell *multipart.FileHeader `json:"-" form:"excell"`
 }
@@ -77,10 +86,9 @@ type CreateResponse struct {
 type GenEmployeeID struct {
 	bun.BaseModel `bun:"table:users"`
 
-	ID           int       `json:"id" bun:"-"`
-	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
-	FullName     *string   `json:"full_name"  bun:"full_name"`
-
+	ID         int     `json:"id" bun:"-"`
+	EmployeeID *string `json:"employee_id"   bun:"employee_id"`
+	FullName   *string `json:"full_name"  bun:"full_name"`
 }
 type CreateRequest struct {
 	Password     *string `json:"password"   form:"password"`
@@ -117,7 +125,7 @@ type StatisticResponse struct {
 type DashboardResponse struct {
 	ComeTime   *string `json:"come_time" bun:"come_time"`
 	LeaveTime  *string `json:"leave_time" bun:"leave_time"`
-	TotalHours string `json:"total_hours" bun:"total_hours"`
+	TotalHours string  `json:"total_hours" bun:"total_hours"`
 }
 type MonthlyStatisticRequest struct {
 	Month date.Date
