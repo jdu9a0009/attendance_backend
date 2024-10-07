@@ -54,9 +54,37 @@ func (r Repository) GetByEmployeeID(ctx context.Context, employee_id string) (en
 		}
 	}
 	return detail, err
-
 }
 
+func (r Repository) GetFullName(ctx context.Context) (GetFullName, error) {
+	claims, err := r.CheckClaims(ctx, auth.RoleEmployee)
+	if err != nil {
+		return GetFullName{}, err
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			full_name
+		FROM
+		    users
+		WHERE deleted_at IS NULL AND role='EMPLOYEE' AND id = %d
+	`, claims.UserId)
+
+	var detail GetFullName
+
+	err = r.QueryRowContext(ctx, query).Scan(
+		&detail.FullName,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return GetFullName{}, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+	}
+	if err != nil {
+		return GetFullName{}, web.NewRequestError(errors.Wrap(err, "selecting employee_name detail"), http.StatusBadRequest)
+	}
+
+	return detail, nil
+}
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
 	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -892,24 +920,22 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
   
 	workDay := time.Now().Format("2006-01-02")
 	query := fmt.Sprintf(`
-	  SELECT
-		u.id,
-		u.employee_id,
-		u.full_name,
-		a.status,
-		d.name AS department_name,
-		(SELECT COUNT(u2.employee_id)
-		 FROM users AS u2
-		 WHERE u2.department_id = u.department_id AND u2.role = 'EMPLOYEE') AS employee_count
-	  FROM
-		users AS u
-	  LEFT JOIN
-		attendance AS a ON a.employee_id = u.employee_id AND a.work_day = '%s'
-	  LEFT JOIN
-		department AS d ON d.id = u.department_id
-	  WHERE
-		u.role = 'EMPLOYEE'
-	  ORDER BY employee_count,department_name %s %s`, workDay, limitQuery, offsetQuery)
+                   SELECT
+                       u.id,
+                       u.employee_id,
+                       u.full_name,
+                       a.status,
+                       d.name AS department
+                   FROM
+                       users AS u
+                   LEFT JOIN
+                       attendance AS a ON u.employee_id = a.employee_id AND a.deleted_at IS NULL
+                   LEFT JOIN
+                       department AS d ON d.id = u.department_id AND d.deleted_at IS NULL
+                   WHERE
+                       u.deleted_at IS NULL
+                       AND u.role = 'EMPLOYEE'
+                   ORDER BY d.name, u.full_name %s %s`, limitQuery, offsetQuery)
   
 	rows, err := r.QueryContext(ctx, query)
 	if err != nil {
@@ -929,7 +955,6 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
 		&detail.FullName,
 		&status,
 		&detail.DepartmentName,
-		&detail.EmployeeCount,
 	  )
 	  if err != nil {
 		return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
@@ -979,3 +1004,54 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
 	return list, count, nil
   }
   
+  func (r Repository) GetDepartmentList(ctx context.Context) ([]GetDepartmentlist, error) {
+       _, err := r.CheckClaims(ctx)
+        if err != nil {
+          return nil, err
+       }
+
+    query := `
+        SELECT
+            d.name AS department,
+            COUNT(u.employee_id) AS employee_count
+        FROM
+            department AS d
+        LEFT JOIN
+            users AS u ON u.department_id = d.id AND u.role = 'EMPLOYEE' AND u.deleted_at IS NULL
+        WHERE
+            d.deleted_at IS NULL
+        GROUP BY
+            d.name
+        ORDER BY
+            employee_count ASC;    
+    `
+
+    rows, err := r.QueryContext(ctx, query) // Assuming r.db is your database connection
+    if err != nil {
+        return nil, web.NewRequestError(errors.Wrap(err, "executing department list query"), http.StatusInternalServerError)
+    }
+    defer rows.Close()
+
+    var list []GetDepartmentlist
+
+    for rows.Next() {
+        var detail GetDepartmentlist
+
+        err = rows.Scan(
+            &detail.DepartmentName,
+            &detail.EmployeeCount,
+        )
+        if err != nil {
+            return nil, web.NewRequestError(errors.Wrap(err, "scanning department list on employee dashboard"), http.StatusBadRequest)
+        }
+
+        list = append(list, detail) // Append to the list
+    }
+
+    // Check for errors from iterating over rows.
+    if err = rows.Err(); err != nil {
+        return nil, web.NewRequestError(errors.Wrap(err, "iterating over department list rows"), http.StatusInternalServerError)
+    }
+
+    return list, nil // Return the list of departments
+}

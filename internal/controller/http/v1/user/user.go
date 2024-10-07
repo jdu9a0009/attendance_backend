@@ -1,6 +1,8 @@
 package user
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/repository/postgres/user"
 	"errors"
 	"fmt"
 	"io"
@@ -9,8 +11,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
-	"attendance/backend/foundation/web"
-	"attendance/backend/internal/repository/postgres/user"
 
 	"github.com/Azure/go-autorest/autorest/date"
 )
@@ -313,40 +313,49 @@ func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
+	full_name, err := uc.user.GetFullName(c.Ctx)
+	if err != nil {
+		return c.RespondError(err)
+	}
 
 	return c.Respond(map[string]interface{}{
-		"data":   response,
-		"status": true,
+		"employee": full_name,
+		"data":      response,
+		"status":    true,
 	}, http.StatusOK)
 }
 
 func (uc Controller) GetDashboardList(c *web.Context) error {
 	var filter user.Filter
-	
+
 	if limit, ok := c.GetQueryFunc(reflect.Int, "limit").(*int); ok {
-	  filter.Limit = limit
+		filter.Limit = limit
 	}
 	if offset, ok := c.GetQueryFunc(reflect.Int, "offset").(*int); ok {
-	  filter.Offset = offset
+		filter.Offset = offset
 	}
 	if page, ok := c.GetQueryFunc(reflect.Int, "page").(*int); ok {
-	  filter.Page = page
+		filter.Page = page
 	}
-	
+
 	if err := c.ValidParam(); err != nil {
-	  return c.RespondError(err)
+		return c.RespondError(err)
 	}
 	list, count, err := uc.user.GetDashboardList(c.Ctx, filter)
 	if err != nil {
-	  return c.RespondError(err)
+		return c.RespondError(err)
 	}
-	
+	department, err := uc.user.GetDepartmentList(c.Ctx)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
 	return c.Respond(map[string]interface{}{
-	  "data": map[string]interface{}{
-	  "results": list,
-	  "count":   count,
-	  },
-	  "status": true,
+		"data": map[string]interface{}{
+			"department":           department,
+			"employee_list":        list,
+			"total_employee_count": count,
+		},
+		"status": true,
 	}, http.StatusOK)
-	}
-  
+}
