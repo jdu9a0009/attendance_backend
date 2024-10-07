@@ -109,6 +109,8 @@ func (r Router) Init() error {
 	r.Get("/api/v1/user/statistics", userController.GetStatistics, middleware.Authenticate(r.auth))
 	r.Get("/api/v1/user/monthly", userController.GetMonthlyStatistics, middleware.Authenticate(r.auth))
 	r.Get("/api/v1/user/dashboard", userController.GetEmployeeDashboard, middleware.Authenticate(r.auth))
+	r.Get("/api/v1/user/dashboardlist", userController.GetDashboardList, middleware.Authenticate(r.auth))
+
 
 	// #department
 	r.Get("/api/v1/department/list", departmentController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleDashboard))
