@@ -870,7 +870,8 @@ LIMIT 1;
 	return detail, nil
 }
 
-func (r Repository) GetDashboardList(ctx context.Context,filter Filter) ([]GetDashboardlist,int, error) {
+
+func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetDashboardlist, int, error) {
 	_, err := r.CheckClaims(ctx)
 	if err != nil {
 	  return nil, 0, err
@@ -883,11 +884,10 @@ func (r Repository) GetDashboardList(ctx context.Context,filter Filter) ([]GetDa
 	}
   
 	if filter.Limit != nil {
-	  limitQuery += fmt.Sprintf(" LIMIT %d", *filter.Limit)
+	  limitQuery = fmt.Sprintf(" LIMIT %d", *filter.Limit)
 	}
-  
 	if filter.Offset != nil {
-	  offsetQuery += fmt.Sprintf(" OFFSET %d", *filter.Offset)
+	  offsetQuery = fmt.Sprintf(" OFFSET %d", *filter.Offset)
 	}
   
 	workDay := time.Now().Format("2006-01-02")
@@ -909,11 +909,11 @@ func (r Repository) GetDashboardList(ctx context.Context,filter Filter) ([]GetDa
 		department AS d ON d.id = u.department_id
 	  WHERE
 		u.role = 'EMPLOYEE'
-	  ORDER BY employee_count %s,%s`, workDay,limitQuery, offsetQuery)
+	  ORDER BY employee_count,department_name %s %s`, workDay, limitQuery, offsetQuery)
   
-	rows, err := r.QueryContext(ctx, query) 
+	rows, err := r.QueryContext(ctx, query)
 	if err != nil {
-	  return nil, 0,web.NewRequestError(errors.Wrap(err, "querying employee dashboard list"), http.StatusBadRequest)
+	  return nil, 0, web.NewRequestError(errors.Wrap(err, "querying employee dashboard list"), http.StatusBadRequest)
 	}
 	defer rows.Close()
   
@@ -932,7 +932,7 @@ func (r Repository) GetDashboardList(ctx context.Context,filter Filter) ([]GetDa
 		&detail.EmployeeCount,
 	  )
 	  if err != nil {
-		return nil,0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
 	  }
   
 	  var statusValue bool = false
@@ -944,26 +944,29 @@ func (r Repository) GetDashboardList(ctx context.Context,filter Filter) ([]GetDa
 	  list = append(list, detail) // Append each detail to the list
 	}
   
-	 if err = rows.Err(); err != nil {
-	  return nil,0, web.NewRequestError(errors.Wrap(err, "iterating over rows"), http.StatusBadRequest)
-	 }
+	if err = rows.Err(); err != nil {
+	  return nil, 0, web.NewRequestError(errors.Wrap(err, "iterating over rows"), http.StatusBadRequest)
+	}
   
 	countQuery := fmt.Sprintf(`
 	  SELECT
-		count(u.id)
-	  FROM  users u
-	  left join attendance as a a.employee_id=u.employee_id
-	  where  u.deleted_at is null and u.role='EMPLOYEE' and a.work_day='%s'  
-	`,workDay)
+		  count(u.employee_id)
+	  FROM
+		  users AS u
+	  LEFT JOIN
+		  attendance AS a ON a.employee_id = u.employee_id AND a.work_day = '%s'
+	  WHERE
+		  u.deleted_at IS NULL AND
+		  u.role = 'EMPLOYEE';   `, workDay)
   
 	countRows, err := r.QueryContext(ctx, countQuery)
-	if errors.Is(err, sql.ErrNoRows) {
-	  return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-	}
 	if err != nil {
+	  if errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+	  }
 	  return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting users"), http.StatusBadRequest)
 	}
-  
+	defer countRows.Close()
   
 	count := 0
   

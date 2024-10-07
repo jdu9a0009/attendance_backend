@@ -319,9 +319,10 @@ func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
+
 func (uc Controller) GetDashboardList(c *web.Context) error {
 	var filter user.Filter
-  
+	
 	if limit, ok := c.GetQueryFunc(reflect.Int, "limit").(*int); ok {
 	  filter.Limit = limit
 	}
@@ -331,7 +332,7 @@ func (uc Controller) GetDashboardList(c *web.Context) error {
 	if page, ok := c.GetQueryFunc(reflect.Int, "page").(*int); ok {
 	  filter.Page = page
 	}
-  
+	
 	if err := c.ValidParam(); err != nil {
 	  return c.RespondError(err)
 	}
@@ -339,13 +340,13 @@ func (uc Controller) GetDashboardList(c *web.Context) error {
 	if err != nil {
 	  return c.RespondError(err)
 	}
-  
+	
 	return c.Respond(map[string]interface{}{
 	  "data": map[string]interface{}{
-		"results": list,
-		"count":   count,
+	  "results": list,
+	  "count":   count,
 	  },
 	  "status": true,
 	}, http.StatusOK)
-  }
+	}
   
