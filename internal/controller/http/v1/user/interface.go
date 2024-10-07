@@ -13,6 +13,8 @@ type User interface {
 	GetDetailById(ctx context.Context, id int) (user.GetDetailByIdResponse, error)
 	GetQrCodeByEmployeeID(ctx context.Context, emloyee_id string) (string,error)
 	GetQrCodeList(ctx context.Context) (string,error)
+	GetDashboardList(ctx context.Context, filter user.Filter) ([]user.GetDashboardlist, int, error)
+
 
 
 	Create(ctx context.Context, request user.CreateRequest) (user.CreateResponse, error)

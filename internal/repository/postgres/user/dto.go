@@ -59,6 +59,15 @@ type GetDetailByIdResponse struct {
 type ExcellRequest struct {
 	Excell *multipart.FileHeader `json:"-" form:"excell"`
 }
+type GetDashboardlist struct {
+	ID             int     `json:"id"`
+	EmployeeID     *string `json:"employee_id"`
+	DepartmentName *string `json:"department"`
+	EmployeeCount   *string `json:"employee_count"`
+	FullName       *string `json:"full_name"`
+	Status         *bool   `json:"status"`
+  }
+  
 type CreateResponse struct {
 	bun.BaseModel `bun:"table:users"`
 
