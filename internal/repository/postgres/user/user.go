@@ -920,22 +920,29 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
   
 	workDay := time.Now().Format("2006-01-02")
 	query := fmt.Sprintf(`
-                   SELECT
-                       u.id,
-                       u.employee_id,
-                       u.full_name,
-                       a.status,
-                       d.name AS department
-                   FROM
-                       users AS u
-                   LEFT JOIN
-                       attendance AS a ON u.employee_id = a.employee_id AND a.deleted_at IS NULL
-                   LEFT JOIN
-                       department AS d ON d.id = u.department_id AND d.deleted_at IS NULL
-                   WHERE
-                       u.deleted_at IS NULL
-                       AND u.role = 'EMPLOYEE'
-                   ORDER BY d.name, u.full_name %s %s`, limitQuery, offsetQuery)
+                    SELECT
+                        u.id,
+                        u.employee_id,
+                        u.full_name,
+                        COALESCE(a.status, false) AS status, -- If no attendance record, default status to false
+                        d.name AS department
+                    FROM users AS u
+                    LEFT JOIN (
+                        SELECT
+                            a.employee_id,
+                            true AS status
+                        FROM
+                            attendance AS a
+                        WHERE
+                            a.work_day = '%s' -- Specify the date you are checking attendance for
+                            AND a.deleted_at IS NULL
+                    ) AS a ON u.employee_id = a.employee_id
+                    LEFT JOIN
+                        department AS d ON d.id = u.department_id AND d.deleted_at IS NULL
+                    WHERE
+                        u.deleted_at IS NULL
+                        AND u.role = 'EMPLOYEE'
+                    ORDER BY    d.name, a.status,u.full_name; %s %s `,workDay, limitQuery, offsetQuery)
   
 	rows, err := r.QueryContext(ctx, query)
 	if err != nil {
