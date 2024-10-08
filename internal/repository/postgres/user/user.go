@@ -1005,10 +1005,10 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
   }
   
   func (r Repository) GetDepartmentList(ctx context.Context) ([]GetDepartmentlist, error) {
-       _, err := r.CheckClaims(ctx)
-        if err != nil {
-          return nil, err
-       }
+    _, err := r.CheckClaims(ctx)
+    if err != nil {
+        return nil, err
+    }
 
     query := `
         SELECT
@@ -1023,10 +1023,14 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
         GROUP BY
             d.name
         ORDER BY
-            employee_count ASC;    
+            CASE 
+                WHEN COUNT(u.employee_id) = 0 THEN 1
+                ELSE 0
+            END,  -- Prioritize departments with non-zero employees
+            employee_count ASC;  -- Then sort by employee count
     `
 
-    rows, err := r.QueryContext(ctx, query) // Assuming r.db is your database connection
+    rows, err := r.QueryContext(ctx, query)
     if err != nil {
         return nil, web.NewRequestError(errors.Wrap(err, "executing department list query"), http.StatusInternalServerError)
     }
@@ -1045,13 +1049,12 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
             return nil, web.NewRequestError(errors.Wrap(err, "scanning department list on employee dashboard"), http.StatusBadRequest)
         }
 
-        list = append(list, detail) // Append to the list
+        list = append(list, detail)
     }
 
-    // Check for errors from iterating over rows.
     if err = rows.Err(); err != nil {
         return nil, web.NewRequestError(errors.Wrap(err, "iterating over department list rows"), http.StatusInternalServerError)
     }
 
-    return list, nil // Return the list of departments
+    return list, nil
 }
