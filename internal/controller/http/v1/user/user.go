@@ -141,7 +141,6 @@ func (uc Controller) CreateUser(c *web.Context) error {
 	if err := c.BindFunc(&request); err != nil {
 		return c.RespondError(err)
 	}
-	fmt.Println("contro", request)
 	response, err := uc.user.Create(c.Ctx, request)
 	if err != nil {
 		return c.RespondError(err)
@@ -152,6 +151,7 @@ func (uc Controller) CreateUser(c *web.Context) error {
 		"status":       true,
 	}, http.StatusOK)
 }
+
 func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	var request user.ExcellRequest
 	if err := c.BindFunc(&request); err != nil {
@@ -320,8 +320,8 @@ func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 
 	return c.Respond(map[string]interface{}{
 		"employee": full_name,
-		"data":      response,
-		"status":    true,
+		"data":     response,
+		"status":   true,
 	}, http.StatusOK)
 }
 
