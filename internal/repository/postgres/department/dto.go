@@ -14,17 +14,20 @@ type Filter struct {
 }
 
 type GetListResponse struct {
-	ID   int     `json:"id"`
-	Name *string `json:"name"`
+	ID            int     `json:"id"`
+	Name          *string `json:"name"`
+	DisplayNumber int     `json:"display_number"`
 }
 
 type GetDetailByIdResponse struct {
-	ID   int     `json:"id"`
-	Name *string `json:"name" form:"name"`
+	ID            int     `json:"id"`
+	Name          *string `json:"name" form:"name"`
+	DisplayNumber int     `json:"display_number"`
 }
 
 type CreateRequest struct {
-	Name *string `json:"name" form:"name"`
+	Name          *string `json:"name" form:"name"`
+	DisplayNumber int     `json:"display_number" form:"display_number"`
 }
 
 type CreateResponse struct {
@@ -32,7 +35,9 @@ type CreateResponse struct {
 
 	ID int `json:"id" bun:"-"`
 
-	Name      *string   `json:"name"       bun:"name"`
+	Name          *string `json:"name"       bun:"name"`
+	DisplayNumber int     `json:"display_number" bun:"display_number"`
+
 	CreatedAt time.Time `json:"-"          bun:"created_at"`
 	CreatedBy int       `json:"-"          bun:"created_by"`
 }
@@ -40,4 +45,6 @@ type CreateResponse struct {
 type UpdateRequest struct {
 	ID   int     `json:"id" form:"id"`
 	Name *string `json:"name" form:"name"`
+	DisplayNumber int     `json:"display_number" form:"display_number"`
+
 }

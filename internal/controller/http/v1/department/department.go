@@ -1,10 +1,10 @@
 package department
 
 import (
-	"net/http"
-	"reflect"
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/repository/postgres/department"
+	"net/http"
+	"reflect"
 )
 
 type Controller struct {
@@ -37,15 +37,16 @@ func (uc Controller) GetList(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	list, count, err := uc.department.GetList(c.Ctx, filter)
+	list, count, displayNumber, err := uc.department.GetList(c.Ctx, filter)
 	if err != nil {
 		return c.RespondError(err)
 	}
 
 	return c.Respond(map[string]interface{}{
 		"data": map[string]interface{}{
-			"results": list,
-			"count":   count,
+			"displayNumber": displayNumber,
+			"results":       list,
+			"count":         count,
 		},
 		"status": true,
 	}, http.StatusOK)
@@ -72,7 +73,7 @@ func (uc Controller) GetDetailById(c *web.Context) error {
 func (uc Controller) Create(c *web.Context) error {
 	var request department.CreateRequest
 
-	if err := c.BindFunc(&request, "Name"); err != nil {
+	if err := c.BindFunc(&request, "Name","DisplayNumber"); err != nil {
 		return c.RespondError(err)
 	}
 
@@ -96,7 +97,7 @@ func (uc Controller) UpdateAll(c *web.Context) error {
 
 	var request department.UpdateRequest
 
-	if err := c.BindFunc(&request, "Name"); err != nil {
+	if err := c.BindFunc(&request, "Name","DisplayNumber"); err != nil {
 		return c.RespondError(err)
 	}
 

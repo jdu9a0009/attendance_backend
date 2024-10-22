@@ -1,16 +1,16 @@
 package department
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/entity"
+	"attendance/backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/repository/postgres"
 	"context"
 	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
-	"attendance/backend/foundation/web"
-	"attendance/backend/internal/entity"
-	"attendance/backend/internal/pkg/repository/postgresql"
-	"attendance/backend/internal/repository/postgres"
 
 	"github.com/pkg/errors"
 )
@@ -31,10 +31,10 @@ func (r Repository) GetById(ctx context.Context, id int) (entity.Department, err
 	return detail, err
 }
 
-func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
+func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, int, error) {
 	_, err := r.CheckClaims(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
 	whereQuery := fmt.Sprintf(`
@@ -49,6 +49,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 				name ILIKE '%s'`, "%"+search+"%")
 	}
 	orderQuery := "ORDER BY created_at desc"
+	groupQuery := "GROUP BY display_number,id"
 
 	var limitQuery, offsetQuery string
 
@@ -68,18 +69,19 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	query := fmt.Sprintf(`
 		SELECT 
 			id,
-			name
+			name,
+			display_number
 		FROM department
 
-		%s %s %s %s
-	`, whereQuery, orderQuery, limitQuery, offsetQuery)
+		%s %s %s %s %s
+	`, whereQuery, groupQuery, orderQuery, limitQuery, offsetQuery)
 
 	rows, err := r.QueryContext(ctx, query)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		return nil, 0, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
 	}
 	if err != nil {
-		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting department"), http.StatusBadRequest)
+		return nil, 0, 0, web.NewRequestError(errors.Wrap(err, "selecting department"), http.StatusBadRequest)
 	}
 
 	var list []GetListResponse
@@ -88,8 +90,9 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		var detail GetListResponse
 		if err = rows.Scan(
 			&detail.ID,
-			&detail.Name); err != nil {
-			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning department list"), http.StatusBadRequest)
+			&detail.Name,
+			&detail.DisplayNumber); err != nil {
+			return nil, 0, 0, web.NewRequestError(errors.Wrap(err, "scanning department list"), http.StatusBadRequest)
 		}
 
 		list = append(list, detail)
@@ -104,21 +107,38 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 
 	countRows, err := r.QueryContext(ctx, countQuery)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		return nil, 0, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
 	}
 	if err != nil {
-		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting department "), http.StatusBadRequest)
+		return nil, 0, 0, web.NewRequestError(errors.Wrap(err, "selecting department "), http.StatusBadRequest)
 	}
 
 	count := 0
 
 	for countRows.Next() {
 		if err = countRows.Scan(&count); err != nil {
-			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning department count"), http.StatusBadRequest)
+			return nil, 0, 0, web.NewRequestError(errors.Wrap(err, "scanning department count"), http.StatusBadRequest)
+		}
+	}
+	LastDisplayNumber := fmt.Sprintf(`SELECT COALESCE(MAX(display_number), 0) FROM department where deleted_at is null`)
+
+	lastRows, err := r.QueryContext(ctx, LastDisplayNumber)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+	}
+	if err != nil {
+		return nil, 0, 0, web.NewRequestError(errors.Wrap(err, "selecting last display number "), http.StatusBadRequest)
+	}
+
+	lastDisplayNumber := 0
+
+	for lastRows.Next() {
+		if err = lastRows.Scan(&lastDisplayNumber); err != nil {
+			return nil, 0, 0, web.NewRequestError(errors.Wrap(err, "scanning last display number count"), http.StatusBadRequest)
 		}
 	}
 
-	return list, count, nil
+	return list, count, lastDisplayNumber + 1, nil
 }
 
 func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdResponse, error) {
@@ -130,7 +150,8 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 	query := fmt.Sprintf(`
 		SELECT
 			id,
-			name
+			name,
+			display_number
 		FROM
 		    department
 	
@@ -142,6 +163,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ID,
 		&detail.Name,
+		&detail.DisplayNumber,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -160,23 +182,41 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
-	if err := r.ValidateStruct(&request, "Name"); err != nil {
+	// Validate the struct fields
+	if err := r.ValidateStruct(&request, "Name", "DisplayNumber"); err != nil {
 		return CreateResponse{}, err
 	}
+
+	// Check if the departmDisplayNumberent name already exists
 	DepartmentName := true
 	if err := r.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT 
-    						CASE WHEN 
-    						(SELECT id FROM department WHERE name = '%s' AND deleted_at IS NULL) IS NOT NULL 
-    						THEN true ELSE false END`, *request.Name)).Scan(&DepartmentName); err != nil {
+		fmt.Sprintf(`SELECT CASE WHEN 
+						(SELECT id FROM department WHERE name = '%s' AND deleted_at IS NULL) IS NOT NULL 
+						THEN true ELSE false END`, *request.Name)).Scan(&DepartmentName); err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusInternalServerError)
 	}
-	if DepartmentName {
-		return CreateResponse{}, web.NewRequestError(errors.Wrap(errors.New(""), "Department Name is used"), http.StatusBadRequest)
-	}
-	var response CreateResponse
 
+	if DepartmentName {
+		return CreateResponse{}, web.NewRequestError(errors.New("Department Name is already used"), http.StatusBadRequest)
+	}
+
+	// Get the last display number from the department table
+	var LastDisplayNumber int
+	if err := r.QueryRowContext(ctx, `SELECT COALESCE(MAX(display_number), 0) FROM department where deleted_at is null`).Scan(&LastDisplayNumber); err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "fetching last display number"), http.StatusInternalServerError)
+	}
+
+	// Check if the new department's display number is valid
+	if request.DisplayNumber <= 0 || request.DisplayNumber > LastDisplayNumber+1 {
+		return CreateResponse{}, web.NewRequestError(
+			errors.Errorf("Invalid Display Number. The maximum allowed is %d or less than this number", LastDisplayNumber+1),
+			http.StatusBadRequest,
+		)
+	}
+
+	var response CreateResponse
 	response.Name = request.Name
+	response.DisplayNumber = request.DisplayNumber
 	response.CreatedAt = time.Now()
 	response.CreatedBy = claims.UserId
 
@@ -210,9 +250,23 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 		return web.NewRequestError(errors.Wrap(err, "Department Name is used"), http.StatusBadRequest)
 
 	}
+	// Get the last display number from the department table
+	var LastDisplayNumber int
+	if err := r.QueryRowContext(ctx, `SELECT COALESCE(MAX(display_number), 0) FROM department where deleted_at is null`).Scan(&LastDisplayNumber); err != nil {
+		return web.NewRequestError(errors.Wrap(err, "fetching last display number"), http.StatusInternalServerError)
+	}
+
+	if request.DisplayNumber <= 0 || request.DisplayNumber > LastDisplayNumber+1 {
+		return web.NewRequestError(
+			errors.Errorf("Invalid Display Number. The maximum allowed is %d or less than this number", LastDisplayNumber+1),
+			http.StatusBadRequest,
+		)
+	}
+
 	q := r.NewUpdate().Table("department").Where("deleted_at IS NULL AND id = ?", request.ID)
 
 	q.Set("name = ?", request.Name)
+	q.Set("display_number = ?", request.DisplayNumber)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
@@ -242,10 +296,26 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		return web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusBadRequest)
 
 	}
+	// Get the last display number from the department table
+	var LastDisplayNumber int
+	if err := r.QueryRowContext(ctx, `SELECT COALESCE(MAX(display_number), 0) FROM department where deleted_at is null`).Scan(&LastDisplayNumber); err != nil {
+		return web.NewRequestError(errors.Wrap(err, "fetching last display number"), http.StatusInternalServerError)
+	}
+
+	if request.DisplayNumber <= 0 || request.DisplayNumber > LastDisplayNumber+1 {
+		return web.NewRequestError(
+			errors.Errorf("Invalid Display Number. The maximum allowed is %d or less than this number", LastDisplayNumber+1),
+			http.StatusBadRequest,
+		)
+	}
+
 	q := r.NewUpdate().Table("department").Where("deleted_at IS NULL AND id = ?", request.ID)
 
 	if request.Name != nil {
 		q.Set("name = ?", request.Name)
+	}
+	if request.DisplayNumber != 0 {
+		q.Set("display_number = ?", request.DisplayNumber)
 	}
 
 	q.Set("updated_at = ?", time.Now())

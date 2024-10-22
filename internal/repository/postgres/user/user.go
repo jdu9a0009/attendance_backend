@@ -362,7 +362,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	if len(excelData) == 0 {
 		return 0, web.NewRequestError(errors.New("no data found in Excel file"), http.StatusBadRequest)
 	}
-
+    var incompleteUsers []IncompleteUser
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -376,20 +376,28 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		}
 	}()
 
+
 	// Create a new user based on the data from the Excel file
 	createdCount := 0 // Initialize the count
 	for _, data := range excelData {
 		// Validate the data from the Excel file
-		if err := r.ValidateStruct(&data, "employee_id", "password", "full_name"); err != nil {
-			return 0, err
+		if err := r.ValidateStruct(&data, "password", "role", "full_name","phone","email"); err != nil {
+			incompleteUserData := CreateRequest{
+				Password:     &data.Password,
+				Role:         &data.Role,
+				FullName:     &data.FullName,
+				DepartmentID: &data.DepartmentID,
+				PositionID:   &data.PositionID,
+				Phone:        &data.Phone,
+				Email:        &data.Email,
+			}
+			incompleteUsers = append(incompleteUsers, IncompleteUser{Data: []CreateRequest{incompleteUserData}, Reason: "Incomplete data"})
+			continue
 		}
 
-		// Check for duplicate employee_id
-		var existingEmployee CreateResponse
-		err := tx.NewSelect().Model(&existingEmployee).Where("employee_id = ?", data.EmployeeID).Scan(ctx)
-		if err == nil { // Employee with the same ID exists
-			fmt.Println("Error: Duplicate employee_id:", data.EmployeeID)
-			return 0, web.NewRequestError(errors.New("Duplicate employee_id found"), http.StatusBadRequest) // Return an error
+		employeeID, err := r.GenerateUniqueEmployeeID(ctx)
+		if err != nil {
+			return 0, web.NewRequestError(errors.Wrap(err, "generate unique employee_id"), http.StatusInternalServerError)
 		}
 
 		// Hash the password
@@ -408,7 +416,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		fmt.Println("Data:da", data)
 		// Create a new user object
 		user := CreateResponse{
-			EmployeeID:   &data.EmployeeID,
+			EmployeeID:   employeeID,
 			Password:     &hashedPassword,
 			Role:         data.Role,
 			FullName:     &data.FullName,

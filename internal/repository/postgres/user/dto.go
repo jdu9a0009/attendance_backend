@@ -91,13 +91,11 @@ type CreateResponse struct {
 	CreatedAt    time.Time `json:"-"          bun:"created_at"`
 	CreatedBy    int       `json:"-"          bun:"created_by"`
 }
-type GenEmployeeID struct {
-	bun.BaseModel `bun:"table:users"`
-
-	ID         int     `json:"id" bun:"-"`
-	EmployeeID *string `json:"employee_id"   bun:"employee_id"`
-	FullName   *string `json:"full_name"  bun:"full_name"`
+type IncompleteUser struct {
+	Data  []CreateRequest
+	Reason string
 }
+
 type CreateRequest struct {
 	Password     *string `json:"password"   form:"password"`
 	Role         *string `json:"role" form:"role"`
@@ -106,6 +104,13 @@ type CreateRequest struct {
 	PositionID   *int    `json:"position_id" form:"position_id"`
 	Phone        *string `json:"phone" form:"phone"`
 	Email        *string `json:"email" form:"email"`
+}
+type GenEmployeeID struct {
+	bun.BaseModel `bun:"table:users"`
+
+	ID         int     `json:"id" bun:"-"`
+	EmployeeID *string `json:"employee_id"   bun:"employee_id"`
+	FullName   *string `json:"full_name"  bun:"full_name"`
 }
 
 type UpdateRequest struct {
