@@ -48,7 +48,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		whereQuery += fmt.Sprintf(` AND
 				name ILIKE '%s'`, "%"+search+"%")
 	}
-	orderQuery := "ORDER BY created_at desc"
+	orderQuery := "ORDER BY display_number desc"
 	groupQuery := "GROUP BY display_number,id"
 
 	var limitQuery, offsetQuery string
@@ -212,6 +212,15 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 			errors.Errorf("Invalid Display Number. The maximum allowed is %d or less than this number", LastDisplayNumber+1),
 			http.StatusBadRequest,
 		)
+	}
+	if request.DisplayNumber <= LastDisplayNumber {
+		_, err = r.ExecContext(ctx, `
+			UPDATE department 
+			SET display_number = display_number + 1 
+			WHERE deleted_at IS NULL AND display_number >= ?`, request.DisplayNumber)
+		if err != nil {
+			return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "updating display numbers"), http.StatusInternalServerError)
+		}
 	}
 
 	var response CreateResponse
