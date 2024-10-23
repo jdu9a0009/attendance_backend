@@ -18,14 +18,14 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"strings"
-	"time"
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/auth"
 	"attendance/backend/internal/entity"
 	"attendance/backend/internal/pkg/repository/postgresql"
 	"attendance/backend/internal/repository/postgres"
 	"attendance/backend/internal/service/hashing"
+	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/skip2/go-qrcode"
@@ -362,7 +362,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	if len(excelData) == 0 {
 		return 0, web.NewRequestError(errors.New("no data found in Excel file"), http.StatusBadRequest)
 	}
-    var incompleteUsers []IncompleteUser
+	var incompleteUsers []IncompleteUser
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -376,12 +376,11 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		}
 	}()
 
-
 	// Create a new user based on the data from the Excel file
 	createdCount := 0 // Initialize the count
 	for _, data := range excelData {
 		// Validate the data from the Excel file
-		if err := r.ValidateStruct(&data, "password", "role", "full_name","phone","email"); err != nil {
+		if err := r.ValidateStruct(&data, "password", "role", "full_name", "phone", "email"); err != nil {
 			incompleteUserData := CreateRequest{
 				Password:     &data.Password,
 				Role:         &data.Role,
@@ -906,26 +905,25 @@ LIMIT 1;
 	return detail, nil
 }
 
-
 func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetDashboardlist, int, error) {
 	_, err := r.CheckClaims(ctx)
 	if err != nil {
-	  return nil, 0, err
+		return nil, 0, err
 	}
 	var limitQuery, offsetQuery string
-  
+
 	if filter.Page != nil && filter.Limit != nil {
-	  offset := (*filter.Page - 1) * (*filter.Limit)
-	  filter.Offset = &offset
+		offset := (*filter.Page - 1) * (*filter.Limit)
+		filter.Offset = &offset
 	}
-  
+
 	if filter.Limit != nil {
-	  limitQuery = fmt.Sprintf(" LIMIT %d", *filter.Limit)
+		limitQuery = fmt.Sprintf(" LIMIT %d", *filter.Limit)
 	}
 	if filter.Offset != nil {
-	  offsetQuery = fmt.Sprintf(" OFFSET %d", *filter.Offset)
+		offsetQuery = fmt.Sprintf(" OFFSET %d", *filter.Offset)
 	}
-  
+
 	workDay := time.Now().Format("2006-01-02")
 	query := fmt.Sprintf(`
                     SELECT
@@ -933,7 +931,8 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
                         u.employee_id,
                         u.full_name,
                         COALESCE(a.status, false) AS status, -- If no attendance record, default status to false
-                        d.name AS department
+                        d.name AS department,
+						d.display_number
                     FROM users AS u
                     LEFT JOIN (
                         SELECT
@@ -950,44 +949,45 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
                     WHERE
                         u.deleted_at IS NULL
                         AND u.role = 'EMPLOYEE'
-                    ORDER BY    d.name, a.status,u.full_name; %s %s `,workDay, limitQuery, offsetQuery)
-  
+                    ORDER BY    d.display_number asc %s %s `, workDay, limitQuery, offsetQuery)
+
 	rows, err := r.QueryContext(ctx, query)
 	if err != nil {
-	  return nil, 0, web.NewRequestError(errors.Wrap(err, "querying employee dashboard list"), http.StatusBadRequest)
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "querying employee dashboard list"), http.StatusBadRequest)
 	}
 	defer rows.Close()
-  
+
 	var list []GetDashboardlist
-  
+
 	for rows.Next() {
-	  var detail GetDashboardlist
-	  var status sql.NullBool
-  
-	  err = rows.Scan(
-		&detail.ID,
-		&detail.EmployeeID,
-		&detail.FullName,
-		&status,
-		&detail.DepartmentName,
-	  )
-	  if err != nil {
-		return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
-	  }
-  
-	  var statusValue bool = false
-	  if status.Valid {
-		statusValue = status.Bool
-	  }
-	  detail.Status = &statusValue
-  
-	  list = append(list, detail) // Append each detail to the list
+		var detail GetDashboardlist
+		var status sql.NullBool
+
+		err = rows.Scan(
+			&detail.ID,
+			&detail.EmployeeID,
+			&detail.FullName,
+			&status,
+			&detail.DepartmentName,
+			&detail.DisplayNumber,
+		)
+		if err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
+		}
+
+		var statusValue bool = false
+		if status.Valid {
+			statusValue = status.Bool
+		}
+		detail.Status = &statusValue
+
+		list = append(list, detail) // Append each detail to the list
 	}
-  
+
 	if err = rows.Err(); err != nil {
-	  return nil, 0, web.NewRequestError(errors.Wrap(err, "iterating over rows"), http.StatusBadRequest)
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "iterating over rows"), http.StatusBadRequest)
 	}
-  
+
 	countQuery := fmt.Sprintf(`
 	  SELECT
 		  count(u.employee_id)
@@ -998,36 +998,37 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
 	  WHERE
 		  u.deleted_at IS NULL AND
 		  u.role = 'EMPLOYEE';   `, workDay)
-  
+
 	countRows, err := r.QueryContext(ctx, countQuery)
 	if err != nil {
-	  if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-	  }
-	  return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting users"), http.StatusBadRequest)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		}
+		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting users"), http.StatusBadRequest)
 	}
 	defer countRows.Close()
-  
-	count := 0
-  
-	for countRows.Next() {
-	  if err = countRows.Scan(&count); err != nil {
-		return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning user count"), http.StatusBadRequest)
-	  }
-	}
-  
-	return list, count, nil
-  }
-  
-  func (r Repository) GetDepartmentList(ctx context.Context) ([]GetDepartmentlist, error) {
-    _, err := r.CheckClaims(ctx)
-    if err != nil {
-        return nil, err
-    }
 
-    query := `
+	count := 0
+
+	for countRows.Next() {
+		if err = countRows.Scan(&count); err != nil {
+			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning user count"), http.StatusBadRequest)
+		}
+	}
+
+	return list, count, nil
+}
+
+func (r Repository) GetDepartmentList(ctx context.Context) ([]GetDepartmentlist, error) {
+	_, err := r.CheckClaims(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `
         SELECT
             d.name AS department,
+			d.display_number,
             COUNT(u.employee_id) AS employee_count
         FROM
             department AS d
@@ -1036,40 +1037,37 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
         WHERE
             d.deleted_at IS NULL
         GROUP BY
-            d.name
+            d.name,d.display_number
         ORDER BY
-            CASE 
-                WHEN COUNT(u.employee_id) = 0 THEN 1
-                ELSE 0
-            END,  -- Prioritize departments with non-zero employees
-            employee_count ASC;  -- Then sort by employee count
+            d.display_number asc;
     `
 
-    rows, err := r.QueryContext(ctx, query)
-    if err != nil {
-        return nil, web.NewRequestError(errors.Wrap(err, "executing department list query"), http.StatusInternalServerError)
-    }
-    defer rows.Close()
+	rows, err := r.QueryContext(ctx, query)
+	if err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "executing department list query"), http.StatusInternalServerError)
+	}
+	defer rows.Close()
 
-    var list []GetDepartmentlist
+	var list []GetDepartmentlist
 
-    for rows.Next() {
-        var detail GetDepartmentlist
+	for rows.Next() {
+		var detail GetDepartmentlist
 
-        err = rows.Scan(
-            &detail.DepartmentName,
-            &detail.EmployeeCount,
-        )
-        if err != nil {
-            return nil, web.NewRequestError(errors.Wrap(err, "scanning department list on employee dashboard"), http.StatusBadRequest)
-        }
+		err = rows.Scan(
+			&detail.DepartmentName,
+			&detail.DisplayNumber,
+			&detail.EmployeeCount,
+		)
+		if err != nil {
+			return nil, web.NewRequestError(errors.Wrap(err, "scanning department list on employee dashboard"), http.StatusBadRequest)
+		}
 
-        list = append(list, detail)
-    }
+		list = append(list, detail)
+	}
 
-    if err = rows.Err(); err != nil {
-        return nil, web.NewRequestError(errors.Wrap(err, "iterating over department list rows"), http.StatusInternalServerError)
-    }
+	if err = rows.Err(); err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "iterating over department list rows"), http.StatusInternalServerError)
+	}
 
-    return list, nil
+	return list, nil
 }

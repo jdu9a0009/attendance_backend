@@ -63,12 +63,14 @@ type GetDashboardlist struct {
 	ID             int     `json:"id"`
 	EmployeeID     *string `json:"employee_id"`
 	DepartmentName *string `json:"department"`
+	DisplayNumber  int     `json:"display_number"`
 	FullName       *string `json:"full_name"`
 	Status         *bool   `json:"status"`
 }
 type GetDepartmentlist struct {
 	DepartmentName *string `json:"department"`
-	EmployeeCount  *string `json:"employee_count"`
+	DisplayNumber  int     `json:"display_number"`
+	EmployeeCount *string `json:"employee_count"`
 }
 type GetFullName struct {
 	bun.BaseModel `bun:"table:users"`
@@ -92,7 +94,7 @@ type CreateResponse struct {
 	CreatedBy    int       `json:"-"          bun:"created_by"`
 }
 type IncompleteUser struct {
-	Data  []CreateRequest
+	Data   []CreateRequest
 	Reason string
 }
 
