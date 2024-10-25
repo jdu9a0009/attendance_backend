@@ -116,7 +116,6 @@ func (r Router) Init() error {
 	r.Get("/api/v1/department/list", departmentController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleDashboard))
 	r.Get("/api/v1/department/:id", departmentController.GetDetailById, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Post("/api/v1/department/create", departmentController.Create, middleware.Authenticate(r.auth, auth.RoleAdmin))
-	r.Put("/api/v1/department/:id", departmentController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Patch("/api/v1/department/:id", departmentController.UpdateColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Delete("/api/v1/department/:id", departmentController.Delete, middleware.Authenticate(r.auth, auth.RoleAdmin))
 

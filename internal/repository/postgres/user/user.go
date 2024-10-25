@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/jung-kurt/gofpdf/v2"
 
@@ -905,18 +906,18 @@ LIMIT 1;
 	return detail, nil
 }
 
-func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetDashboardlist, int, error) {
+func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]DepartmentResult, int, error) {
 	_, err := r.CheckClaims(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
-	var limitQuery, offsetQuery string
 
+	// Pagination queries
+	var limitQuery, offsetQuery string
 	if filter.Page != nil && filter.Limit != nil {
 		offset := (*filter.Page - 1) * (*filter.Limit)
 		filter.Offset = &offset
 	}
-
 	if filter.Limit != nil {
 		limitQuery = fmt.Sprintf(" LIMIT %d", *filter.Limit)
 	}
@@ -926,30 +927,31 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
 
 	workDay := time.Now().Format("2006-01-02")
 	query := fmt.Sprintf(`
-                    SELECT
-                        u.id,
-                        u.employee_id,
-                        u.full_name,
-                        COALESCE(a.status, false) AS status, -- If no attendance record, default status to false
-                        d.name AS department,
-						d.display_number
-                    FROM users AS u
-                    LEFT JOIN (
-                        SELECT
-                            a.employee_id,
-                            true AS status
-                        FROM
-                            attendance AS a
-                        WHERE
-                            a.work_day = '%s' -- Specify the date you are checking attendance for
-                            AND a.deleted_at IS NULL
-                    ) AS a ON u.employee_id = a.employee_id
-                    LEFT JOIN
-                        department AS d ON d.id = u.department_id AND d.deleted_at IS NULL
-                    WHERE
-                        u.deleted_at IS NULL
-                        AND u.role = 'EMPLOYEE'
-                    ORDER BY    d.display_number asc %s %s `, workDay, limitQuery, offsetQuery)
+        SELECT
+            u.id,
+            u.employee_id,
+            u.full_name,
+            COALESCE(a.status, false) AS status,
+            d.id AS department_id,
+            d.name AS department_name,
+            d.display_number
+        FROM users AS u
+        LEFT JOIN (
+            SELECT
+                a.employee_id,
+                true AS status
+            FROM
+                attendance AS a
+            WHERE
+                a.work_day = '%s'
+                AND a.deleted_at IS NULL
+        ) AS a ON u.employee_id = a.employee_id
+        LEFT JOIN
+            department AS d ON d.id = u.department_id AND d.deleted_at IS NULL
+        WHERE
+            u.deleted_at IS NULL and d.deleted_at is null
+            AND u.role = 'EMPLOYEE'
+        ORDER BY d.display_number ASC %s %s`, workDay, limitQuery, offsetQuery)
 
 	rows, err := r.QueryContext(ctx, query)
 	if err != nil {
@@ -957,117 +959,86 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]GetD
 	}
 	defer rows.Close()
 
-	var list []GetDashboardlist
+	// Map to store departments with employees grouped
+	departmentMap := make(map[int]*DepartmentResult)
 
 	for rows.Next() {
-		var detail GetDashboardlist
-		var status sql.NullBool
+		var (
+			detail         GetDashboardlist
+			departmentID  int
+			displayNumber  sql.NullInt64
+			departmentName sql.NullString
+		)
 
+		// Scan the row with individual fields
 		err = rows.Scan(
 			&detail.ID,
 			&detail.EmployeeID,
 			&detail.FullName,
-			&status,
-			&detail.DepartmentName,
-			&detail.DisplayNumber,
+			&detail.Status,
+			departmentID,
+			&departmentName,
+			&displayNumber,
 		)
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
 		}
-
-		var statusValue bool = false
-		if status.Valid {
-			statusValue = status.Bool
+		fmt.Println(detail.DepartmentID)
+		// Assign values to the struct after checking for null
+		if departmentName.Valid {
+			detail.DepartmentName = &departmentName.String
 		}
-		detail.Status = &statusValue
+		if displayNumber.Valid {
+			dn := int(displayNumber.Int64)
+			detail.DisplayNumber = &dn
+		}
 
-		list = append(list, detail) // Append each detail to the list
+		// Group employees by department
+		if deptResult, exists := departmentMap[*detail.DepartmentID]; exists {
+			deptResult.Employees = append(deptResult.Employees, detail)
+		} else {
+			departmentMap[*detail.DepartmentID] = &DepartmentResult{
+				DepartmentName: detail.DepartmentName,
+				DisplayNumber:  *detail.DisplayNumber,
+				Employees:      []GetDashboardlist{detail},
+			}
+		}
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, 0, web.NewRequestError(errors.Wrap(err, "iterating over rows"), http.StatusBadRequest)
+	// Convert map to slice and sort by DisplayNumber
+	var results []DepartmentResult
+	for _, dept := range departmentMap {
+		results = append(results, *dept)
 	}
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].DisplayNumber < results[j].DisplayNumber
+	})
 
+	// Total count query
 	countQuery := fmt.Sprintf(`
-	  SELECT
-		  count(u.employee_id)
-	  FROM
-		  users AS u
-	  LEFT JOIN
-		  attendance AS a ON a.employee_id = u.employee_id AND a.work_day = '%s'
-	  WHERE
-		  u.deleted_at IS NULL AND
-		  u.role = 'EMPLOYEE';   `, workDay)
+        SELECT
+            count(u.employee_id)
+        FROM
+            users AS u
+        LEFT JOIN
+            attendance AS a ON a.employee_id = u.employee_id AND a.work_day = '%s'
+        WHERE
+            u.deleted_at IS NULL AND
+            u.role = 'EMPLOYEE';`, workDay)
 
 	countRows, err := r.QueryContext(ctx, countQuery)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, 0, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-		}
 		return nil, 0, web.NewRequestError(errors.Wrap(err, "selecting users"), http.StatusBadRequest)
 	}
 	defer countRows.Close()
 
+	// Get total count
 	count := 0
-
 	for countRows.Next() {
 		if err = countRows.Scan(&count); err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning user count"), http.StatusBadRequest)
 		}
 	}
 
-	return list, count, nil
-}
-
-func (r Repository) GetDepartmentList(ctx context.Context) ([]GetDepartmentlist, error) {
-	_, err := r.CheckClaims(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	query := `
-        SELECT
-            d.name AS department,
-			d.display_number,
-            COUNT(u.employee_id) AS employee_count
-        FROM
-            department AS d
-        LEFT JOIN
-            users AS u ON u.department_id = d.id AND u.role = 'EMPLOYEE' AND u.deleted_at IS NULL
-        WHERE
-            d.deleted_at IS NULL
-        GROUP BY
-            d.name,d.display_number
-        ORDER BY
-            d.display_number asc;
-    `
-
-	rows, err := r.QueryContext(ctx, query)
-	if err != nil {
-		return nil, web.NewRequestError(errors.Wrap(err, "executing department list query"), http.StatusInternalServerError)
-	}
-	defer rows.Close()
-
-	var list []GetDepartmentlist
-
-	for rows.Next() {
-		var detail GetDepartmentlist
-
-		err = rows.Scan(
-			&detail.DepartmentName,
-			&detail.DisplayNumber,
-			&detail.EmployeeCount,
-		)
-		if err != nil {
-			return nil, web.NewRequestError(errors.Wrap(err, "scanning department list on employee dashboard"), http.StatusBadRequest)
-		}
-
-		list = append(list, detail)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, web.NewRequestError(errors.Wrap(err, "iterating over department list rows"), http.StatusInternalServerError)
-	}
-
-	return list, nil
+	return results, count, nil
 }

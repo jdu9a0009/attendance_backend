@@ -59,18 +59,25 @@ type GetDetailByIdResponse struct {
 type ExcellRequest struct {
 	Excell *multipart.FileHeader `json:"-" form:"excell"`
 }
+type DepartmentResult struct {
+	DepartmentName *string             `json:"department_name"`
+	DisplayNumber  int                `json:"display_number"`
+	Employees      []GetDashboardlist `json:"result"`
+}
 type GetDashboardlist struct {
 	ID             int     `json:"id"`
-	EmployeeID     *string `json:"employee_id"`
-	DepartmentName *string `json:"department"`
-	DisplayNumber  int     `json:"display_number"`
-	FullName       *string `json:"full_name"`
-	Status         *bool   `json:"status"`
+	EmployeeID     *string  `json:"employee_id"`
+	DepartmentID   *int     `json:"department_id"`
+	DepartmentName *string `json:"department_name"` // Use sql.NullString
+	DisplayNumber  *int    `json:"display_number"`  // Use sql.NullInt32
+	FullName       *string  `json:"full_name"`
+	Status         *bool    `json:"status"`
 }
+
 type GetDepartmentlist struct {
 	DepartmentName *string `json:"department"`
 	DisplayNumber  int     `json:"display_number"`
-	EmployeeCount *string `json:"employee_count"`
+	EmployeeCount  *string `json:"employee_count"`
 }
 type GetFullName struct {
 	bun.BaseModel `bun:"table:users"`

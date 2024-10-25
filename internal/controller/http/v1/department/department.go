@@ -88,31 +88,7 @@ func (uc Controller) Create(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-func (uc Controller) UpdateAll(c *web.Context) error {
-	id := c.GetParam(reflect.Int, "id").(int)
 
-	if err := c.ValidParam(); err != nil {
-		return c.RespondError(err)
-	}
-
-	var request department.UpdateRequest
-
-	if err := c.BindFunc(&request, "Name","DisplayNumber"); err != nil {
-		return c.RespondError(err)
-	}
-
-	request.ID = id
-
-	err := uc.department.UpdateAll(c.Ctx, request)
-	if err != nil {
-		return c.RespondError(err)
-	}
-
-	return c.Respond(map[string]interface{}{
-		"data":   "ok!",
-		"status": true,
-	}, http.StatusOK)
-}
 
 func (uc Controller) UpdateColumns(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)

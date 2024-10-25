@@ -345,16 +345,11 @@ func (uc Controller) GetDashboardList(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-	department, err := uc.user.GetDepartmentList(c.Ctx)
-	if err != nil {
-		return c.RespondError(err)
-	}
 
 	return c.Respond(map[string]interface{}{
 		"data": map[string]interface{}{
-			"department":           department,
-			"employee_list":        list,
-			"total_employee_count": count,
+			"results": list,
+			"count":   count,
 		},
 		"status": true,
 	}, http.StatusOK)
