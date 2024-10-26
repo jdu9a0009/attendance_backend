@@ -197,7 +197,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	}
 
 	if DepartmentName {
-		return CreateResponse{}, web.NewRequestError(errors.New("Department Name is already used"), http.StatusBadRequest)
+		return CreateResponse{}, web.NewRequestError(errors.New("部門名はすでに使用されています。"), http.StatusBadRequest)
 	}
 
 	// Get the last display number from the department table
@@ -322,20 +322,25 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	return nil
 }
 func (r Repository) Delete(ctx context.Context, id int) error {
-	// Query to check if there are active users associated with this department
-	query := `SELECT id FROM users WHERE deleted_at IS NULL AND department_id = ?`
-	row := r.DB.QueryRowContext(ctx, query, id)
 
-	var userID int
-	err := row.Scan(&userID)
-	if err == nil {
-		// If a user exists, return an error
-		return web.NewRequestError(errors.New("this department is used by active users; you can't delete it without removing the associated users first"), http.StatusBadRequest)
-	} else if err != sql.ErrNoRows {
-		// If another error occurred (e.g., database error), return it
-		return errors.Wrap(err, "failed to check if department is in use")
+	var exists bool
+	err := r.DB.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT u.id 
+			FROM users AS u 
+			JOIN department AS d ON d.id = u.department_id 
+			WHERE u.deleted_at IS NULL 
+			  AND d.deleted_at IS NULL 
+			  AND d.id = ?
+		)
+	`, id).Scan(&exists)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "failed to check if department is in use"), http.StatusInternalServerError)
 	}
 
-	// If no active users are found, proceed with deletion
+	if exists {
+		return web.NewRequestError(errors.New("この部門はアクティブなユーザーに使われています。関連するユーザーを先に削除しないと、削除できません。"), http.StatusBadRequest)
+	}
+
 	return r.DeleteRow(ctx, "department", id)
 }

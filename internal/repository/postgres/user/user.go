@@ -94,7 +94,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 
 	whereQuery := fmt.Sprintf(`
 			WHERE 
-				u.deleted_at IS NULL
+				u.deleted_at IS NULL and role='EMPLOYEE'
 			`)
 
 	if filter.Search != nil {
@@ -133,14 +133,14 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			u.employee_id,
 			u.full_name,
 			u.department_id,
-			d.name,
+			d.name as department_name,
 			u.position_id,
-			p.name,
+			p.name as position_name,
 			u.phone,
 			u.email
 		FROM users u
-		LEFT JOIN department d ON d.id=u.department_id
-		LEFT JOIN position p ON p.id=u.position_id
+		RIGHT JOIN department d ON d.id=u.department_id and d.deleted_at is null
+		RIGHT JOIN position p ON p.id=u.position_id and p.deleted_at is null
 
 		%s %s %s %s
 	`, whereQuery, orderQuery, limitQuery, offsetQuery)
@@ -177,6 +177,8 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		SELECT
 			count(u.id)
 		FROM  users u
+		LEFT JOIN department d ON d.id=u.department_id and d.deleted_at is null
+		LEFT JOIN position p ON p.id=u.position_id and p.deleted_at is null
 			%s
 	`, whereQuery)
 
@@ -218,9 +220,9 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 			u.email
 		FROM
 		    users u 
-		LEFT JOIN department d ON u.department_id = d.id
-		LEFT JOIN  position p ON u.position_id=p.id
-		WHERE u.deleted_at IS NULL AND u.id = %d
+		RIGHT JOIN department d ON u.department_id = d.id and d.deleted_at is null
+		RIGHT JOIN  position p ON u.position_id=p.id and p.deleted_at is null
+		WHERE u.deleted_at IS NULL and role = 'EMPLOYEE' AND u.id = %d
 	`, id)
 
 	var detail GetDetailByIdResponse
@@ -255,7 +257,17 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	if err := r.ValidateStruct(&request, "Password", "Role", "FullName"); err != nil {
 		return CreateResponse{}, err
 	}
+	var deptExists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&deptExists)
+	if err != nil || !deptExists {
+		return CreateResponse{}, web.NewRequestError(errors.New("invalid department ID"), http.StatusBadRequest)
+	}
 
+	var posExists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM position WHERE id = ? AND deleted_at IS NULL)", request.PositionID).Scan(&posExists)
+	if err != nil || !posExists {
+		return CreateResponse{}, web.NewRequestError(errors.New("invalid position ID"), http.StatusBadRequest)
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
@@ -413,7 +425,6 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			// Option 2: Return an error
 			return 0, web.NewRequestError(errors.New("Role cannot be empty"), http.StatusBadRequest)
 		}
-		fmt.Println("Data:da", data)
 		// Create a new user object
 		user := CreateResponse{
 			EmployeeID:   employeeID,
@@ -584,53 +595,6 @@ func (r *Repository) GetQrCodeList(ctx context.Context) (string, error) {
 
 	return pdfFilename, nil
 }
-func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {
-	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
-	if err != nil {
-		return err
-	}
-
-	if err := r.ValidateStruct(&request, "ID", "EmployeeID", "Role"); err != nil {
-		return err
-	}
-	userIdStatus := true
-	if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.EmployeeID, request.ID)).Scan(&userIdStatus); err != nil {
-		return web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
-	}
-	if userIdStatus {
-		return web.NewRequestError(errors.Wrap(errors.New(""), "employee_id is used"), http.StatusInternalServerError)
-	}
-
-	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND id = ?", request.ID)
-
-	role := strings.ToUpper(*request.Role)
-	if (role != "EMPLOYEE") && (role != "ADMIN") {
-		return web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
-	}
-	hashedPassword := string(hash)
-
-	q.Set("employee_id = ?", request.EmployeeID)
-	q.Set("role = ?", role)
-	q.Set("full_name = ?", request.FullName)
-	q.Set("department_id=?", request.DepartmentID)
-	q.Set("position_id=?", request.PositionID)
-	q.Set("phone=?", request.Phone)
-	q.Set("email=?", request.Email)
-	q.Set("password=?", hashedPassword)
-	q.Set("updated_at = ?", time.Now())
-	q.Set("updated_by = ?", claims.UserId)
-
-	_, err = q.Exec(ctx)
-	if err != nil {
-		return web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
-	}
-
-	return nil
-}
 
 func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) error {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
@@ -667,6 +631,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		return web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 	}
 	hashedPassword := string(hash)
+
 	if request.FullName != nil {
 		q.Set("full_name = ?", request.FullName)
 	}
@@ -861,7 +826,7 @@ func ptr(s string) *string {
 }
 
 func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse, error) {
-	claims, err := r.CheckClaims(ctx)
+	claims, err := r.CheckClaims(ctx, auth.RoleEmployee)
 	if err != nil {
 		return DashboardResponse{}, err
 	}
@@ -907,7 +872,7 @@ LIMIT 1;
 }
 
 func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]DepartmentResult, int, error) {
-	_, err := r.CheckClaims(ctx)
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -939,17 +904,17 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
         LEFT JOIN (
             SELECT
                 a.employee_id,
-                true AS status
+            COALESCE(a.status, false) AS status
             FROM
                 attendance AS a
             WHERE
                 a.work_day = '%s'
                 AND a.deleted_at IS NULL
         ) AS a ON u.employee_id = a.employee_id
-        LEFT JOIN
+        RIGHT JOIN
             department AS d ON d.id = u.department_id AND d.deleted_at IS NULL
         WHERE
-            u.deleted_at IS NULL and d.deleted_at is null
+            u.deleted_at IS NULL
             AND u.role = 'EMPLOYEE'
         ORDER BY d.display_number ASC %s %s`, workDay, limitQuery, offsetQuery)
 
@@ -965,7 +930,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 	for rows.Next() {
 		var (
 			detail         GetDashboardlist
-			departmentID  int
+			departmentID   int
 			displayNumber  sql.NullInt64
 			departmentName sql.NullString
 		)
@@ -976,14 +941,15 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 			&detail.EmployeeID,
 			&detail.FullName,
 			&detail.Status,
-			departmentID,
+			&departmentID,
 			&departmentName,
 			&displayNumber,
 		)
+		detail.DepartmentID = &departmentID
+
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
 		}
-		fmt.Println(detail.DepartmentID)
 		// Assign values to the struct after checking for null
 		if departmentName.Valid {
 			detail.DepartmentName = &departmentName.String
@@ -992,17 +958,19 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 			dn := int(displayNumber.Int64)
 			detail.DisplayNumber = &dn
 		}
-
 		// Group employees by department
-		if deptResult, exists := departmentMap[*detail.DepartmentID]; exists {
-			deptResult.Employees = append(deptResult.Employees, detail)
-		} else {
-			departmentMap[*detail.DepartmentID] = &DepartmentResult{
-				DepartmentName: detail.DepartmentName,
-				DisplayNumber:  *detail.DisplayNumber,
-				Employees:      []GetDashboardlist{detail},
+		if detail.DepartmentID != nil {
+			if deptResult, exists := departmentMap[*detail.DepartmentID]; exists {
+				deptResult.Employees = append(deptResult.Employees, detail)
+			} else {
+				departmentMap[*detail.DepartmentID] = &DepartmentResult{
+					DepartmentName: detail.DepartmentName,
+					DisplayNumber:  *detail.DisplayNumber,
+					Employees:      []GetDashboardlist{detail},
+				}
 			}
 		}
+
 	}
 
 	// Convert map to slice and sort by DisplayNumber
@@ -1022,6 +990,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
             users AS u
         LEFT JOIN
             attendance AS a ON a.employee_id = u.employee_id AND a.work_day = '%s'
+		RIGHT JOIN department as d on d.id=u.department_id AND d.deleted_at IS NULL	
         WHERE
             u.deleted_at IS NULL AND
             u.role = 'EMPLOYEE';`, workDay)

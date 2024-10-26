@@ -1,16 +1,17 @@
 package position
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
+	"attendance/backend/internal/entity"
+	"attendance/backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/repository/postgres"
 	"context"
 	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
-	"attendance/backend/foundation/web"
-	"attendance/backend/internal/entity"
-	"attendance/backend/internal/pkg/repository/postgresql"
-	"attendance/backend/internal/repository/postgres"
 
 	"github.com/pkg/errors"
 )
@@ -32,14 +33,14 @@ func (r Repository) GetById(ctx context.Context, id int) (entity.Position, error
 }
 
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
-	_, err := r.CheckClaims(ctx)
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	whereQuery := fmt.Sprintf(`
 			WHERE 
-				p.deleted_at IS NULL
+				p.deleted_at IS NULL and d.deleted_at is null
 			`)
 
 	if filter.Search != nil {
@@ -74,10 +75,10 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		SELECT
 			p.id,
 			p.name,
-			p.department_id,
+			d.id,
 			d.name
 		FROM   position as p
-		LEFT JOIN department d ON p.department_id=d.id	
+		 JOIN department d ON p.department_id=d.id	AND d.deleted_at IS NULL
 		%s %s %s %s
 	`, whereQuery, orderQuery, limitQuery, offsetQuery)
 
@@ -109,7 +110,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			count(p.id)
 		FROM
 		    position as p
-		LEFT JOIN department d ON p.department_id=d.id	
+		JOIN department d ON p.department_id=d.id	
 		%s
 	`, whereQuery)
 
@@ -133,7 +134,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 }
 
 func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdResponse, error) {
-	_, err := r.CheckClaims(ctx)
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return GetDetailByIdResponse{}, err
 	}
@@ -170,13 +171,22 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 }
 
 func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateResponse, error) {
-	claims, err := r.CheckClaims(ctx)
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return CreateResponse{}, err
 	}
 
 	if err := r.ValidateStruct(&request, "Name", "DepartmentID"); err != nil {
 		return CreateResponse{}, err
+	}
+
+	var exists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
+	}
+	if !exists {
+		return CreateResponse{}, web.NewRequestError(errors.New("無効または削除された部門ID"), http.StatusBadRequest)
 	}
 
 	var response CreateResponse
@@ -198,11 +208,18 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if err := r.ValidateStruct(&request, "ID", "Name", "DepartmentID"); err != nil {
 		return err
 	}
-	
 
-	claims, err := r.CheckClaims(ctx)
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
 		return err
+	}
+	var exists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
+	}
+	if !exists {
+		return web.NewRequestError(errors.New("無効または削除された部門ID"), http.StatusBadRequest)
 	}
 
 	q := r.NewUpdate().Table("position").Where("deleted_at IS NULL AND id = ?", request.ID)
@@ -229,6 +246,14 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if err != nil {
 		return err
 	}
+	var exists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
+	}
+	if !exists {
+		return web.NewRequestError(errors.New("無効または削除された部門ID"), http.StatusBadRequest)
+	}
 
 	q := r.NewUpdate().Table("position").Where("deleted_at IS NULL AND id = ?", request.ID)
 
@@ -251,5 +276,23 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 }
 
 func (r Repository) Delete(ctx context.Context, id int) error {
+	var exists bool
+	err := r.DB.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT u.id 
+			FROM users AS u 
+			JOIN position AS p ON p.id = u.position_id 
+			WHERE u.deleted_at IS NULL 
+			  AND p.deleted_at IS NULL 
+			  AND d.id = ?
+		)
+	`, id).Scan(&exists)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "failed to check if position is in use"), http.StatusInternalServerError)
+	}
+
+	if exists {
+		return web.NewRequestError(errors.New("このポジションはアクティブなユーザーに使われています。関連するユーザーを先に削除しないと、削除できません。"), http.StatusBadRequest)
+	}
 	return r.DeleteRow(ctx, "position", id)
 }

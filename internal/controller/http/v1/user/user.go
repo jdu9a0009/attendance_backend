@@ -169,31 +169,7 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-func (uc Controller) UpdateUserAll(c *web.Context) error {
-	id := c.GetParam(reflect.Int, "id").(int)
 
-	if err := c.ValidParam(); err != nil {
-		return c.RespondError(err)
-	}
-
-	var request user.UpdateRequest
-
-	if err := c.BindFunc(&request, "UserID", "FirstName", "Surname"); err != nil {
-		return c.RespondError(err)
-	}
-
-	request.ID = id
-
-	err := uc.user.UpdateAll(c.Ctx, request)
-	if err != nil {
-		return c.RespondError(err)
-	}
-
-	return c.Respond(map[string]interface{}{
-		"data":   "ok!",
-		"status": true,
-	}, http.StatusOK)
-}
 
 func (uc Controller) UpdateUserColumns(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)

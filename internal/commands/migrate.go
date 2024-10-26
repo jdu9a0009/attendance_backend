@@ -59,6 +59,7 @@ var scheme = []Scheme{
         CREATE TABLE IF NOT EXISTS department (
             id serial primary key,
             name text not null,
+			display_number int not null,
             created_at timestamp default now(),
             created_by int references users(id),
             updated_at timestamp,
