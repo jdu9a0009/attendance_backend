@@ -139,8 +139,8 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			u.phone,
 			u.email
 		FROM users u
-		RIGHT JOIN department d ON d.id=u.department_id and d.deleted_at is null
-		RIGHT JOIN position p ON p.id=u.position_id and p.deleted_at is null
+		 JOIN department d ON d.id=u.department_id and d.deleted_at is null
+		 JOIN position p ON p.id=u.position_id and p.deleted_at is null
 
 		%s %s %s %s
 	`, whereQuery, orderQuery, limitQuery, offsetQuery)
@@ -177,8 +177,8 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		SELECT
 			count(u.id)
 		FROM  users u
-		LEFT JOIN department d ON d.id=u.department_id and d.deleted_at is null
-		LEFT JOIN position p ON p.id=u.position_id and p.deleted_at is null
+		 JOIN department d ON d.id=u.department_id and d.deleted_at is null
+		 JOIN position p ON p.id=u.position_id and p.deleted_at is null
 			%s
 	`, whereQuery)
 
