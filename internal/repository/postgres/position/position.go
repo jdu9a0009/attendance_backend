@@ -284,7 +284,7 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 			JOIN position AS p ON p.id = u.position_id 
 			WHERE u.deleted_at IS NULL 
 			  AND p.deleted_at IS NULL 
-			  AND d.id = ?
+			  AND p.id = ?
 		)
 	`, id).Scan(&exists)
 	if err != nil {
