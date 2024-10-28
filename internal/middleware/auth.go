@@ -5,7 +5,6 @@ import (
 	"attendance/backend/internal/auth"
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -57,22 +56,20 @@ func Authenticate(a *auth.Auth, role ...string) web.Middleware {
 	return m
 }
 func ValidateUserInput() web.Middleware {
-	// phoneRegex := regexp.MustCompile(`^0\d{1,4}-?\d{1,4}-?\d{3,4}$`)
+	phoneRegex := regexp.MustCompile(`^0\d{1,4}-?\d{1,4}-?\d{3,4}$`)
 
 	return func(handler web.Handler) web.Handler {
 		return func(c *web.Context) error {
 			phone := c.Request.FormValue("phone")
 			email := c.Request.FormValue("email")
-			fmt.Print("Email:", email)
-			fmt.Println("Japanese PhoneNumber: ", phone)
 
 			// Normalize the phone number (add dashes if needed).
-			// normalizedPhone := addDashesToPhone(phone)
+			normalizedPhone := addDashesToPhone(phone)
 
-			// // Check if input is a valid phone number.
-			// if !isValidPhoneNumber(normalizedPhone, phoneRegex) {
-			// 	return c.RespondError(web.NewRequestError(errors.New("無効な電話番号形式"), http.StatusBadRequest))
-			// }
+			// Check if input is a valid phone number.
+			if !isValidPhoneNumber(normalizedPhone, phoneRegex) {
+				return c.RespondError(web.NewRequestError(errors.New("無効な電話番号形式"), http.StatusBadRequest))
+			}
 
 			// Check if input is a valid email.
 			if !isValidEmail(email) {
