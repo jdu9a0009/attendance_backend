@@ -158,18 +158,17 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	response, err := uc.user.CreateByExcell(c.Ctx, request)
+	response, incomplete, err := uc.user.CreateByExcell(c.Ctx, request)
 	if err != nil {
 		return c.RespondError(err)
 	}
 
 	return c.Respond(map[string]interface{}{
-		"created_data": response,
-		"status":       true,
+		"Total number of successfully created users":               response,
+		"Excell rows that user not created due to incomplete data": incomplete,
+		"status": true,
 	}, http.StatusOK)
 }
-
-
 
 func (uc Controller) UpdateUserColumns(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)

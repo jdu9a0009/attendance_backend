@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -81,69 +80,86 @@ type UserExcellData struct {
 	Email        string
 }
 
-func ExcelReader(filePath string) ([]UserExcellData, error) {
+func ExcelReader(filePath string) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
-	// Open the Excel file
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	defer func() {
-		// Close the file to release resources
-		if err := f.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
+	defer f.Close()
 
-	// Read rows from the specified sheet
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var users []UserExcellData
+	var incompleteRows []int
 
-	// Iterate through the rows, starting from the second row to skip headers
 	for i, row := range rows {
 		if i == 0 {
-			// Skip the header row
 			continue
 		}
 
 		var user UserExcellData
-		
+		isComplete := true // Track if row is complete
+
 		for j, colCell := range row {
 			switch j {
 			case 1:
-				user.EmployeeID = colCell
-			case 2:
 				user.Password = colCell
-			case 3:
+				if colCell == "" {
+					isComplete = false
+				}
+			case 2:
 				user.Role = colCell
-			case 4:
+				if colCell == "" {
+					isComplete = false
+				}
+			case 3:
 				user.FullName = colCell
+				if colCell == "" {
+					isComplete = false
+				}
+			case 4:
+				if colCell != "" {
+					departmentID, err := strconv.Atoi(colCell)
+					if err != nil {
+						return nil, nil, fmt.Errorf("invalid department ID in row %d: %v", i+1, err)
+					}
+					user.DepartmentID = departmentID
+				} else {
+					isComplete = false
+				}
 			case 5:
-				departmentID, err := strconv.Atoi(colCell)
-				if err != nil {
-					return nil, fmt.Errorf("invalid department ID in row %d: %v", i+1, err)
+				if colCell != "" {
+					positionID, err := strconv.Atoi(colCell)
+					if err != nil {
+						return nil, nil, fmt.Errorf("invalid position ID in row %d: %v", i+1, err)
+					}
+					user.PositionID = positionID
+				} else {
+					isComplete = false
 				}
-				user.DepartmentID = departmentID
 			case 6:
-				positionID, err := strconv.Atoi(colCell)
-				if err != nil {
-					return nil, fmt.Errorf("invalid position ID in row %d: %v", i+1, err)
-				}
-				user.PositionID = positionID
-			case 7:
 				user.Phone = colCell
-			case 8:
+				if colCell == "" {
+					isComplete = false
+				}
+			case 7:
 				user.Email = colCell
+				if colCell == "" {
+					isComplete = false
+				}
 			}
 		}
-		users = append(users, user)
+
+		if isComplete {
+			users = append(users, user)
+		} else {
+			incompleteRows = append(incompleteRows, i+1) // Store the Excel row number
+		}
 	}
 
-	return users, nil
+	return users, incompleteRows, nil
 }
-
-// ... rest of the code

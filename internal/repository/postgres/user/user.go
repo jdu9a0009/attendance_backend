@@ -335,97 +335,65 @@ func (r Repository) GenerateUniqueEmployeeID(ctx context.Context) (*string, erro
 }
 
 // Create creates new users from an Excel file.
-func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, error) {
+func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 
 	// Validate the ExcellRequest struct
 	if err := r.ValidateStruct(&request); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	file, err := request.Excell.Open()
 	if err != nil {
-		return 0, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
 	}
 	defer file.Close()
 
-	// Create a temporary file to store the uploaded Excel file
 	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
 	if err != nil {
-		return 0, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
 	}
 	defer tempFile.Close()
 	defer os.Remove(tempFile.Name())
 
-	// Copy the uploaded Excel file to the temporary file
-	_, err = io.Copy(tempFile, file) // Use the opened file as the reader
+	_, err = io.Copy(tempFile, file)
 	if err != nil {
-		return 0, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
 
-	// Read the Excel file and parse the data
-	excelData, err := hashing.ExcelReader(tempFile.Name())
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name())
 	if err != nil {
-		return 0, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
 
-	// Check if there are any data rows
-	if len(excelData) == 0 {
-		return 0, web.NewRequestError(errors.New("no data found in Excel file"), http.StatusBadRequest)
-	}
-	var incompleteUsers []IncompleteUser
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
 	}
 	defer func() {
 		if err != nil {
-			_ = tx.Rollback() // Rollback the transaction if an error occurred
+			_ = tx.Rollback()
 		} else {
 			_ = tx.Commit()
 		}
 	}()
 
-	// Create a new user based on the data from the Excel file
-	createdCount := 0 // Initialize the count
+	createdCount := 0
 	for _, data := range excelData {
-		// Validate the data from the Excel file
-		if err := r.ValidateStruct(&data, "password", "role", "full_name", "phone", "email"); err != nil {
-			incompleteUserData := CreateRequest{
-				Password:     &data.Password,
-				Role:         &data.Role,
-				FullName:     &data.FullName,
-				DepartmentID: &data.DepartmentID,
-				PositionID:   &data.PositionID,
-				Phone:        &data.Phone,
-				Email:        &data.Email,
-			}
-			incompleteUsers = append(incompleteUsers, IncompleteUser{Data: []CreateRequest{incompleteUserData}, Reason: "Incomplete data"})
-			continue
-		}
-
 		employeeID, err := r.GenerateUniqueEmployeeID(ctx)
 		if err != nil {
-			return 0, web.NewRequestError(errors.Wrap(err, "generate unique employee_id"), http.StatusInternalServerError)
+			return 0, nil, web.NewRequestError(errors.Wrap(err, "generate unique employee_id"), http.StatusInternalServerError)
 		}
 
-		// Hash the password
 		hash, err := bcrypt.GenerateFromPassword([]byte(data.Password), bcrypt.DefaultCost)
 		if err != nil {
-			return 0, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+			return 0, nil, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 		}
 		hashedPassword := string(hash)
 
-		if data.Role == "" {
-			// Option 1: Set a default value
-			data.Role = "EMPLOYEE" // Replace with your default role
-			// Option 2: Return an error
-			return 0, web.NewRequestError(errors.New("Role cannot be empty"), http.StatusBadRequest)
-		}
-		// Create a new user object
 		user := CreateResponse{
 			EmployeeID:   employeeID,
 			Password:     &hashedPassword,
@@ -439,24 +407,22 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			CreatedBy:    claims.UserId,
 		}
 
-		// Validate the user object
 		if err := r.ValidateStruct(&user); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 
-		// Save the new user to the database within the transaction
 		_, err = tx.NewInsert().Model(&user).Returning("id").Exec(ctx, &user.ID)
 		if err != nil {
-			// If an error occurs during insertion, rollback the transaction
-			fmt.Printf("Error inserting employee: %v, Error: %v\n", data.EmployeeID, err) // Log the error and employee ID
-			return 0, web.NewRequestError(errors.Wrapf(err, "error inserting employee %s", data.EmployeeID), http.StatusBadRequest)
+			fmt.Printf("Error inserting employee: %v, Error: %v\n", data.EmployeeID, err)
+			return 0, nil, web.NewRequestError(errors.Wrapf(err, "error inserting employee %s", data.EmployeeID), http.StatusBadRequest)
 		}
 
 		createdCount++
 	}
 
-	return createdCount, err
+	return createdCount, incompleteRows, nil
 }
+
 
 func GenerateQRCode(employeeID string, filename string) error {
 	// Generate the QR code
