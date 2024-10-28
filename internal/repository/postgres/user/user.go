@@ -892,31 +892,29 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 
 	workDay := time.Now().Format("2006-01-02")
 	query := fmt.Sprintf(`
-        SELECT
-            u.id,
-            u.employee_id,
-            u.full_name,
-            COALESCE(a.status, false) AS status,
-            d.id AS department_id,
-            d.name AS department_name,
-            d.display_number
-        FROM users AS u
-        LEFT JOIN (
-            SELECT
-                a.employee_id,
-            COALESCE(a.status, false) AS status
-            FROM
-                attendance AS a
-            WHERE
-                a.work_day = '%s'
-                AND a.deleted_at IS NULL
-        ) AS a ON u.employee_id = a.employee_id
-        RIGHT JOIN
-            department AS d ON d.id = u.department_id AND d.deleted_at IS NULL
-        WHERE
-            u.deleted_at IS NULL
-            AND u.role = 'EMPLOYEE'
-        ORDER BY d.display_number ASC %s %s`, workDay, limitQuery, offsetQuery)
+
+                 SELECT
+                    u.id,
+                    u.employee_id,
+                    u.full_name,
+                    COALESCE(a.status, false) AS status,
+                    d.id AS department_id,
+                    d.name AS department_name,
+                    d.display_number
+                FROM
+                       department AS d
+                   LEFT JOIN users AS u ON d.id = u.department_id AND u.deleted_at IS NULL
+                   LEFT JOIN (
+                       SELECT
+                           a.employee_id,
+                           COALESCE(a.status, false) AS status
+                       FROM
+                           attendance AS a
+                       WHERE
+                           a.work_day = '%s'  AND a.deleted_at IS NULL
+                   ) AS a ON a.employee_id = u.employee_id
+                   WHERE    d.deleted_at IS NULL
+                   ORDER BY   d.display_number ASC %s %s`, workDay, limitQuery, offsetQuery)
 
 	rows, err := r.QueryContext(ctx, query)
 	if err != nil {
@@ -932,12 +930,13 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 			detail         GetDashboardlist
 			departmentID   int
 			displayNumber  sql.NullInt64
+			userID         sql.NullInt64
 			departmentName sql.NullString
 		)
 
 		// Scan the row with individual fields
 		err = rows.Scan(
-			&detail.ID,
+			&userID,
 			&detail.EmployeeID,
 			&detail.FullName,
 			&detail.Status,
@@ -957,6 +956,11 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 		if displayNumber.Valid {
 			dn := int(displayNumber.Int64)
 			detail.DisplayNumber = &dn
+		}
+
+		if userID.Valid {
+			dn := int(userID.Int64)
+			detail.ID = &dn
 		}
 		// Group employees by department
 		if detail.DepartmentID != nil {

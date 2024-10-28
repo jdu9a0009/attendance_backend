@@ -65,7 +65,7 @@ type DepartmentResult struct {
 	Employees      []GetDashboardlist `json:"result"`
 }
 type GetDashboardlist struct {
-	ID             int     `json:"id"`
+	ID             *int     `json:"id"`
 	EmployeeID     *string  `json:"employee_id"`
 	DepartmentID   *int     `json:"department_id"`
 	DepartmentName *string `json:"department_name"` // Use sql.NullString
