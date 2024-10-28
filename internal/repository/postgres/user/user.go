@@ -837,7 +837,7 @@ LIMIT 1;
 }
 
 func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]DepartmentResult, int, error) {
-	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	_, err := r.CheckClaims(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
