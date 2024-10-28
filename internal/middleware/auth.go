@@ -63,6 +63,7 @@ func ValidateUserInput() web.Middleware {
 		return func(c *web.Context) error {
 			phone := c.Request.FormValue("phone")
 			email := c.Request.FormValue("email")
+			fmt.Print("Email:", email)
 			fmt.Println("Japanese PhoneNumber: ", phone)
 
 			// Normalize the phone number (add dashes if needed).
@@ -81,31 +82,32 @@ func ValidateUserInput() web.Middleware {
 			// Call the next handler if validation passes.
 			return handler(c)
 		}
-    }
+	}
 }
+
 // addDashesToPhone formats a Japanese phone number by adding dashes.
 // It converts numbers like "0358462131" to "03-5846-2131" or "0451234567" to "045-123-4567".
 func addDashesToPhone(phone string) string {
-    // Remove any existing dashes just in case.
-    phone = strings.ReplaceAll(phone, "-", "")
+	// Remove any existing dashes just in case.
+	phone = strings.ReplaceAll(phone, "-", "")
 
-    // Ensure the phone number starts with a 0 and has 10 or 11 digits.
-    if len(phone) < 10 || len(phone) > 11 || phone[0] != '0' {
-        return phone // Return as-is if it's not of expected length.
-    }
+	// Ensure the phone number starts with a 0 and has 10 or 11 digits.
+	if len(phone) < 10 || len(phone) > 11 || phone[0] != '0' {
+		return phone // Return as-is if it's not of expected length.
+	}
 
-    // For numbers starting with "03" (e.g., Tokyo area codes), format as "03-xxxx-xxxx".
-    if strings.HasPrefix(phone, "03") {
-        return phone[:2] + "-" + phone[2:6] + "-" + phone[6:]
-    }
+	// For numbers starting with "03" (e.g., Tokyo area codes), format as "03-xxxx-xxxx".
+	if strings.HasPrefix(phone, "03") {
+		return phone[:2] + "-" + phone[2:6] + "-" + phone[6:]
+	}
 
-    // For numbers starting with a "0X" (e.g., 0xx-yyyy-zzzz like 045 for Yokohama), format as "0xx-xxx-xxxx".
-    if len(phone) == 10 {
-        return phone[:3] + "-" + phone[3:6] + "-" + phone[6:]
-    }
+	// For numbers starting with a "0X" (e.g., 0xx-yyyy-zzzz like 045 for Yokohama), format as "0xx-xxx-xxxx".
+	if len(phone) == 10 {
+		return phone[:3] + "-" + phone[3:6] + "-" + phone[6:]
+	}
 
-    // For numbers with 11 digits (e.g., mobile numbers like 09012345678), format as "0xx-xxxx-xxxx".
-    return phone[:3] + "-" + phone[3:7] + "-" + phone[7:]
+	// For numbers with 11 digits (e.g., mobile numbers like 09012345678), format as "0xx-xxxx-xxxx".
+	return phone[:3] + "-" + phone[3:7] + "-" + phone[7:]
 }
 
 // isValidPhoneNumber validates the phone number against the regex.
