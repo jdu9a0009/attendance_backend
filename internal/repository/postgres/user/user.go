@@ -110,7 +110,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	if filter.PositionID != nil {
 		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
-	orderQuery := "ORDER BY u.created_at desc"
+	orderQuery := "ORDER BY u.employee_id desc"
 
 	var limitQuery, offsetQuery string
 
@@ -422,7 +422,6 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 
 	return createdCount, incompleteRows, nil
 }
-
 
 func GenerateQRCode(employeeID string, filename string) error {
 	// Generate the QR code
