@@ -641,9 +641,7 @@ func (r *Repository) GetQrCodeByEmployeeID(ctx context.Context, employeeID strin
 	return filename, nil
 }
 
-// GetListQrCode generates a PDF containing QR codes for all employees from the database.
 func (r *Repository) GetQrCodeList(ctx context.Context) (string, error) {
-	// Query to fetch employee IDs
 	rows, err := r.Query("SELECT employee_id FROM users WHERE deleted_at IS NULL AND role='EMPLOYEE'")
 	if err != nil {
 		return "", fmt.Errorf("failed to query employee IDs: %v", err)
@@ -918,20 +916,20 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 	var totalMinutes int
 	query := fmt.Sprintf(`
         SELECT
-    MAX(ap.come_time) AS come_time,  -- Use MAX to get the latest come_time
-    MAX(a.leave_time) AS leave_time, -- Use MAX to get the latest leave_time
-    COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time))/ 60)::INT, 0) AS total_hours
-FROM attendance AS a
-JOIN users AS u ON u.employee_id = a.employee_id
-JOIN attendance_period AS ap ON ap.attendance_id = a.id
-WHERE a.work_day= '%s'
-AND ap.work_day= '%s'
-AND a.deleted_at IS NULL
-AND u.deleted_at IS NULL
-AND u.id = %d
-GROUP BY a.employee_id
-ORDER BY come_time DESC
-LIMIT 1;            
+   		 MAX(ap.come_time) AS come_time,  -- Use MAX to get the latest come_time
+   		 MAX(a.leave_time) AS leave_time, -- Use MAX to get the latest leave_time
+    		COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time))/ 60)::INT, 0) AS total_hours
+		FROM attendance AS a
+		JOIN users AS u ON u.employee_id = a.employee_id
+		JOIN attendance_period AS ap ON ap.attendance_id = a.id
+		WHERE a.work_day= '%s'
+		AND ap.work_day= '%s'
+		AND a.deleted_at IS NULL
+		AND u.deleted_at IS NULL
+		AND u.id = %d
+		GROUP BY a.employee_id
+		ORDER BY come_time DESC
+		LIMIT 1;            
 	`, workDay, workDay, claims.UserId)
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ComeTime,
@@ -1121,4 +1119,49 @@ func (r Repository) UploadTemplate(ctx context.Context, request ExcellUpload) er
 		request.Url = path
 	}
 	return err
+}
+func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
+	query := `
+	SELECT 
+		u.employee_id,
+		u.full_name,
+		d.name as department_name,
+		p.name as position_name,
+		u.phone,
+		u.email
+	FROM users u
+	JOIN department d ON d.id = u.department_id AND d.deleted_at IS NULL
+	JOIN position p ON p.id = u.position_id AND p.deleted_at IS NULL
+	WHERE u.deleted_at IS NULL AND u.role = 'EMPLOYEE'
+	ORDER BY u.employee_id DESC;
+`
+
+	rows, err := r.Query(query)
+	if err != nil {
+		return "", fmt.Errorf("failed to export employee list: %v", err)
+	}
+	defer rows.Close()
+
+	var list []service.Employee // Use the Employee type from the service package
+
+	for rows.Next() {
+		var detail service.Employee // Use the Employee type from the service package
+		if err = rows.Scan(
+			&detail.EmployeeID,
+			&detail.FullName,
+			&detail.DepartmentName,
+			&detail.PositionName,
+			&detail.Phone,
+			&detail.Email); err != nil {
+			return "", web.NewRequestError(errors.Wrap(err, "scanning user list"), http.StatusBadRequest)
+		}
+
+		list = append(list, detail)
+	}
+	xlsxFilename := "employee_list.xlsx"
+	if err := service.AddDataToExcel(list, xlsxFilename); err != nil {
+		return "", fmt.Errorf("failed to create xlsx: %v", err)
+	}
+
+	return xlsxFilename, nil
 }
