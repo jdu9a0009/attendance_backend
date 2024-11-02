@@ -158,18 +158,48 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	response, incomplete, err := uc.user.CreateByExcell(c.Ctx, request)
+	var response int
+	var incomplete []int // Declare outside switch to use later
+	var err error        // Declare error variable
+
+	switch request.Mode {
+	case 0: // Create mode
+		response, incomplete, err = uc.user.CreateByExcell(c.Ctx, request)
+	case 1: // Update mode
+		// response, incomplete, err = uc.user.UpdateByExcell(c.Ctx, request.Excell)
+	case 2: // Delete mode
+		// response, incomplete, err = uc.user.DeleteByExcell(c.Ctx, request.Excell)
+	default:
+		return c.RespondError(errors.New("invalid mode specified"))
+	}
+
+	// Check for any error that occurred during the operation
 	if err != nil {
 		return c.RespondError(err)
 	}
 
 	return c.Respond(map[string]interface{}{
-		"Total number of successfully created users":               response,
-		"Excell rows that user not created due to incomplete data": incomplete,
+		"Total number of successfully created users":                    response,
+		"Excel rows that users were not created due to incomplete data": incomplete,
 		"status": true,
 	}, http.StatusOK)
 }
 
+func (uc Controller) UploadTemplate(c *web.Context) error {
+	var request user.ExcellUpload
+	if err := c.BindFunc(&request); err != nil {
+		return c.RespondError(err)
+	}
+
+	err := uc.user.UploadTemplate(c.Ctx, request)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return c.Respond(map[string]interface{}{
+		"status": true,
+	}, http.StatusOK)
+}
 func (uc Controller) UpdateUserColumns(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
 

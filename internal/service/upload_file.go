@@ -29,12 +29,15 @@ func Upload(file *multipart.FileHeader, folder string) (path string, err error) 
 		return "", nil
 	}
 
+	// Updated to include Excel MIME types
 	expectedContentType := []string{
 		"image/jpeg",
 		"image/png",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // for .xlsx files
+		"application/vnd.ms-excel", // for .xls files
 	}
 
-	incomeContentType := file.Header.Values("Content-Type")[0]
+	incomeContentType := file.Header.Get("Content-Type")
 	if !InArray(incomeContentType, expectedContentType) {
 		return "", fmt.Errorf("invalid file type, expected: %v, got: %s", expectedContentType, incomeContentType)
 	}
@@ -52,12 +55,21 @@ func Upload(file *multipart.FileHeader, folder string) (path string, err error) 
 	if err != nil {
 		return "", err
 	}
-	defer log.Println("file upload src.Close() error: ", src.Close())
+	defer func() {
+		if closeErr := src.Close(); closeErr != nil {
+			log.Println("file upload src.Close() error:", closeErr)
+		}
+	}()
 
 	out, err := os.Create(filepath)
 	if err != nil {
 		return "", err
 	}
+	defer func() {
+		if closeErr := out.Close(); closeErr != nil {
+			log.Println("file upload out.Close() error:", closeErr)
+		}
+	}()
 
 	_, err = io.Copy(out, src)
 	if err != nil {

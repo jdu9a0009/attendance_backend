@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/xuri/excelize/v2"
@@ -70,18 +69,18 @@ func ExcelDog(data ExcelData) (string, error) {
 }
 
 type UserExcellData struct {
-	EmployeeID   string
-	Password     string
-	Role         string
-	FullName     string
-	DepartmentID int
-	PositionID   int
-	Phone        string
-	Email        string
+	EmployeeID     string
+	Password       string
+	Role           string
+	FullName       string
+	DepartmentName string
+	PositionName   string
+	Phone          string
+	Email          string
 }
 
 func ExcelReader(filePath string) ([]UserExcellData, []int, error) {
-	sheetName := "Sheet1"
+	sheetName := "Employee"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return nil, nil, err
@@ -122,23 +121,13 @@ func ExcelReader(filePath string) ([]UserExcellData, []int, error) {
 					isComplete = false
 				}
 			case 4:
-				if colCell != "" {
-					departmentID, err := strconv.Atoi(colCell)
-					if err != nil {
-						return nil, nil, fmt.Errorf("invalid department ID in row %d: %v", i+1, err)
-					}
-					user.DepartmentID = departmentID
-				} else {
+				user.DepartmentName = colCell
+				if colCell == "" {
 					isComplete = false
 				}
 			case 5:
-				if colCell != "" {
-					positionID, err := strconv.Atoi(colCell)
-					if err != nil {
-						return nil, nil, fmt.Errorf("invalid position ID in row %d: %v", i+1, err)
-					}
-					user.PositionID = positionID
-				} else {
+				user.PositionName = colCell
+				if colCell == "" {
 					isComplete = false
 				}
 			case 6:

@@ -73,7 +73,7 @@ func (uc Controller) GetDetailById(c *web.Context) error {
 func (uc Controller) Create(c *web.Context) error {
 	var request department.CreateRequest
 
-	if err := c.BindFunc(&request, "Name","DisplayNumber"); err != nil {
+	if err := c.BindFunc(&request, "Name", "DisplayNumber"); err != nil {
 		return c.RespondError(err)
 	}
 
@@ -87,8 +87,6 @@ func (uc Controller) Create(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
-
-
 
 func (uc Controller) UpdateColumns(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)

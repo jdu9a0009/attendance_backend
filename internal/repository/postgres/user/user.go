@@ -24,6 +24,9 @@ import (
 	"attendance/backend/internal/entity"
 	"attendance/backend/internal/pkg/repository/postgresql"
 	"attendance/backend/internal/repository/postgres"
+	"attendance/backend/internal/repository/postgres/department"
+	"attendance/backend/internal/repository/postgres/position"
+	"attendance/backend/internal/service"
 	"attendance/backend/internal/service/hashing"
 	"strings"
 	"time"
@@ -38,6 +41,8 @@ import (
 
 type Repository struct {
 	*postgresql.Database
+	PositionRepo   *position.Repository
+	DepartmentRepo *department.Repository
 }
 
 func NewRepository(database *postgresql.Database) *Repository {
@@ -340,11 +345,20 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	if err != nil {
 		return 0, nil, err
 	}
-
-	// Validate the ExcellRequest struct
-	if err := r.ValidateStruct(&request); err != nil {
-		return 0, nil, err
+	departmentMap, err := r.LoadDepartmentMap(ctx)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading department map"), http.StatusInternalServerError)
 	}
+
+	positionMap, err := r.LoadPositionMap(ctx)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
+	}
+
+	if err := r.ValidateStruct(request.Excell); err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
+	}
+
 	file, err := request.Excell.Open()
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
@@ -367,7 +381,6 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
-
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -382,7 +395,17 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	}()
 
 	createdCount := 0
+	rowNum := 0
 	for _, data := range excelData {
+		// Validate department and position names against the maps
+		departmentID, okDept := departmentMap[data.DepartmentName]
+		positionID, okPos := positionMap[data.PositionName]
+
+		if !okDept || !okPos {
+			// Add to incompleteRows if department or position name is invalid
+			incompleteRows = append(incompleteRows, rowNum+1) // assuming rowNum is zero-indexed
+			continue
+		}
 		employeeID, err := r.GenerateUniqueEmployeeID(ctx)
 		if err != nil {
 			return 0, nil, web.NewRequestError(errors.Wrap(err, "generate unique employee_id"), http.StatusInternalServerError)
@@ -399,8 +422,8 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			Password:     &hashedPassword,
 			Role:         data.Role,
 			FullName:     &data.FullName,
-			DepartmentID: &data.DepartmentID,
-			PositionID:   &data.PositionID,
+			DepartmentID: &departmentID,
+			PositionID:   &positionID,
 			Phone:        &data.Phone,
 			Email:        &data.Email,
 			CreatedAt:    time.Now(),
@@ -423,6 +446,100 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	return createdCount, incompleteRows, nil
 }
 
+type GetDepartmentListResponse struct {
+	ID            int     `json:"id"`
+	Name          *string `json:"name"`
+	DisplayNumber int     `json:"display_number"`
+}
+
+func (r Repository) LoadDepartmentMap(ctx context.Context) (map[string]int, error) {
+	departmentMap := make(map[string]int)
+	var departments []GetDepartmentListResponse
+
+	query := `
+			SELECT 
+			id,
+			name
+		FROM department
+		WHERE deleted_at IS NULL`
+
+	rows, err := r.DB.QueryContext(ctx, query)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		}
+		return nil, web.NewRequestError(errors.Wrap(err, "selecting department"), http.StatusBadRequest)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var detail GetDepartmentListResponse
+		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
+			return nil, web.NewRequestError(errors.Wrap(err, "scanning department"), http.StatusBadRequest)
+		}
+		departments = append(departments, detail)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
+	}
+
+	for _, dept := range departments {
+		if dept.Name != nil {
+			departmentMap[*dept.Name] = dept.ID
+		}
+	}
+
+	return departmentMap, nil
+}
+
+type GetPositionListResponse struct {
+	ID           int     `json:"id"`
+	Name         *string `json:"name"`
+	DepartmentID *int    `json:"department_id"`
+	Department   *string `json:"department"`
+}
+
+func (r Repository) LoadPositionMap(ctx context.Context) (map[string]int, error) {
+	positionMap := make(map[string]int)
+	var positions []GetPositionListResponse
+
+	query := `
+		SELECT 
+		id,
+		name
+	FROM position
+	WHERE deleted_at IS NULL`
+
+	rows, err := r.DB.QueryContext(ctx, query)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		}
+		return nil, web.NewRequestError(errors.Wrap(err, "selecting position"), http.StatusBadRequest)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var detail GetPositionListResponse
+		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
+			return nil, web.NewRequestError(errors.Wrap(err, "scanning position"), http.StatusBadRequest)
+		}
+		positions = append(positions, detail)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
+	}
+
+	for _, dept := range positions {
+		if dept.Name != nil {
+			positionMap[*dept.Name] = dept.ID
+		}
+	}
+
+	return positionMap, nil
+}
 func GenerateQRCode(employeeID string, filename string) error {
 	// Generate the QR code
 	qrCode, err := qrcode.New(employeeID, qrcode.Medium)
@@ -979,4 +1096,29 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 	}
 
 	return results, count, nil
+}
+
+func (r Repository) UploadTemplate(ctx context.Context, request ExcellUpload) error {
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return err
+	}
+
+	// Validate the ExcellRequest struct
+	if err := r.ValidateStruct(&request); err != nil {
+		return err
+
+	}
+	const productDir = "product"
+
+	if request.Excell != nil {
+		path, err := service.Upload(request.Excell, productDir)
+
+		if err != nil {
+			return web.NewRequestError(errors.New("error uploading excell file"), http.StatusNoContent)
+
+		}
+		request.Url = path
+	}
+	return err
 }

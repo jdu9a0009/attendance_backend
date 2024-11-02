@@ -18,6 +18,8 @@ type User interface {
 
 	Create(ctx context.Context, request user.CreateRequest) (user.CreateResponse, error)
 	CreateByExcell(ctx context.Context, request user.ExcellRequest) (int,[]int, error)
+	UploadTemplate(ctx context.Context, request user.ExcellUpload) error
+
 	UpdateColumns(ctx context.Context, request user.UpdateRequest) error
 	Delete(ctx context.Context, id int) error
 }

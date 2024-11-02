@@ -57,21 +57,26 @@ type GetDetailByIdResponse struct {
 	Email        *string `json:"email"`
 }
 type ExcellRequest struct {
+	Mode   int                  `json:"mode" form:"-"`
 	Excell *multipart.FileHeader `json:"-" form:"excell"`
 }
+type ExcellUpload struct {
+	Excell *multipart.FileHeader `json:"-" form:"excell"`
+	Url    string                `json:"url" form:"-"`
+}
 type DepartmentResult struct {
-	DepartmentName *string             `json:"department_name"`
+	DepartmentName *string            `json:"department_name"`
 	DisplayNumber  int                `json:"display_number"`
 	Employees      []GetDashboardlist `json:"result"`
 }
 type GetDashboardlist struct {
-	ID             *int     `json:"id"`
-	EmployeeID     *string  `json:"employee_id"`
-	DepartmentID   *int     `json:"department_id"`
+	ID             *int    `json:"id"`
+	EmployeeID     *string `json:"employee_id"`
+	DepartmentID   *int    `json:"department_id"`
 	DepartmentName *string `json:"department_name"` // Use sql.NullString
 	DisplayNumber  *int    `json:"display_number"`  // Use sql.NullInt32
-	FullName       *string  `json:"full_name"`
-	Status         *bool    `json:"status"`
+	FullName       *string `json:"full_name"`
+	Status         *bool   `json:"status"`
 }
 
 type GetDepartmentlist struct {

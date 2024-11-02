@@ -296,3 +296,43 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 	}
 	return r.DeleteRow(ctx, "position", id)
 }
+func (r Repository) LoadPositionMap(ctx context.Context) (map[string]int, error) {
+	positionMap := make(map[string]int)
+	var positions []GetListResponse
+
+	query := `
+		SELECT 
+		id,
+		name
+	FROM position
+	WHERE deleted_at IS NULL`
+
+	rows, err := r.DB.QueryContext(ctx, query)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		}
+		return nil, web.NewRequestError(errors.Wrap(err, "selecting position"), http.StatusBadRequest)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var detail GetListResponse
+		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
+			return nil, web.NewRequestError(errors.Wrap(err, "scanning position"), http.StatusBadRequest)
+		}
+		positions = append(positions, detail)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
+	}
+
+	for _, dept := range positions {
+		if dept.Name != nil {
+			positionMap[*dept.Name] = dept.ID
+		}
+	}
+
+	return positionMap, nil
+}
