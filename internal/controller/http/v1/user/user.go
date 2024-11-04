@@ -142,24 +142,46 @@ func (uc Controller) ExportEmployee(c *web.Context) error {
 		return c.RespondError(err) // Handle any error from generating the Excel file
 	}
 
-	// Open the generated Excel file
 	file, err := os.Open(xlsxFilename)
 	if err != nil {
-		return c.RespondError(err) // Handle error if the file cannot be opened
+		return c.RespondError(err)
 	}
-	defer file.Close() // Ensure the file is closed after we're done with it
+	defer file.Close()
 
 	// Set the content type for Excel files
-	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") // Correct MIME type for XLSX
-	c.Header("Content-Disposition", "attachment; filename=\"employee_list.xlsx\"")                // Attachment header for downloading
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=\"employee_list.xlsx\"")
 
-	// Write the Excel file to the response writer
 	_, err = io.Copy(c.Writer, file)
 	if err != nil {
-		return c.RespondError(err) // Handle error during file copy
+		return c.RespondError(err)
 	}
 
-	return nil // Return nil to indicate success
+	return nil
+}
+func (uc Controller) ExportTemplate(c *web.Context) error {
+	// Generate the Excel file containing employee data
+	xlsxFilename, err := uc.user.ExportTemplate(c.Ctx)
+	if err != nil {
+		return c.RespondError(err) // Handle any error from generating the Excel file
+	}
+
+	file, err := os.Open(xlsxFilename)
+	if err != nil {
+		return c.RespondError(err)
+	}
+	defer file.Close()
+
+	// Set the content type for Excel files
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=\"template.xlsx\"")
+
+	_, err = io.Copy(c.Writer, file)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
+	return nil
 }
 
 func (uc Controller) CreateUser(c *web.Context) error {

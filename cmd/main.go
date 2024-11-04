@@ -63,9 +63,9 @@ func run(log *log.Logger) error {
 		Web           struct {
 			APIHost         string        `conf:"default:0.0.0.0:3000"`
 			DebugHost       string        `conf:"default:0.0.0.0:4000"`
-			ReadTimeout     time.Duration `conf:"default:5s"`
-			WriteTimeout    time.Duration `conf:"default:5s"`
-			ShutdownTimeout time.Duration `conf:"default:5s"`
+			ReadTimeout     time.Duration `conf:"default:50s"`
+			WriteTimeout    time.Duration `conf:"default:50s"`
+			ShutdownTimeout time.Duration `conf:"default:50s"`
 		}
 		Auth struct {
 			KeyID          string `conf:"default:54bb2165-71e1-41a6-af3e-7da4a0e1e2c1"`

@@ -312,6 +312,29 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 
 	return response, nil
 }
+func IncrementEmployeeID(employeeID *string) error {
+	if employeeID == nil {
+		return fmt.Errorf("employeeID is nil")
+	}
+
+	// Assuming your employeeID is like "DK0120"
+	prefix := (*employeeID)[:2]  // Get the prefix "DK"
+	numPart := (*employeeID)[2:] // Get the numeric part "0120"
+
+	// Convert the numeric part to an integer
+	num, err := strconv.Atoi(numPart)
+	if err != nil {
+		return fmt.Errorf("invalid employeeID format: %v", err)
+	}
+
+	// Increment the numeric part
+	num++
+
+	// Format back to "DK" + incremented number with zero padding
+	*employeeID = fmt.Sprintf("%s%04d", prefix, num) // Adjust padding if needed
+	return nil
+}
+
 func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -349,9 +372,9 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
 	fields := map[int]string{
-		1: "Password",
+		1: "FullName",
 		2: "Role",
-		3: "FullName",
+		3: "Password",
 		4: "DepartmentName",
 		5: "PositionName",
 		6: "Phone",
@@ -374,22 +397,16 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			_ = tx.Commit()
 		}
 	}()
+	employeeID, err := r.GenerateUniqueEmployeeID(ctx)
 
 	createdCount, rowNum := 0, 0
 	for _, data := range excelData {
-		fmt.Println("Time: ", data)
-		// Validate department and position names against the maps
 		departmentID, okDept := departmentMap[data.DepartmentName]
 		positionID, okPos := positionMap[data.PositionName]
 
 		if !okDept || !okPos {
-			// Add to incompleteRows if department or position name is invalid
-			incompleteRows = append(incompleteRows, rowNum+1) // assuming rowNum is zero-indexed
+			incompleteRows = append(incompleteRows, rowNum+1)
 			continue
-		}
-		employeeID, err := r.GenerateUniqueEmployeeID(ctx)
-		if err != nil {
-			return 0, nil, web.NewRequestError(errors.Wrap(err, "generate unique employee_id"), http.StatusInternalServerError)
 		}
 
 		hash, err := bcrypt.GenerateFromPassword([]byte(data.Password), bcrypt.DefaultCost)
@@ -397,7 +414,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			return 0, nil, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 		}
 		hashedPassword := string(hash)
-
+		fmt.Println("Data: ", data)
 		user := CreateResponse{
 			EmployeeID:   employeeID,
 			Password:     &hashedPassword,
@@ -422,9 +439,203 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		}
 
 		createdCount++
+		err = IncrementEmployeeID(employeeID)
+		if err != nil {
+			return 0, nil, web.NewRequestError(errors.Wrap(err, "incrementing employee ID"), http.StatusInternalServerError)
+		}
 	}
 
 	return createdCount, incompleteRows, nil
+}
+func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return 0, nil, err
+	}
+	departmentMap, err := r.LoadDepartmentMap(ctx)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading department map"), http.StatusInternalServerError)
+	}
+	positionMap, err := r.LoadPositionMap(ctx)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
+	}
+
+	if err := r.ValidateStruct(request.Excell); err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
+	}
+
+	file, err := request.Excell.Open()
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
+	}
+	defer file.Close()
+
+	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
+	}
+	defer tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
+	}
+	fields := map[int]string{
+		0: "EmployeeID",
+		1: "FullName",
+		2: "DepartmentName",
+		3: "PositionName",
+		4: "Phone",
+		5: "Email",
+	}
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
+	}
+	// Start a transaction
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			_ = tx.Commit()
+		}
+	}()
+	createdCount := 0
+	rowNum := 0
+	for _, data := range excelData {
+		rowNum++
+
+		departmentID, okDept := departmentMap[data.DepartmentName]
+		positionID, okPos := positionMap[data.PositionName]
+
+		if !okDept || !okPos {
+			incompleteRows = append(incompleteRows, rowNum)
+			continue
+		}
+		user := UpdateResponse{
+			EmployeeID:   &data.EmployeeID,
+			FullName:     &data.FullName,
+			DepartmentID: &departmentID,
+			PositionID:   &positionID,
+			Phone:        &data.Phone,
+			Email:        &data.Email,
+			UpdatedAt:    time.Now(),
+			UpdatedBy:    claims.UserId,
+		}
+
+		if err := r.ValidateStruct(&user); err != nil {
+			return 0, nil, err
+		}
+
+		q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
+
+
+		if user.FullName != nil {
+			q.Set("full_name=?", data.FullName)
+		}
+		q.Set("department_id=?", departmentID)
+		q.Set("position_id=?", positionID)
+		if user.Phone != nil {
+			q.Set("phone=?", data.Phone)
+		}
+		if user.Email != nil {
+			q.Set("email=?", data.Email)
+		}
+		q.Set("updated_at=?", time.Now())
+		q.Set("updated_by=?", claims.UserId)
+
+		// Execute the update query
+		_, err = q.Exec(ctx)
+		if err != nil {
+			return 0, nil, web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
+		}
+
+		createdCount++
+	}
+
+	return createdCount, incompleteRows, nil
+}
+
+func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
+	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if err := r.ValidateStruct(request.Excell); err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
+	}
+
+	file, err := request.Excell.Open()
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
+	}
+	defer file.Close()
+
+	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
+	}
+	defer tempFile.Close()
+	defer os.Remove(tempFile.Name())
+
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
+	}
+	fields := map[int]string{
+		0: "EmployeeID",
+		1: "FullName",
+		2: "DepartmentName",
+		3: "PositionName",
+		4: "Phone",
+		5: "Email",
+	}
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
+	}
+	// Start a transaction
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		} else {
+			_ = tx.Commit()
+		}
+	}()
+	deletedCount := 0
+	rowNum := 0
+	for _, data := range excelData {
+		rowNum++
+
+		q := r.NewDelete().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
+
+		// Execute the delete query
+		result, err := q.Exec(ctx)
+		if err != nil {
+			incompleteRows = append(incompleteRows, rowNum) // Add to incomplete rows if deletion fails
+			continue
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return 0, nil, web.NewRequestError(errors.Wrap(err, "getting affected rows after delete"), http.StatusInternalServerError)
+		}
+
+		deletedCount += int(rowsAffected)
+	}
+
+	return deletedCount, incompleteRows, nil
 }
 
 func (r Repository) GenerateUniqueEmployeeID(ctx context.Context) (*string, error) {
@@ -456,99 +667,6 @@ func (r Repository) GenerateUniqueEmployeeID(ctx context.Context) (*string, erro
 	return &newID, nil
 }
 
-type GetDepartmentListResponse struct {
-	ID            int     `json:"id"`
-	Name          *string `json:"name"`
-	DisplayNumber int     `json:"display_number"`
-}
-
-func (r Repository) LoadDepartmentMap(ctx context.Context) (map[string]int, error) {
-	departmentMap := make(map[string]int)
-	var departments []GetDepartmentListResponse
-
-	query := `
-			SELECT 
-			id,
-			name
-		FROM department
-		WHERE deleted_at IS NULL`
-
-	rows, err := r.DB.QueryContext(ctx, query)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-		}
-		return nil, web.NewRequestError(errors.Wrap(err, "selecting department"), http.StatusBadRequest)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var detail GetDepartmentListResponse
-		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
-			return nil, web.NewRequestError(errors.Wrap(err, "scanning department"), http.StatusBadRequest)
-		}
-		departments = append(departments, detail)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
-	}
-
-	for _, dept := range departments {
-		if dept.Name != nil {
-			departmentMap[*dept.Name] = dept.ID
-		}
-	}
-	return departmentMap, nil
-}
-
-type GetPositionListResponse struct {
-	ID           int     `json:"id"`
-	Name         *string `json:"name"`
-	DepartmentID *int    `json:"department_id"`
-	Department   *string `json:"department"`
-}
-
-func (r Repository) LoadPositionMap(ctx context.Context) (map[string]int, error) {
-	positionMap := make(map[string]int)
-	var positions []GetPositionListResponse
-
-	query := `
-		SELECT 
-		id,
-		name
-	FROM position
-	WHERE deleted_at IS NULL`
-
-	rows, err := r.DB.QueryContext(ctx, query)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-		}
-		return nil, web.NewRequestError(errors.Wrap(err, "selecting position"), http.StatusBadRequest)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var detail GetPositionListResponse
-		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
-			return nil, web.NewRequestError(errors.Wrap(err, "scanning position"), http.StatusBadRequest)
-		}
-		positions = append(positions, detail)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
-	}
-
-	for _, dept := range positions {
-		if dept.Name != nil {
-			positionMap[*dept.Name] = dept.ID
-		}
-	}
-
-	return positionMap, nil
-}
 func GenerateQRCode(employeeID string, filename string) error {
 	// Generate the QR code
 	qrCode, err := qrcode.New(employeeID, qrcode.Medium)
@@ -1175,195 +1293,118 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 	return xlsxFilename, nil
 }
 
-func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
-	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
+func (r Repository) ExportTemplate(ctx context.Context) (string, error) {
+	departments := []string{}
+	positions := []string{}
+
+	query := `SELECT name FROM department  where deleted_at is null  ORDER BY display_number ASC`
+	err := r.NewRaw(query).Scan(ctx, &departments)
 	if err != nil {
-		return 0, nil, err
+		return "", web.NewRequestError(errors.Wrap(err, "fetching departments list"), http.StatusInternalServerError)
 	}
-	departmentMap, err := r.LoadDepartmentMap(ctx)
+
+	queryy := `SELECT name FROM position  where deleted_at is null `
+	err = r.NewRaw(queryy).Scan(ctx, &positions)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading department map"), http.StatusInternalServerError)
+		return "", web.NewRequestError(errors.Wrap(err, "fetching position list"), http.StatusInternalServerError)
 	}
-	positionMap, err := r.LoadPositionMap(ctx)
+	file, err := hashing.EditExcell(departments, positions)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
+		fmt.Printf("Error: %v\n", err)
 	}
-
-	if err := r.ValidateStruct(request.Excell); err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
-	}
-
-	file, err := request.Excell.Open()
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
-	}
-	defer file.Close()
-
-	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
-	}
-	defer tempFile.Close()
-	defer os.Remove(tempFile.Name())
-
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
-	}
-	fields := map[int]string{
-		0: "EmployeeID",
-		1: "FullName",
-		2: "DepartmentName",
-		3: "PositionName",
-		4: "Phone",
-		5: "Email",
-	}
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
-	}
-	// Start a transaction
-	tx, err := r.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		} else {
-			_ = tx.Commit()
-		}
-	}()
-	createdCount := 0
-	rowNum := 0
-	for _, data := range excelData {
-		rowNum++
-
-		departmentID, okDept := departmentMap[data.DepartmentName]
-		positionID, okPos := positionMap[data.PositionName]
-
-		if !okDept || !okPos {
-			incompleteRows = append(incompleteRows, rowNum)
-			continue
-		}
-		user := UpdateResponse{
-			EmployeeID:   &data.EmployeeID,
-			FullName:     &data.FullName,
-			DepartmentID: &departmentID,
-			PositionID:   &positionID,
-			Phone:        &data.Phone,
-			Email:        &data.Email,
-			UpdatedAt:    time.Now(),
-			UpdatedBy:    claims.UserId,
-		}
-
-		if err := r.ValidateStruct(&user); err != nil {
-			return 0, nil, err
-		}
-
-		q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
-
-		if user.EmployeeID != nil {
-			q.Set("employee_id=?", data.EmployeeID)
-		}
-		if user.FullName != nil {
-			q.Set("full_name=?", data.FullName)
-		}
-		q.Set("department_id=?", departmentID)
-		q.Set("position_id=?", positionID)
-		if user.Phone != nil {
-			q.Set("phone=?", data.Phone)
-		}
-		if user.Email != nil {
-			q.Set("email=?", data.Email)
-		}
-		q.Set("updated_at=?", time.Now())
-		q.Set("updated_by=?", claims.UserId)
-
-		// Execute the update query
-		_, err = q.Exec(ctx)
-		if err != nil {
-			return 0, nil, web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
-		}
-
-		createdCount++
-	}
-
-	return createdCount, incompleteRows, nil
+	return file, nil
 }
 
-func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
-	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
-	if err != nil {
-		return 0, nil, err
-	}
+type GetDepartmentListResponse struct {
+	ID            int     `json:"id"`
+	Name          *string `json:"name"`
+	DisplayNumber int     `json:"display_number"`
+}
 
-	if err := r.ValidateStruct(request.Excell); err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
-	}
+func (r Repository) LoadDepartmentMap(ctx context.Context) (map[string]int, error) {
+	departmentMap := make(map[string]int)
+	var departments []GetDepartmentListResponse
 
-	file, err := request.Excell.Open()
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
-	}
-	defer file.Close()
+	query := `
+			SELECT 
+			id,
+			name
+		FROM department
+		WHERE deleted_at IS NULL`
 
-	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
+	rows, err := r.DB.QueryContext(ctx, query)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
-	}
-	defer tempFile.Close()
-	defer os.Remove(tempFile.Name())
-
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
-	}
-	fields := map[int]string{
-		0: "EmployeeID",
-		1: "FullName",
-		2: "DepartmentName",
-		3: "PositionName",
-		4: "Phone",
-		5: "Email",
-	}
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
-	}
-	// Start a transaction
-	tx, err := r.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		} else {
-			_ = tx.Commit()
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
 		}
-	}()
-	deletedCount := 0
-	rowNum := 0
-	for _, data := range excelData {
-		rowNum++
+		return nil, web.NewRequestError(errors.Wrap(err, "selecting department"), http.StatusBadRequest)
+	}
+	defer rows.Close()
 
-		q := r.NewDelete().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
-
-		// Execute the delete query
-		result, err := q.Exec(ctx)
-		if err != nil {
-			incompleteRows = append(incompleteRows, rowNum) // Add to incomplete rows if deletion fails
-			continue
+	for rows.Next() {
+		var detail GetDepartmentListResponse
+		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
+			return nil, web.NewRequestError(errors.Wrap(err, "scanning department"), http.StatusBadRequest)
 		}
-
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			return 0, nil, web.NewRequestError(errors.Wrap(err, "getting affected rows after delete"), http.StatusInternalServerError)
-		}
-
-		deletedCount += int(rowsAffected)
+		departments = append(departments, detail)
 	}
 
-	return deletedCount, incompleteRows, nil
+	if err := rows.Err(); err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
+	}
+
+	for _, dept := range departments {
+		if dept.Name != nil {
+			departmentMap[*dept.Name] = dept.ID
+		}
+	}
+	return departmentMap, nil
+}
+
+type GetPositionListResponse struct {
+	ID           int     `json:"id"`
+	Name         *string `json:"name"`
+	DepartmentID *int    `json:"department_id"`
+	Department   *string `json:"department"`
+}
+
+func (r Repository) LoadPositionMap(ctx context.Context) (map[string]int, error) {
+	positionMap := make(map[string]int)
+	var positions []GetPositionListResponse
+
+	query := `
+		SELECT 
+		id,
+		name
+	FROM position
+	WHERE deleted_at IS NULL`
+
+	rows, err := r.DB.QueryContext(ctx, query)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
+		}
+		return nil, web.NewRequestError(errors.Wrap(err, "selecting position"), http.StatusBadRequest)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var detail GetPositionListResponse
+		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
+			return nil, web.NewRequestError(errors.Wrap(err, "scanning position"), http.StatusBadRequest)
+		}
+		positions = append(positions, detail)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
+	}
+
+	for _, dept := range positions {
+		if dept.Name != nil {
+			positionMap[*dept.Name] = dept.ID
+		}
+	}
+
+	return positionMap, nil
 }

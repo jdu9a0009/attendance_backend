@@ -65,17 +65,17 @@ func ExcelDog(data ExcelData) (string, error) {
 
 type UserExcellData struct {
 	EmployeeID     string
-	Password       string
-	Role           string
 	FullName       string
+	Role           string
+	Password       string
 	DepartmentName string
 	PositionName   string
 	Phone          string
 	Email          string
 }
 
-func ExcelReader(filePath string,  fields map[int]string) ([]UserExcellData, []int, error) {
-	sheetName:="Employee"
+func ExcelReader(filePath string, fields map[int]string) ([]UserExcellData, []int, error) {
+	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return nil, nil, err
@@ -108,12 +108,12 @@ func ExcelReader(filePath string,  fields map[int]string) ([]UserExcellData, []i
 				switch fieldName {
 				case "EmployeeID":
 					user.EmployeeID = value
-				case "Password":
-					user.Password = value
-				case "Role":
-					user.Role = value
 				case "FullName":
 					user.FullName = value
+				case "Role":
+					user.Role = value
+				case "Password":
+					user.EmployeeID = value
 				case "DepartmentName":
 					user.DepartmentName = value
 				case "PositionName":
@@ -134,4 +134,47 @@ func ExcelReader(filePath string,  fields map[int]string) ([]UserExcellData, []i
 	}
 
 	return users, incompleteRows, nil
+}
+
+func EditExcell(departments, positions []string) (string, error) {
+	// Open the Excel file
+	f, err := excelize.OpenFile("template.xlsx")
+	if err != nil {
+		return "", fmt.Errorf("failed to open Excel file: %w", err)
+	}
+	defer f.Close()
+
+	department := "部署"
+	position := "役職"
+
+	// Check if the sheet exists
+	if sheetIndex, err := f.GetSheetIndex(department); sheetIndex == -1 {
+		if err != nil {
+			return "", fmt.Errorf("failed to Department GetSheet  Excel file: %w", err)
+		}
+	}
+	if sheetIndex, err := f.GetSheetIndex(position); sheetIndex == -1 {
+		if err != nil {
+			return "", fmt.Errorf("failed to Position GetSheet Excel file: %w", err)
+		}
+	}
+
+	for i, dept := range departments {
+		cell := fmt.Sprintf("A%d", i+2)
+		if err := f.SetCellValue(department, cell, dept); err != nil {
+			return "", fmt.Errorf("failed to write department data: %w", err)
+		}
+	}
+
+	for i, pos := range positions {
+		cell := fmt.Sprintf("A%d", i+2)
+		if err := f.SetCellValue(position, cell, pos); err != nil {
+			return "", fmt.Errorf("failed to write position data: %w", err)
+		}
+	}
+
+	if err := f.Save(); err != nil {
+		return "", fmt.Errorf("error saving file: %w", err)
+	}
+	return "template.xlsx", nil
 }
