@@ -156,7 +156,7 @@ func (uc Controller) ExportEmployee(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-
+	os.Remove("employee_list.xlsx")
 	return nil
 }
 func (uc Controller) ExportTemplate(c *web.Context) error {
