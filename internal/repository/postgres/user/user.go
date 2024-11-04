@@ -116,7 +116,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	if filter.PositionID != nil {
 		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
-	orderQuery := "ORDER BY u.employee_id,u.department_id, u.position_id desc"
+	orderQuery := "ORDER BY u.employee_id desc"
 
 	var limitQuery, offsetQuery string
 
