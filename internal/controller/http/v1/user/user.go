@@ -136,30 +136,30 @@ func (uc Controller) GetQrCodeList(c *web.Context) error {
 	return nil
 }
 func (uc Controller) ExportEmployee(c *web.Context) error {
-    // Generate the Excel file containing employee data
-    xlsxFilename, err := uc.user.ExportEmployee(c.Ctx)
-    if err != nil {
-        return c.RespondError(err) // Handle any error from generating the Excel file
-    }
-    
-    // Open the generated Excel file
-    file, err := os.Open(xlsxFilename)
-    if err != nil {
-        return c.RespondError(err) // Handle error if the file cannot be opened
-    }
-    defer file.Close() // Ensure the file is closed after we're done with it
-    
-    // Set the content type for Excel files
-    c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") // Correct MIME type for XLSX
-    c.Header("Content-Disposition", "attachment; filename=\"employee_list.xlsx\"") // Attachment header for downloading
-    
-    // Write the Excel file to the response writer
-    _, err = io.Copy(c.Writer, file)
-    if err != nil {
-        return c.RespondError(err) // Handle error during file copy
-    }
-    
-    return nil // Return nil to indicate success
+	// Generate the Excel file containing employee data
+	xlsxFilename, err := uc.user.ExportEmployee(c.Ctx)
+	if err != nil {
+		return c.RespondError(err) // Handle any error from generating the Excel file
+	}
+
+	// Open the generated Excel file
+	file, err := os.Open(xlsxFilename)
+	if err != nil {
+		return c.RespondError(err) // Handle error if the file cannot be opened
+	}
+	defer file.Close() // Ensure the file is closed after we're done with it
+
+	// Set the content type for Excel files
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") // Correct MIME type for XLSX
+	c.Header("Content-Disposition", "attachment; filename=\"employee_list.xlsx\"")                // Attachment header for downloading
+
+	// Write the Excel file to the response writer
+	_, err = io.Copy(c.Writer, file)
+	if err != nil {
+		return c.RespondError(err) // Handle error during file copy
+	}
+
+	return nil // Return nil to indicate success
 }
 
 func (uc Controller) CreateUser(c *web.Context) error {
@@ -177,7 +177,6 @@ func (uc Controller) CreateUser(c *web.Context) error {
 		"status":       true,
 	}, http.StatusOK)
 }
-
 func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	var request user.ExcellRequest
 	if err := c.BindFunc(&request); err != nil {
@@ -189,12 +188,12 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	var err error        // Declare error variable
 
 	switch request.Mode {
-	case 0: // Create mode
+	case 1: // Create mode
 		response, incomplete, err = uc.user.CreateByExcell(c.Ctx, request)
-	case 1: // Update mode
-		// response, incomplete, err = uc.user.UpdateByExcell(c.Ctx, request.Excell)
-	case 2: // Delete mode
-		// response, incomplete, err = uc.user.DeleteByExcell(c.Ctx, request.Excell)
+	case 2: // Update mode
+		response, incomplete, err = uc.user.UpdateByExcell(c.Ctx, request)
+	case 3: // Delete mode
+		response, incomplete, err = uc.user.DeleteByExcell(c.Ctx, request)
 	default:
 		return c.RespondError(errors.New("invalid mode specified"))
 	}
@@ -205,9 +204,9 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	}
 
 	return c.Respond(map[string]interface{}{
-		"Total number of successfully created users":                    response,
-		"Excel rows that users were not created due to incomplete data": incomplete,
-		"status": true,
+		"Successfully Users":           response,
+		"Incomplete  Users Excell Row": incomplete,
+		"status":                       true,
 	}, http.StatusOK)
 }
 

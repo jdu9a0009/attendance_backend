@@ -35,7 +35,6 @@ func ExcelDog(data ExcelData) (string, error) {
 		return "", err
 	}
 
-	// POST watermark
 	req, err := http.NewRequest("POST", "http://localhost:8022/generate-excel", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
@@ -45,13 +44,9 @@ func ExcelDog(data ExcelData) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer func() {
-		if resp != nil {
-			resp.Body.Close()
-		}
-	}()
-	var resByte []byte
-	resByte, err = io.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+	resByte, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -79,8 +74,8 @@ type UserExcellData struct {
 	Email          string
 }
 
-func ExcelReader(filePath string) ([]UserExcellData, []int, error) {
-	sheetName := "Employee"
+func ExcelReader(filePath string,  fields map[int]string) ([]UserExcellData, []int, error) {
+	sheetName:="Employee"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return nil, nil, err
@@ -101,44 +96,32 @@ func ExcelReader(filePath string) ([]UserExcellData, []int, error) {
 		}
 
 		var user UserExcellData
-		isComplete := true // Track if row is complete
+		isComplete := true
 
-		for j, colCell := range row {
-			switch j {
-			case 1:
-				user.Password = colCell
-				if colCell == "" {
+		for colIdx, fieldName := range fields {
+			if colIdx < len(row) {
+				value := row[colIdx]
+				if value == "" {
 					isComplete = false
 				}
-			case 2:
-				user.Role = colCell
-				if colCell == "" {
-					isComplete = false
-				}
-			case 3:
-				user.FullName = colCell
-				if colCell == "" {
-					isComplete = false
-				}
-			case 4:
-				user.DepartmentName = colCell
-				if colCell == "" {
-					isComplete = false
-				}
-			case 5:
-				user.PositionName = colCell
-				if colCell == "" {
-					isComplete = false
-				}
-			case 6:
-				user.Phone = colCell
-				if colCell == "" {
-					isComplete = false
-				}
-			case 7:
-				user.Email = colCell
-				if colCell == "" {
-					isComplete = false
+
+				switch fieldName {
+				case "EmployeeID":
+					user.EmployeeID = value
+				case "Password":
+					user.Password = value
+				case "Role":
+					user.Role = value
+				case "FullName":
+					user.FullName = value
+				case "DepartmentName":
+					user.DepartmentName = value
+				case "PositionName":
+					user.PositionName = value
+				case "Phone":
+					user.Phone = value
+				case "Email":
+					user.Email = value
 				}
 			}
 		}
@@ -146,7 +129,7 @@ func ExcelReader(filePath string) ([]UserExcellData, []int, error) {
 		if isComplete {
 			users = append(users, user)
 		} else {
-			incompleteRows = append(incompleteRows, i+1) // Store the Excel row number
+			incompleteRows = append(incompleteRows, i+1)
 		}
 	}
 

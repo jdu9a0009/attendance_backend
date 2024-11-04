@@ -56,8 +56,10 @@ type GetDetailByIdResponse struct {
 	Phone        *string `json:"phone"`
 	Email        *string `json:"email"`
 }
+
+
 type ExcellRequest struct {
-	Mode   int                  `json:"mode" form:"-"`
+	Mode   int                   `json:"mode" form:"mode"`
 	Excell *multipart.FileHeader `json:"-" form:"excell"`
 }
 type ExcellUpload struct {
@@ -104,6 +106,18 @@ type CreateResponse struct {
 	Email        *string   `json:"email" bun:"email"`
 	CreatedAt    time.Time `json:"-"          bun:"created_at"`
 	CreatedBy    int       `json:"-"          bun:"created_by"`
+}
+type UpdateResponse struct {
+	bun.BaseModel `bun:"table:users"`
+
+	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
+	FullName     *string   `json:"full_name"  bun:"full_name"`
+	DepartmentID *int      `json:"department_id" bun:"department_id"`
+	PositionID   *int      `json:"position_id" bun:"position_id"`
+	Phone        *string   `json:"phone" bun:"phone"`
+	Email        *string   `json:"email" bun:"email"`
+	UpdatedAt    time.Time `json:"-"          bun:"created_at"`
+	UpdatedBy    int       `json:"-"          bun:"created_by"`
 }
 type IncompleteUser struct {
 	Data   []CreateRequest
