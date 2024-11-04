@@ -116,7 +116,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	if filter.PositionID != nil {
 		whereQuery += fmt.Sprintf(` AND u.position_id = %d`, *filter.PositionID)
 	}
-	orderQuery := "ORDER BY u.employee_id,department_id desc"
+	orderQuery := "ORDER BY u.employee_id,u.department_id, u.position_id desc"
 
 	var limitQuery, offsetQuery string
 
@@ -341,7 +341,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-    defer cancel()
+	defer cancel()
 	departmentMap, err := r.LoadDepartmentMap(ctx)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading department map"), http.StatusInternalServerError)
@@ -537,7 +537,6 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		}
 
 		q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
-
 
 		if user.FullName != nil {
 			q.Set("full_name=?", data.FullName)
