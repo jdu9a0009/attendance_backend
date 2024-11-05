@@ -835,7 +835,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		}
 		q.Set("role = ?", role)
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 	}
@@ -853,7 +853,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if request.Phone != nil {
 		q.Set("phone=?", request.Phone)
 	}
-	if request.Password != nil {
+	if request.Password != "" {
 		q.Set("password=?", hashedPassword)
 	}
 	if request.Email != nil {

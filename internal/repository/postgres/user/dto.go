@@ -144,7 +144,7 @@ type GenEmployeeID struct {
 type UpdateRequest struct {
 	ID           int     `json:"id" form:"id"`
 	EmployeeID   *string `json:"employee_id"   form:"employee_id"`
-	Password     *string `json:"password"   form:"password"`
+	Password     string `json:"password"   form:"password"`
 	Role         *string `json:"role"       form:"role"`
 	FullName     *string `json:"full_name"  form:"full_name"`
 	DepartmentID *int    `json:"department_id" form:"department_id"`
