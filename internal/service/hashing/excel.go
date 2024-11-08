@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -80,8 +81,11 @@ func ExcelReader(filePath string, fields map[int]string) ([]UserExcellData, []in
 	if err != nil {
 		return nil, nil, err
 	}
-	defer f.Close()
-
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
 		return nil, nil, err
@@ -89,50 +93,29 @@ func ExcelReader(filePath string, fields map[int]string) ([]UserExcellData, []in
 
 	var users []UserExcellData
 	var incompleteRows []int
-
 	for i, row := range rows {
 		if i == 0 {
+			// Skip the header row
+			continue
+		}
+
+		if len(row) < 7 { // Adjust the number based on expected columns
+			incompleteRows = append(incompleteRows, i)
 			continue
 		}
 
 		var user UserExcellData
-		isComplete := true
+		user.EmployeeID = row[0]
+		user.FullName = row[1]
+		user.Role = row[2]
+		user.Password = row[3]
+		user.DepartmentName = row[4]
+		user.PositionName = row[5]
+		user.Phone = row[6]
+		user.Email = row[7]
 
-		for colIdx, fieldName := range fields {
-			if colIdx < len(row) {
-				value := row[colIdx]
-				if value == "" {
-					isComplete = false
-				}
-
-				switch fieldName {
-				case "EmployeeID":
-					user.EmployeeID = value
-				case "FullName":
-					user.FullName = value
-				case "Role":
-					user.Role = value
-				case "Password":
-					user.EmployeeID = value
-				case "DepartmentName":
-					user.DepartmentName = value
-				case "PositionName":
-					user.PositionName = value
-				case "Phone":
-					user.Phone = value
-				case "Email":
-					user.Email = value
-				}
-			}
-		}
-
-		if isComplete {
-			users = append(users, user)
-		} else {
-			incompleteRows = append(incompleteRows, i+1)
-		}
+		users = append(users, user)
 	}
-
 	return users, incompleteRows, nil
 }
 

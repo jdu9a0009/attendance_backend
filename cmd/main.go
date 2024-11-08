@@ -57,7 +57,6 @@ func run(log *log.Logger) error {
 
 	var cfg struct {
 		conf.Version
-		ServerBaseUrl string `conf:"default:http://university.uz"`
 		DefaultLang   string `conf:"default:uz"`
 		ServerPort    string `conf:"default:8080"`
 		Web           struct {
@@ -206,7 +205,7 @@ func run(log *log.Logger) error {
 	commands.MigrateUP(postgresDB)
 	//commands.Migrate(postgresDB)
 
-	r := router.NewRouter(webApp, postgresDB, redisDB, fmt.Sprintf(":%s", cfg.ServerPort), auth, cfg.ServerBaseUrl)
+	r := router.NewRouter(webApp, postgresDB, redisDB, fmt.Sprintf(":%s", cfg.ServerPort), auth, yamlConfig.BaseUrl)
 
 	return r.Init()
 }

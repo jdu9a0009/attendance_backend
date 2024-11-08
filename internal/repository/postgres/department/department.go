@@ -341,49 +341,22 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 	if exists {
 		return web.NewRequestError(errors.New("この部門はアクティブなユーザーに使われています。関連するユーザーを先に削除しないと、削除できません。"), http.StatusBadRequest)
 	}
+	// Fetch the current display number for the department being updated
+	var CurrentDisplayNumber int
+	if err := r.QueryRowContext(ctx, `SELECT display_number FROM department WHERE id = ?`, id).Scan(&CurrentDisplayNumber); err != nil {
+		return web.NewRequestError(errors.Wrap(err, "fetching current display number"), http.StatusInternalServerError)
+	}
+
+	// Update the display numbers of other departments
+	_, err = r.DB.ExecContext(ctx, `
+		UPDATE department
+		SET display_number = display_number - 1
+		WHERE deleted_at IS NULL 
+		AND display_number > ?
+	`, CurrentDisplayNumber)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "updating display numbers"), http.StatusInternalServerError)
+	}
 
 	return r.DeleteRow(ctx, "department", id)
-}
-func (r Repository) LoadDepartmentMap(ctx context.Context) (map[string]int, error) {
-	departmentMap := make(map[string]int)
-	var departments []GetListResponse
-	fmt.Println("Department started working")
-
-	query := `
-			SELECT 
-			id,
-			name
-		FROM department
-		WHERE deleted_at IS NULL`
-
-	rows, err := r.DB.QueryContext(ctx, query)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
-		}
-		return nil, web.NewRequestError(errors.Wrap(err, "selecting department"), http.StatusBadRequest)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var detail GetListResponse
-		if err := rows.Scan(&detail.ID, &detail.Name); err != nil {
-			return nil, web.NewRequestError(errors.Wrap(err, "scanning department"), http.StatusBadRequest)
-		}
-		departments = append(departments, detail)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, web.NewRequestError(errors.Wrap(err, "reading rows"), http.StatusInternalServerError)
-	}
-
-	for _, dept := range departments {
-		if dept.Name != nil {
-			departmentMap[*dept.Name] = dept.ID
-		}
-	}
-
-	fmt.Println("Department end working")
-
-	return departmentMap, nil
 }

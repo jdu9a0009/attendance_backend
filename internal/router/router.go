@@ -107,7 +107,6 @@ func (r Router) Init() error {
 
 	r.Post("/api/v1/user/create", userController.CreateUser, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Post("/api/v1/user/create_excell", userController.CreateUserByExcell, middleware.Authenticate(r.auth, auth.RoleAdmin))
-	r.Post("/api/v1/user/excell_upload", userController.UploadTemplate, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
 	r.Patch("/api/v1/user/:id", userController.UpdateUserColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Delete("/api/v1/user/:id", userController.DeleteUser, middleware.Authenticate(r.auth, auth.RoleAdmin))

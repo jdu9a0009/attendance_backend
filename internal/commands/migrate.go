@@ -1,9 +1,9 @@
 package commands
 
 import (
+	"attendance/backend/internal/pkg/repository/postgresql"
 	"fmt"
 	"log"
-	"attendance/backend/internal/pkg/repository/postgresql"
 
 	"github.com/pkg/errors"
 )
@@ -23,7 +23,7 @@ var scheme = []Scheme{
 		Index:       1,
 		Description: "CREATE TYPE \"user_role\" AS ENUM",
 		Query: `
-        CREATE TYPE "user_role" AS ENUM ('EMPLOYEE', 'ADMIN');`,
+        CREATE TYPE "user_role" AS ENUM ('EMPLOYEE', 'ADMIN','DASHBOARD','QRCODE');`,
 	},
 	{
 		Index:       2,
@@ -45,7 +45,7 @@ var scheme = []Scheme{
 	},
 	{
 		Index:       3,
-		Description: "Create area with user_id: Admin01, password: 1",
+		Description: "Create area with employee_id: Admin01, password: 1",
 		Query: `
         INSERT INTO users(employee_id, role, password)
         SELECT 'Admin01', 'ADMIN', '$2a$10$NKtnMwDPFSQLG6uOi4Zqheru5Ygbj9TWFHjpl478rRSaO5cJ9QuH2'
@@ -54,6 +54,24 @@ var scheme = []Scheme{
 	},
 	{
 		Index:       4,
+		Description: "Create area with employee_id: QrCode01, password: 1",
+		Query: `
+        INSERT INTO users(employee_id, role, password)
+        SELECT 'QrCode01', 'QRCODE', '$2a$10$NKtnMwDPFSQLG6uOi4Zqheru5Ygbj9TWFHjpl478rRSaO5cJ9QuH2'
+        WHERE NOT EXISTS (SELECT employee_id FROM users WHERE employee_id = 'QrCode01');
+        `,
+	},
+	{
+		Index:       5,
+		Description: "Create area with employee_id: Dashboard01, password: 1",
+		Query: `
+        INSERT INTO users(employee_id, role, password)
+        SELECT 'Dashboard01', 'DASHBOARD', '$2a$10$NKtnMwDPFSQLG6uOi4Zqheru5Ygbj9TWFHjpl478rRSaO5cJ9QuH2'
+        WHERE NOT EXISTS (SELECT employee_id FROM users WHERE employee_id = 'Dashboard01');
+        `,
+	},
+	{
+		Index:       6,
 		Description: "Create table: department",
 		Query: `
         CREATE TABLE IF NOT EXISTS department (
@@ -69,7 +87,7 @@ var scheme = []Scheme{
         );`,
 	},
 	{
-		Index:       5,
+		Index:       7,
 		Description: "Create table: position.",
 		Query: `
         CREATE TABLE IF NOT EXISTS position (
@@ -85,24 +103,19 @@ var scheme = []Scheme{
         );`,
 	},
 	{
-		Index:       6,
+		Index:       8,
 		Description: "Alter table users",
 		Query: `
         ALTER TABLE users
         ADD COLUMN IF NOT EXISTS department_id int references department(id),
-        ADD COLUMN IF NOT EXISTS position_id int references position(id);`,
-	},
-	{
-		Index:       7,
-		Description: "Alter table users",
-		Query: `
-        ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS phone VARCHAR(255),
+		ADD COLUMN IF NOT EXISTS position_id int references position(id),
+		 ADD COLUMN IF NOT EXISTS phone VARCHAR(255),
         ADD COLUMN IF NOT EXISTS status BOOLEAN DEFAULT false,
         ADD COLUMN IF NOT EXISTS email VARCHAR(255);`,
 	},
+
 	{
-		Index:       8,
+		Index:       9,
 		Description: "Create table: attendance.",
 		Query: `
         CREATE TABLE attendance (
@@ -121,7 +134,7 @@ var scheme = []Scheme{
         );`,
 	},
 	{
-		Index:       9,
+		Index:       10,
 		Description: "Create table: attendance_period.",
 		Query: `
         CREATE TABLE attendance_period (
@@ -134,7 +147,7 @@ var scheme = []Scheme{
         );`,
 	},
 	{
-		Index:       13,
+		Index:       11,
 		Description: "Create table: company_info.",
 		Query: `
         CREATE TABLE company_info (
@@ -156,7 +169,7 @@ var scheme = []Scheme{
         );`,
 	},
 	{
-		Index:       14,
+		Index:       12,
 		Description: "Insert data fortable: company_info.",
 		Query: `
         INSERT INTO company_info (
@@ -175,8 +188,8 @@ var scheme = []Scheme{
         1,
         'Digital Knowledge',
         'statics/company_info/2024-09-24T20:49:17+05:00-Screenshot from 2024-09-24 13-55-14.png',
-        41.319006,
-        41.319006,
+        35.7031509,
+        139.7745439,
         '09:00:00',
         '18:00:00',
         '09:20:00',

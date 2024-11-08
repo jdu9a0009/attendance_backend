@@ -233,21 +233,7 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-func (uc Controller) UploadTemplate(c *web.Context) error {
-	var request user.ExcellUpload
-	if err := c.BindFunc(&request); err != nil {
-		return c.RespondError(err)
-	}
 
-	err := uc.user.UploadTemplate(c.Ctx, request)
-	if err != nil {
-		return c.RespondError(err)
-	}
-
-	return c.Respond(map[string]interface{}{
-		"status": true,
-	}, http.StatusOK)
-}
 func (uc Controller) UpdateUserColumns(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
 

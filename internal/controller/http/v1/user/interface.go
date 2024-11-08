@@ -20,7 +20,6 @@ type User interface {
 	CreateByExcell(ctx context.Context, request user.ExcellRequest) (int, []int, error)
 	UpdateByExcell(ctx context.Context, request user.ExcellRequest) (int, []int, error)
 	DeleteByExcell(ctx context.Context, request user.ExcellRequest) (int, []int, error)
-	UploadTemplate(ctx context.Context, request user.ExcellUpload) error
 	ExportEmployee(ctx context.Context) (string, error)
 	ExportTemplate(ctx context.Context) (string, error)
 	UpdateColumns(ctx context.Context, request user.UpdateRequest) error

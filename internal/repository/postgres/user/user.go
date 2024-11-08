@@ -1225,30 +1225,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 	return results, count, nil
 }
 
-func (r Repository) UploadTemplate(ctx context.Context, request ExcellUpload) error {
-	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
-	if err != nil {
-		return err
-	}
 
-	// Validate the ExcellRequest struct
-	if err := r.ValidateStruct(&request); err != nil {
-		return err
-
-	}
-	const productDir = "product"
-
-	if request.Excell != nil {
-		path, err := service.Upload(request.Excell, productDir)
-
-		if err != nil {
-			return web.NewRequestError(errors.New("error uploading excell file"), http.StatusNoContent)
-
-		}
-		request.Url = path
-	}
-	return err
-}
 func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 	query := `
 	SELECT 
