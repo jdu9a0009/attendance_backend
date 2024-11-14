@@ -79,6 +79,7 @@ type GetDashboardlist struct {
 	DepartmentName *string `json:"department_name"` // Use sql.NullString
 	DisplayNumber  *int    `json:"display_number"`  // Use sql.NullInt32
 	FullName       *string `json:"full_name"`
+	NickName       string  `json:"nick_name"`
 	Status         *bool   `json:"status"`
 }
 

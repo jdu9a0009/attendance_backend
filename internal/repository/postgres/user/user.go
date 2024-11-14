@@ -1113,6 +1113,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
                     u.id,
                     u.employee_id,
                     u.full_name,
+					u.nick_name,
                     COALESCE(a.status, false) AS status,
                     d.id AS department_id,
                     d.name AS department_name,
@@ -1148,6 +1149,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 			displayNumber  sql.NullInt64
 			userID         sql.NullInt64
 			departmentName sql.NullString
+			nickName       sql.NullString
 		)
 
 		// Scan the row with individual fields
@@ -1155,6 +1157,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 			&userID,
 			&detail.EmployeeID,
 			&detail.FullName,
+			&nickName,
 			&detail.Status,
 			&departmentID,
 			&departmentName,
@@ -1165,7 +1168,12 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 		if err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning dashboard employee list"), http.StatusBadRequest)
 		}
-		// Assign values to the struct after checking for null
+
+		if nickName.Valid {
+			detail.NickName = nickName.String
+		} else {
+			detail.NickName = ""
+		}
 		if departmentName.Valid {
 			detail.DepartmentName = &departmentName.String
 		}
@@ -1237,6 +1245,7 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 	SELECT 
 		u.employee_id,
 		u.full_name,
+		u.nick_name,
 		d.name as department_name,
 		p.name as position_name,
 		u.phone,
