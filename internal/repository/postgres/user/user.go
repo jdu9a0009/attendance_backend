@@ -1278,15 +1278,21 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 
 	for rows.Next() {
 		var detail service.Employee // Use the Employee type from the service package
+		var nickName sql.NullString
 		if err = rows.Scan(
 			&detail.EmployeeID,
 			&detail.FullName,
-			&detail.NickName,
+			&nickName,
 			&detail.DepartmentName,
 			&detail.PositionName,
 			&detail.Phone,
 			&detail.Email); err != nil {
 			return "", web.NewRequestError(errors.Wrap(err, "scanning user list"), http.StatusBadRequest)
+		}
+		if nickName.Valid {
+			detail.NickName = nickName.String
+		} else {
+			detail.NickName = ""
 		}
 
 		list = append(list, detail)
