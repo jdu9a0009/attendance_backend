@@ -67,6 +67,7 @@ func ExcelDog(data ExcelData) (string, error) {
 type UserExcellData struct {
 	EmployeeID     string
 	FullName       string
+	NickName       string
 	Role           string
 	Password       string
 	DepartmentName string
@@ -107,12 +108,13 @@ func ExcelReader(filePath string, fields map[int]string) ([]UserExcellData, []in
 		var user UserExcellData
 		user.EmployeeID = row[0]
 		user.FullName = row[1]
-		user.Role = row[2]
-		user.Password = row[3]
-		user.DepartmentName = row[4]
-		user.PositionName = row[5]
-		user.Phone = row[6]
-		user.Email = row[7]
+		user.NickName = row[2]
+		user.Role = row[3]
+		user.Password = row[4]
+		user.DepartmentName = row[5]
+		user.PositionName = row[6]
+		user.Phone = row[7]
+		user.Email = row[8]
 
 		users = append(users, user)
 	}

@@ -37,6 +37,7 @@ type GetListResponse struct {
 	ID           int     `json:"id"`
 	EmployeeID   *string `json:"employee_id"`
 	FullName     *string `json:"full_name"`
+	NickName     string  `json:"nick_name"`
 	DepartmentID *int    `json:"department_id"`
 	Department   *string `json:"department"`
 	PositionID   *int    `json:"position_id"`
@@ -49,6 +50,7 @@ type GetDetailByIdResponse struct {
 	ID           int     `json:"id"`
 	EmployeeID   *string `json:"employee_id"`
 	FullName     *string `json:"full_name"`
+	NickName     string  `json:"nick_name"`
 	DepartmentID *int    `json:"department_id"`
 	Department   *string `json:"department"`
 	PositionID   *int    `json:"position_id"`
@@ -56,7 +58,6 @@ type GetDetailByIdResponse struct {
 	Phone        *string `json:"phone"`
 	Email        *string `json:"email"`
 }
-
 
 type ExcellRequest struct {
 	Mode   int                   `json:"mode" form:"mode"`
@@ -100,6 +101,7 @@ type CreateResponse struct {
 	Password     *string   `json:"-"   bun:"password"`
 	Role         string    `json:"role" bun:"role"`
 	FullName     *string   `json:"full_name"  bun:"full_name"`
+	NickName     string    `json:"nick_name" bun:"nick_name"`
 	DepartmentID *int      `json:"department_id" bun:"department_id"`
 	PositionID   *int      `json:"position_id" bun:"position_id"`
 	Phone        *string   `json:"phone" bun:"phone"`
@@ -112,6 +114,7 @@ type UpdateResponse struct {
 
 	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
 	FullName     *string   `json:"full_name"  bun:"full_name"`
+	NickName     string    `json:"nick_name"  bun:"nick_name"`
 	DepartmentID *int      `json:"department_id" bun:"department_id"`
 	PositionID   *int      `json:"position_id" bun:"position_id"`
 	Phone        *string   `json:"phone" bun:"phone"`
@@ -128,6 +131,7 @@ type CreateRequest struct {
 	Password     *string `json:"password"   form:"password"`
 	Role         *string `json:"role" form:"role"`
 	FullName     *string `json:"full_name"  form:"full_name"`
+	NickName     string  `json:"nick_name"  form:"nick_name"`
 	DepartmentID *int    `json:"department_id" form:"department_id"`
 	PositionID   *int    `json:"position_id" form:"position_id"`
 	Phone        *string `json:"phone" form:"phone"`
@@ -144,9 +148,10 @@ type GenEmployeeID struct {
 type UpdateRequest struct {
 	ID           int     `json:"id" form:"id"`
 	EmployeeID   *string `json:"employee_id"   form:"employee_id"`
-	Password     string `json:"password"   form:"password"`
+	Password     string  `json:"password"   form:"password"`
 	Role         *string `json:"role"       form:"role"`
 	FullName     *string `json:"full_name"  form:"full_name"`
+	NickName     string  `json:"nick_name"  form:"nick_name"`
 	DepartmentID *int    `json:"department_id" form:"department_id"`
 	PositionID   *int    `json:"position_id" form:"position_id"`
 	Phone        *string `json:"phone" form:"phone"`

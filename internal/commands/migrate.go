@@ -107,6 +107,7 @@ var scheme = []Scheme{
 		Description: "Alter table users",
 		Query: `
         ALTER TABLE users
+		ADD COLUMN IF NOT EXISTS nick_name varchar(255),
         ADD COLUMN IF NOT EXISTS department_id int references department(id),
 		ADD COLUMN IF NOT EXISTS position_id int references position(id),
 		 ADD COLUMN IF NOT EXISTS phone VARCHAR(255),

@@ -138,6 +138,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			u.id,
 			u.employee_id,
 			u.full_name,
+			u.nick_name,
 			u.department_id,
 			d.name as department_name,
 			u.position_id,
@@ -167,6 +168,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			&detail.ID,
 			&detail.EmployeeID,
 			&detail.FullName,
+			&detail.NickName,
 			&detail.DepartmentID,
 			&detail.Department,
 			&detail.PositionID,
@@ -218,6 +220,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 			u.id,
 			u.employee_id,
 			u.full_name,
+			u.nick_name,
 			u.department_id,
 			d.name,
 			u.position_id,
@@ -237,6 +240,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		&detail.ID,
 		&detail.EmployeeID,
 		&detail.FullName,
+		&detail.NickName,
 		&detail.DepartmentID,
 		&detail.Department,
 		&detail.PositionID,
@@ -294,6 +298,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 
 	response.Role = role
 	response.FullName = request.FullName
+	response.NickName = request.NickName
 	response.EmployeeID = employeeID
 	response.DepartmentID = request.DepartmentID
 	response.Password = &hashedPassword
@@ -375,12 +380,13 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	}
 	fields := map[int]string{
 		1: "FullName",
-		2: "Role",
-		3: "Password",
-		4: "DepartmentName",
-		5: "PositionName",
-		6: "Phone",
-		7: "Email",
+		2: "NickName",
+		3: "Role",
+		4: "Password",
+		5: "DepartmentName",
+		6: "PositionName",
+		7: "Phone",
+		8: "Email",
 	}
 	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
 	if err != nil {
@@ -422,6 +428,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			Password:     &hashedPassword,
 			Role:         data.Role,
 			FullName:     &data.FullName,
+			NickName:     data.NickName,
 			DepartmentID: &departmentID,
 			PositionID:   &positionID,
 			Phone:        &data.Phone,
@@ -449,6 +456,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 
 	return createdCount, incompleteRows, nil
 }
+
 func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -646,11 +654,7 @@ func (r Repository) GenerateUniqueEmployeeID(ctx context.Context) (*string, erro
 	// Using a raw SQL query to fetch the highest existing employee ID
 	query := `SELECT employee_id FROM users  where role='EMPLOYEE'  ORDER BY employee_id DESC LIMIT 1`
 	err := r.NewRaw(query).Scan(ctx, &highestID)
-	if err != nil {
-		return nil, web.NewRequestError(errors.Wrap(err, "fetching highest employee ID"), http.StatusInternalServerError)
-	}
-	fmt.Println("query:", query)
-	fmt.Println("Highest:", highestID)
+	fmt.Println("Err:", err)
 	var newID string
 	if highestID == "" {
 		// If there are no existing IDs, start with the first one
@@ -843,6 +847,9 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 	if request.FullName != nil {
 		q.Set("full_name = ?", request.FullName)
+	}
+	if request.NickName != "" {
+		q.Set("nick_name = ?", request.NickName)
 	}
 	if request.DepartmentID != nil {
 		q.Set("department_id = ?", request.DepartmentID)
@@ -1224,7 +1231,6 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 
 	return results, count, nil
 }
-
 
 func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 	query := `
