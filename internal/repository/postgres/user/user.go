@@ -164,11 +164,12 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 
 	for rows.Next() {
 		var detail GetListResponse
+		var nickName sql.NullString
 		if err = rows.Scan(
 			&detail.ID,
 			&detail.EmployeeID,
 			&detail.FullName,
-			&detail.NickName,
+			&nickName,
 			&detail.DepartmentID,
 			&detail.Department,
 			&detail.PositionID,
@@ -176,6 +177,11 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			&detail.Phone,
 			&detail.Email); err != nil {
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning user list"), http.StatusBadRequest)
+		}
+		if nickName.Valid {
+			detail.NickName = nickName.String
+		} else {
+			detail.NickName = ""
 		}
 
 		list = append(list, detail)
@@ -235,12 +241,13 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 	`, id)
 
 	var detail GetDetailByIdResponse
+	var nickName sql.NullString
 
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.ID,
 		&detail.EmployeeID,
 		&detail.FullName,
-		&detail.NickName,
+		&nickName,
 		&detail.DepartmentID,
 		&detail.Department,
 		&detail.PositionID,
@@ -248,7 +255,11 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		&detail.Phone,
 		&detail.Email,
 	)
-
+	if nickName.Valid {
+		detail.NickName = nickName.String
+	} else {
+		detail.NickName = ""
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return GetDetailByIdResponse{}, web.NewRequestError(postgres.ErrNotFound, http.StatusBadRequest)
 	}
@@ -1270,6 +1281,7 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 		if err = rows.Scan(
 			&detail.EmployeeID,
 			&detail.FullName,
+			&detail.NickName,
 			&detail.DepartmentName,
 			&detail.PositionName,
 			&detail.Phone,
