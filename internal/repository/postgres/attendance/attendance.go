@@ -77,7 +77,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		limitQuery = fmt.Sprintf("LIMIT %d", *filter.Limit)
 	}
 
-	groupByQuery := `GROUP BY u.employee_id, u.full_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time`
+	groupByQuery := `GROUP BY u.employee_id, u.first_name,u.last_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time`
 	orderQuery := "ORDER BY u.employee_id DESC" // Order by user's name or any other field
 
 	if filter.Offset != nil {
@@ -88,7 +88,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	query := fmt.Sprintf(`SELECT
 
     u.employee_id,
-    u.full_name,
+    CONCAT(u.first_name, ' ', u.last_name) AS full_name,
     u.department_id,
     d.name AS department_name,
     u.position_id,
@@ -602,7 +602,7 @@ func (r Repository) updateUserStatus(ctx context.Context, employeeID *string, st
 		Set("status = ?", status).
 		Exec(ctx)
 	return err
-} 
+}
 
 func stringPointer(s string) *string {
 	return &s
