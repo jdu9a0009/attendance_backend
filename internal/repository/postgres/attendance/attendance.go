@@ -1,17 +1,17 @@
 package attendance
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/auth"
+	"attendance/backend/internal/pkg/repository/postgresql"
+	"attendance/backend/internal/repository/postgres"
+	"attendance/backend/internal/repository/postgres/companyInfo"
 	"context"
 	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
-	"attendance/backend/foundation/web"
-	"attendance/backend/internal/auth"
-	"attendance/backend/internal/pkg/repository/postgresql"
-	"attendance/backend/internal/repository/postgres"
-	"attendance/backend/internal/repository/postgres/companyInfo"
 
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/pkg/errors"
@@ -78,7 +78,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	}
 
 	groupByQuery := `GROUP BY u.employee_id, u.full_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time`
-	orderQuery := "ORDER BY u.full_name" // Order by user's name or any other field
+	orderQuery := "ORDER BY u.employee_id DESC" // Order by user's name or any other field
 
 	if filter.Offset != nil {
 		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset)
@@ -597,7 +597,7 @@ func (r Repository) insertAttendance(ctx context.Context, response *CreateRespon
 
 func (r Repository) updateUserStatus(ctx context.Context, employeeID *string, status bool) error {
 	_, err := r.NewUpdate().
-		Table("users").
+		Table("attendance").
 		Where("deleted_at IS NULL AND employee_id = ?", employeeID).
 		Set("status = ?", status).
 		Exec(ctx)
