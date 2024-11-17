@@ -602,7 +602,7 @@ func (r Repository) updateUserStatus(ctx context.Context, employeeID *string, st
 		Set("status = ?", status).
 		Exec(ctx)
 	return err
-}
+} 
 
 func stringPointer(s string) *string {
 	return &s
