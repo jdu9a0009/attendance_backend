@@ -66,7 +66,8 @@ func ExcelDog(data ExcelData) (string, error) {
 
 type UserExcellData struct {
 	EmployeeID     string
-	FullName       string
+	FirstName      string
+	LastName       string
 	NickName       string
 	Role           string
 	Password       string
@@ -100,21 +101,22 @@ func ExcelReader(filePath string, fields map[int]string) ([]UserExcellData, []in
 			continue
 		}
 
-		if len(row) < 7 { // Adjust the number based on expected columns
+		if len(row) < 10 { // Adjust the number based on expected columns
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
 
 		var user UserExcellData
 		user.EmployeeID = row[0]
-		user.FullName = row[1]
-		user.NickName = row[2]
-		user.Role = row[3]
-		user.Password = row[4]
-		user.DepartmentName = row[5]
-		user.PositionName = row[6]
-		user.Phone = row[7]
-		user.Email = row[8]
+		user.FirstName = row[1]
+		user.LastName = row[2]
+		user.NickName = row[3]
+		user.Role = row[4]
+		user.Password = row[5]
+		user.DepartmentName = row[6]
+		user.PositionName = row[7]
+		user.Phone = row[8]
+		user.Email = row[9]
 
 		users = append(users, user)
 	}

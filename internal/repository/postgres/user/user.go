@@ -71,7 +71,7 @@ func (r Repository) GetFullName(ctx context.Context) (GetFullName, error) {
 
 	query := fmt.Sprintf(`
 		SELECT
-			full_name
+		     CONCAT(first_name, ' ', last_name) AS full_name
 		FROM
 		    users
 		WHERE deleted_at IS NULL AND role='EMPLOYEE' AND id = %d
@@ -137,7 +137,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		SELECT 
 			u.id,
 			u.employee_id,
-			u.full_name,
+			CONCAT(u.first_name, ' ', u.last_name) AS full_name,
 			u.nick_name,
 			u.department_id,
 			d.name as department_name,
@@ -225,7 +225,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		SELECT
 			u.id,
 			u.employee_id,
-			u.full_name,
+			CONCAT(u.first_name, ' ', u.last_name) AS full_name,
 			u.nick_name,
 			u.department_id,
 			d.name,
@@ -275,7 +275,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
-	if err := r.ValidateStruct(&request, "Password", "Role", "FullName"); err != nil {
+	if err := r.ValidateStruct(&request, "Password", "Role", "FirstName,LastName"); err != nil {
 		return CreateResponse{}, err
 	}
 	var deptExists bool
@@ -308,7 +308,8 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	}
 
 	response.Role = role
-	response.FullName = request.FullName
+	response.FirstName = request.FirstName
+	response.LastName = request.LastName
 	response.NickName = request.NickName
 	response.EmployeeID = employeeID
 	response.DepartmentID = request.DepartmentID
@@ -390,20 +391,20 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
 	fields := map[int]string{
-		1: "FullName",
-		2: "NickName",
-		3: "Role",
-		4: "Password",
-		5: "DepartmentName",
-		6: "PositionName",
-		7: "Phone",
-		8: "Email",
+		1: "FirstName",
+		2: "LastName",
+		3: "NickName",
+		4: "Role",
+		5: "Password",
+		6: "DepartmentName",
+		7: "PositionName",
+		8: "Phone",
+		9: "Email",
 	}
 	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
-
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -422,7 +423,12 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	for _, data := range excelData {
 		departmentID, okDept := departmentMap[data.DepartmentName]
 		positionID, okPos := positionMap[data.PositionName]
-
+		if !okDept {
+			fmt.Printf("Missing Department: %s\n", data.DepartmentName)
+		}
+		if !okPos {
+			fmt.Printf("Missing Position: %s\n", data.PositionName)
+		}
 		if !okDept || !okPos {
 			incompleteRows = append(incompleteRows, rowNum+1)
 			continue
@@ -433,12 +439,12 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			return 0, nil, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 		}
 		hashedPassword := string(hash)
-		fmt.Println("Data: ", data)
 		user := CreateResponse{
 			EmployeeID:   employeeID,
 			Password:     &hashedPassword,
 			Role:         data.Role,
-			FullName:     &data.FullName,
+			FirstName:    &data.FirstName,
+			LastName:     &data.LastName,
 			NickName:     data.NickName,
 			DepartmentID: &departmentID,
 			PositionID:   &positionID,
@@ -506,11 +512,12 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 	}
 	fields := map[int]string{
 		0: "EmployeeID",
-		1: "FullName",
-		2: "DepartmentName",
-		3: "PositionName",
-		4: "Phone",
-		5: "Email",
+		1: "FirstName",
+		2: "LastName",
+		3: "DepartmentName",
+		4: "PositionName",
+		5: "Phone",
+		6: "Email",
 	}
 	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
 	if err != nil {
@@ -542,7 +549,8 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		}
 		user := UpdateResponse{
 			EmployeeID:   &data.EmployeeID,
-			FullName:     &data.FullName,
+			FirstName:    &data.FirstName,
+			LastName:     &data.LastName,
 			DepartmentID: &departmentID,
 			PositionID:   &positionID,
 			Phone:        &data.Phone,
@@ -557,8 +565,11 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 
 		q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
 
-		if user.FullName != nil {
-			q.Set("full_name=?", data.FullName)
+		if user.FirstName != nil {
+			q.Set("first_name=?", data.FirstName)
+		}
+		if user.LastName != nil {
+			q.Set("last_name=?", data.LastName)
 		}
 		q.Set("department_id=?", departmentID)
 		q.Set("position_id=?", positionID)
@@ -612,11 +623,12 @@ func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (
 	}
 	fields := map[int]string{
 		0: "EmployeeID",
-		1: "FullName",
-		2: "DepartmentName",
-		3: "PositionName",
-		4: "Phone",
-		5: "Email",
+		1: "FirstName",
+		2: "LastName",
+		3: "DepartmentName",
+		4: "PositionName",
+		5: "Phone",
+		6: "Email",
 	}
 	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
 	if err != nil {
@@ -856,8 +868,12 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	}
 	hashedPassword := string(hash)
 
-	if request.FullName != nil {
-		q.Set("full_name = ?", request.FullName)
+	if request.FirstName != nil {
+		q.Set("first_name = ?", request.FirstName)
+	}
+
+	if request.LastName != nil {
+		q.Set("last_name = ?", request.LastName)
 	}
 	if request.NickName != "" {
 		q.Set("nick_name = ?", request.NickName)
@@ -1123,7 +1139,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
                  SELECT
                     u.id,
                     u.employee_id,
-                    u.full_name,
+                    u.last_name,
 					u.nick_name,
                     COALESCE(a.status, false) AS status,
                     d.id AS department_id,
@@ -1167,7 +1183,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 		err = rows.Scan(
 			&userID,
 			&detail.EmployeeID,
-			&detail.FullName,
+			&detail.LastName,
 			&nickName,
 			&detail.Status,
 			&departmentID,
@@ -1255,7 +1271,8 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 	query := `
 	SELECT 
 		u.employee_id,
-		u.full_name,
+		u.first_name,
+		u.last_name,
 		u.nick_name,
 		d.name as department_name,
 		p.name as position_name,
@@ -1281,7 +1298,8 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 		var nickName sql.NullString
 		if err = rows.Scan(
 			&detail.EmployeeID,
-			&detail.FullName,
+			&detail.FirstName,
+			&detail.LastName,
 			&nickName,
 			&detail.DepartmentName,
 			&detail.PositionName,

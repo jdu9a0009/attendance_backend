@@ -78,7 +78,7 @@ type GetDashboardlist struct {
 	DepartmentID   *int    `json:"department_id"`
 	DepartmentName *string `json:"department_name"` // Use sql.NullString
 	DisplayNumber  *int    `json:"display_number"`  // Use sql.NullInt32
-	FullName       *string `json:"full_name"`
+	LastName       *string `json:"last_name"`
 	NickName       string  `json:"nick_name"`
 	Status         *bool   `json:"status"`
 }
@@ -101,7 +101,8 @@ type CreateResponse struct {
 	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
 	Password     *string   `json:"-"   bun:"password"`
 	Role         string    `json:"role" bun:"role"`
-	FullName     *string   `json:"full_name"  bun:"full_name"`
+	FirstName    *string   `json:"first_name"  bun:"first_name"`
+	LastName     *string   `json:"last_name"  form:"last_name"`
 	NickName     string    `json:"nick_name" bun:"nick_name"`
 	DepartmentID *int      `json:"department_id" bun:"department_id"`
 	PositionID   *int      `json:"position_id" bun:"position_id"`
@@ -114,7 +115,8 @@ type UpdateResponse struct {
 	bun.BaseModel `bun:"table:users"`
 
 	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
-	FullName     *string   `json:"full_name"  bun:"full_name"`
+	FirstName    *string   `json:"first_name"  bun:"first_name"`
+	LastName     *string   `json:"last_name"  bun:"last_name"`
 	NickName     string    `json:"nick_name"  bun:"nick_name"`
 	DepartmentID *int      `json:"department_id" bun:"department_id"`
 	PositionID   *int      `json:"position_id" bun:"position_id"`
@@ -131,7 +133,8 @@ type IncompleteUser struct {
 type CreateRequest struct {
 	Password     *string `json:"password"   form:"password"`
 	Role         *string `json:"role" form:"role"`
-	FullName     *string `json:"full_name"  form:"full_name"`
+	FirstName    *string `json:"first_name"  form:"first_name"`
+	LastName     *string `json:"last_name"  form:"last_name"`
 	NickName     string  `json:"nick_name"  form:"nick_name"`
 	DepartmentID *int    `json:"department_id" form:"department_id"`
 	PositionID   *int    `json:"position_id" form:"position_id"`
@@ -151,7 +154,8 @@ type UpdateRequest struct {
 	EmployeeID   *string `json:"employee_id"   form:"employee_id"`
 	Password     string  `json:"password"   form:"password"`
 	Role         *string `json:"role"       form:"role"`
-	FullName     *string `json:"full_name"  form:"full_name"`
+	FirstName    *string `json:"first_name"  form:"first_name"`
+	LastName     *string `json:"last_name"  form:"last_name"`
 	NickName     string  `json:"nick_name"  form:"nick_name"`
 	DepartmentID *int    `json:"department_id" form:"department_id"`
 	PositionID   *int    `json:"position_id" form:"position_id"`

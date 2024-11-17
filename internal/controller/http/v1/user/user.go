@@ -233,7 +233,6 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-
 func (uc Controller) UpdateUserColumns(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
 

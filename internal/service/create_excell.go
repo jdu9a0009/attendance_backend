@@ -9,7 +9,8 @@ import (
 
 type Employee struct {
 	EmployeeID     string
-	FullName       string
+	FirstName      string
+	LastName       string
 	NickName       string
 	DepartmentName string
 	PositionName   string
@@ -28,7 +29,7 @@ func AddDataToExcel(employees []Employee, fileName string) error {
 		f.SetSheetName("Sheet1", sheet)
 
 		// Set headers in the first row
-		headers := []string{"Employee ID", "Full Name","Nick Name", "Department Name", "Position Name", "Phone Number", "Email"}
+		headers := []string{"Employee ID", "FirstName", "LastName", "NickName", "Department Name", "Position Name", "Phone Number", "Email"}
 		for i, header := range headers {
 			cell := fmt.Sprintf("%c1", 'A'+i)
 			f.SetCellValue(sheet, cell, header)
@@ -54,12 +55,13 @@ func AddDataToExcel(employees []Employee, fileName string) error {
 	// Populate rows with data starting from the next empty row
 	for _, entry := range employees {
 		f.SetCellValue(sheet, fmt.Sprintf("A%d", rowNum), entry.EmployeeID)
-		f.SetCellValue(sheet, fmt.Sprintf("B%d", rowNum), entry.FullName)
-		f.SetCellValue(sheet, fmt.Sprintf("C%d", rowNum), entry.NickName)
-		f.SetCellValue(sheet, fmt.Sprintf("D%d", rowNum), entry.DepartmentName)
-		f.SetCellValue(sheet, fmt.Sprintf("E%d", rowNum), entry.PositionName)
-		f.SetCellValue(sheet, fmt.Sprintf("F%d", rowNum), entry.Phone)
-		f.SetCellValue(sheet, fmt.Sprintf("G%d", rowNum), entry.Email)
+		f.SetCellValue(sheet, fmt.Sprintf("B%d", rowNum), entry.FirstName)
+		f.SetCellValue(sheet, fmt.Sprintf("C%d", rowNum), entry.LastName)
+		f.SetCellValue(sheet, fmt.Sprintf("D%d", rowNum), entry.NickName)
+		f.SetCellValue(sheet, fmt.Sprintf("E%d", rowNum), entry.DepartmentName)
+		f.SetCellValue(sheet, fmt.Sprintf("F%d", rowNum), entry.PositionName)
+		f.SetCellValue(sheet, fmt.Sprintf("G%d", rowNum), entry.Phone)
+		f.SetCellValue(sheet, fmt.Sprintf("H%d", rowNum), entry.Email)
 		rowNum++
 	}
 
