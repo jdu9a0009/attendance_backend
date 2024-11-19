@@ -77,7 +77,7 @@ type UserExcellData struct {
 	Email          string
 }
 
-func ExcelReader(filePath string, fields map[int]string) ([]UserExcellData, []int, error) {
+func ExcelReader(filePath string, rowLen int, fields map[int]string) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -101,27 +101,30 @@ func ExcelReader(filePath string, fields map[int]string) ([]UserExcellData, []in
 			continue
 		}
 
-		if len(row) < 10 { // Adjust the number based on expected columns
+		if len(row) < rowLen { // Check if the row has enough columns
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
 
 		var user UserExcellData
-		user.EmployeeID = row[0]
-		user.FirstName = row[1]
-		user.LastName = row[2]
-		user.NickName = row[3]
-		user.Role = row[4]
-		user.Password = row[5]
-		user.DepartmentName = row[6]
-		user.PositionName = row[7]
-		user.Phone = row[8]
-		user.Email = row[9]
+
+		// Only assign values if the column exists
+		if len(row) > 0 { user.EmployeeID = row[0] }
+		if len(row) > 1 { user.FirstName = row[1] }
+		if len(row) > 2 { user.LastName = row[2] }
+		if len(row) > 3 { user.NickName = row[3] }
+		if len(row) > 4 { user.Role = row[4] }
+		if len(row) > 5 { user.Password = row[5] }
+		if len(row) > 6 { user.DepartmentName = row[6] }
+		if len(row) > 7 { user.PositionName = row[7] }
+		if len(row) > 8 { user.Phone = row[8] }
+		if len(row) > 9 { user.Email = row[9] }
 
 		users = append(users, user)
 	}
 	return users, incompleteRows, nil
 }
+
 
 func EditExcell(departments, positions []string) (string, error) {
 	// Open the Excel file

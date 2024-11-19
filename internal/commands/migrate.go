@@ -35,7 +35,7 @@ var scheme = []Scheme{
             password text not null,
             role user_role,
             first_name text,
-			last__name text,
+			last_name text,
             created_at timestamp default now(),
             created_by int references users(id),
             updated_at timestamp,

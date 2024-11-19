@@ -401,7 +401,8 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		8: "Phone",
 		9: "Email",
 	}
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
+	rowLen:=9
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(),rowLen, fields)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
@@ -519,7 +520,8 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		5: "Phone",
 		6: "Email",
 	}
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
+	rowLen:=7
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen,fields)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
@@ -630,7 +632,8 @@ func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (
 		5: "Phone",
 		6: "Email",
 	}
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), fields)
+	rowLen:=7
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen,fields)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
