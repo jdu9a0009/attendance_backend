@@ -339,13 +339,17 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 		return CreateResponse{}, err
 	}
 	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
+
 		return r.resetLeaveTimeAndCreatePeriod(ctx, claims, existingAttendance, request.EmployeeID)
 	}
 
 	if existingAttendance.ComeTime != nil {
 		return CreateResponse{}, web.NewRequestError(errors.New("まず退勤してください"), http.StatusBadRequest)
 	}
-
+	err = r.fixIncompleteAttendance(ctx, request.EmployeeID, claims)
+	if err != nil {
+		return CreateResponse{}, err
+	}
 	return r.createNewAttendance(ctx, claims, request)
 }
 func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (CreateResponse, error) {
@@ -395,9 +399,54 @@ func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (C
 		response, err := r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
 		return response, "無事に帰宅", err
 	}
-
+	err = r.fixIncompleteAttendance(ctx, request.EmployeeID, claims)
+	if err != nil {
+		return CreateResponse{}, "", err
+	}
 	response, err := r.createNewAttendance(ctx, claims, request)
 	return response, "仕事へようこそ", err
+}
+func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *string, claims auth.Claims) error {
+	var workEndTime, lastWorkDay string
+	var attendanceID int
+
+	// Fetch company's default end time
+	query := `SELECT end_time FROM company_info ORDER BY created_at DESC LIMIT 1`
+	err := r.NewRaw(query).Scan(ctx, &workEndTime)
+	if err != nil {
+		return fmt.Errorf("failed to fetch company's default end time: %w", err)
+	}
+
+	// Fetch the most recent attendance record
+	query = `SELECT id, work_day 
+	         FROM attendance 
+	         WHERE employee_id = ?
+	         ORDER BY work_day DESC NULLS LAST, created_at DESC 
+	         LIMIT 1`
+	err = r.NewRaw(query, employeeID).Scan(ctx, &attendanceID, &lastWorkDay)
+	if err != nil {
+		// If no attendance record exists, skip fixing and return nil
+		if errors.Is(err, sql.ErrNoRows) {
+			fmt.Println("No incomplete attendance record found, skipping...")
+			return nil
+		}
+		return fmt.Errorf("failed to fetch attendance's id, workday: %w", err)
+	}
+
+	// Update the LeaveTime for the incomplete record
+	err = r.updateAttendanceLeaveTime(ctx, attendanceID, claims.UserId, workEndTime)
+	if err != nil {
+		return fmt.Errorf("failed to update LeaveTime: %w", err)
+	}
+
+	// Update the work period for the incomplete record
+	err = r.updateAttendancePeriod(ctx, attendanceID, lastWorkDay, workEndTime)
+	if err != nil {
+		return fmt.Errorf("failed to update work period: %w", err)
+	}
+
+	fmt.Println("Completed fixing incomplete attendance.")
+	return nil
 }
 
 func (r Repository) handleExistingAttendance(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
@@ -443,12 +492,15 @@ func (r Repository) getExistingAttendancePeriod(ctx context.Context, attendance_
 }
 func (r Repository) updateLeaveTime(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
 
-	err := r.updateAttendanceLeaveTime(ctx, existingAttendance.ID, claims.UserId)
+	currentTime := time.Now()
+	leaveTimeStr := currentTime.Format("15:04")
+	workDay := currentTime.Format("2006-01-02")
+	err := r.updateAttendanceLeaveTime(ctx, existingAttendance.ID, claims.UserId, leaveTimeStr)
 	if err != nil {
 		return CreateResponse{}, err
 	}
-
-	err = r.updateAttendancePeriod(ctx, existingAttendance.ID)
+	//change thsi place
+	err = r.updateAttendancePeriod(ctx, existingAttendance.ID, workDay, leaveTimeStr)
 	if err != nil {
 		return CreateResponse{}, err
 	}
@@ -457,8 +509,6 @@ func (r Repository) updateLeaveTime(ctx context.Context, claims auth.Claims, exi
 	if err != nil {
 		return CreateResponse{}, err
 	}
-	currentTime := time.Now()
-	workDay := currentTime.Format("2006-01-02")
 
 	ExistingAttendance, err := r.getExistingAttendance(ctx, employeeID)
 	if err != nil {
@@ -535,10 +585,9 @@ func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims,
 	return response, nil
 }
 
-// Helper functions for database operations
-func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userId int) error {
+func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userId int, leaveTimeStr string) error {
 	currentTime := time.Now()
-	leaveTimeStr := currentTime.Format("15:04")
+	fmt.Println("Updated attendance table")
 	_, err := r.NewUpdate().
 		Table("attendance").
 		Where("deleted_at IS NULL AND id = ?", id).
@@ -550,12 +599,13 @@ func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userI
 	return err
 }
 
-func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int) error {
+func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int, workDay string, leaveTimeStr string) error {
 	currentTime := time.Now()
-	leaveTimeStr := currentTime.Format("15:04")
+	fmt.Println("Updated attendance_period table")
+
 	_, err := r.NewUpdate().
 		Table("attendance_period").
-		Where(" leave_time is null and attendance_id = ? AND work_day = ?", attendanceID, currentTime.Format("2006-01-02")).
+		Where(" leave_time is null and attendance_id = ? AND work_day = ?", attendanceID, workDay).
 		Set("leave_time = ?", leaveTimeStr).
 		Set("updated_at = ?", currentTime).
 		Exec(ctx)
