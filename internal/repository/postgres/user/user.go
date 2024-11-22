@@ -357,8 +357,9 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	if err != nil {
 		return 0, nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
+	if err := r.ValidateStruct(&request); err != nil {
+		return 0, nil, err
+	}
 	departmentMap, err := r.LoadDepartmentMap(ctx)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading department map"), http.StatusInternalServerError)
@@ -369,10 +370,6 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
 	}
 
-	// Validate the ExcellRequest struct
-	if err := r.ValidateStruct(&request); err != nil {
-		return 0, nil, err
-	}
 	file, err := request.Excell.Open()
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
@@ -401,54 +398,29 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		8: "Phone",
 		9: "Email",
 	}
-	rowLen:=9
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(),rowLen, fields)
+	employeeID, _ := r.GenerateUniqueEmployeeID(ctx)
+
+	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap, employeeID)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
-	// Start a transaction
-	tx, err := r.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		} else {
-			_ = tx.Commit()
-		}
-	}()
-	employeeID, err := r.GenerateUniqueEmployeeID(ctx)
-
-	createdCount, rowNum := 0, 0
+	var users []CreateResponse
 	for _, data := range excelData {
-		departmentID, okDept := departmentMap[data.DepartmentName]
-		positionID, okPos := positionMap[data.PositionName]
-		if !okDept {
-			fmt.Printf("Missing Department: %s\n", data.DepartmentName)
-		}
-		if !okPos {
-			fmt.Printf("Missing Position: %s\n", data.PositionName)
-		}
-		if !okDept || !okPos {
-			incompleteRows = append(incompleteRows, rowNum+1)
-			continue
-		}
-
 		hash, err := bcrypt.GenerateFromPassword([]byte(data.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return 0, nil, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 		}
 		hashedPassword := string(hash)
+
 		user := CreateResponse{
-			EmployeeID:   employeeID,
+			EmployeeID:   &data.EmployeeID,
 			Password:     &hashedPassword,
 			Role:         data.Role,
 			FirstName:    &data.FirstName,
 			LastName:     &data.LastName,
 			NickName:     data.NickName,
-			DepartmentID: &departmentID,
-			PositionID:   &positionID,
+			DepartmentID: &data.DepartmentID,
+			PositionID:   &data.PositionID,
 			Phone:        &data.Phone,
 			Email:        &data.Email,
 			CreatedAt:    time.Now(),
@@ -459,22 +431,19 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 			return 0, nil, err
 		}
 
-		_, err = tx.NewInsert().Model(&user).Returning("id").Exec(ctx, &user.ID)
-		if err != nil {
-			fmt.Printf("Error inserting employee: %v, Error: %v\n", data.EmployeeID, err)
-			return 0, nil, web.NewRequestError(errors.Wrapf(err, "error inserting employee %s", data.EmployeeID), http.StatusBadRequest)
-		}
-
-		createdCount++
-		err = IncrementEmployeeID(employeeID)
-		if err != nil {
-			return 0, nil, web.NewRequestError(errors.Wrap(err, "incrementing employee ID"), http.StatusInternalServerError)
-		}
+		users = append(users, user)
 	}
 
+	// Execute the batch insert
+	_, err = r.NewInsert().Model(&users).Returning("id").Exec(ctx)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "batch inserting employees"), http.StatusBadRequest)
+	}
+
+	// Count the created users
+	createdCount := len(users)
 	return createdCount, incompleteRows, nil
 }
-
 func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -520,8 +489,8 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		5: "Phone",
 		6: "Email",
 	}
-	rowLen:=7
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen,fields)
+	rowLen := 7
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen, fields)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
@@ -632,8 +601,8 @@ func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (
 		5: "Phone",
 		6: "Email",
 	}
-	rowLen:=7
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen,fields)
+	rowLen := 7
+	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen, fields)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}

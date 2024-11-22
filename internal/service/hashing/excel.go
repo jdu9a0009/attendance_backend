@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/xuri/excelize/v2"
@@ -72,9 +73,90 @@ type UserExcellData struct {
 	Role           string
 	Password       string
 	DepartmentName string
+	DepartmentID   int
 	PositionName   string
+	PositionID     int
 	Phone          string
 	Email          string
+}
+
+func IncrementEmployeeID(employeeID *string) error {
+	if employeeID == nil {
+		return fmt.Errorf("employeeID is nil")
+	}
+
+	// Assuming your employeeID is like "DK0120"
+	prefix := (*employeeID)[:2]  // Get the prefix "DK"
+	numPart := (*employeeID)[2:] // Get the numeric part "0120"
+
+	// Convert the numeric part to an integer
+	num, err := strconv.Atoi(numPart)
+	if err != nil {
+		return fmt.Errorf("invalid employeeID format: %v", err)
+	}
+
+	// Increment the numeric part
+	num++
+
+	// Format back to "DK" + incremented number with zero padding
+	*employeeID = fmt.Sprintf("%s%04d", prefix, num) // Adjust padding if needed
+	return nil
+}
+func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeID *string) ([]UserExcellData, []int, error) {
+	sheetName := "Sheet1"
+	f, err := excelize.OpenFile(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var users []UserExcellData
+	var incompleteRows []int
+	for i, row := range rows {
+		if i == 0 {
+			// Skip the header row
+			continue
+		}
+
+		if len(row) < 10 { // Adjust the number based on expected columns
+			incompleteRows = append(incompleteRows, i)
+			continue
+		}
+		err = IncrementEmployeeID(employeeID)
+		if err != nil {
+			fmt.Println("error on creating employee_id")
+		}
+		departmentID, okDept := departmentMap[row[6]]
+		positionID, okPos := positionMap[row[7]]
+		if !okDept || !okPos {
+			incompleteRows = append(incompleteRows, i)
+			continue
+		}
+
+		users = append(users, UserExcellData{
+			EmployeeID:   *employeeID,
+			FirstName:    row[1],
+			LastName:     row[2],
+			NickName:     row[3],
+			Role:         row[4],
+			Password:     row[5],
+			DepartmentID: departmentID,
+			PositionID:   positionID,
+			Phone:        row[8],
+			Email:        row[9],
+		})
+	}
+
+	return users, incompleteRows, nil
 }
 
 func ExcelReader(filePath string, rowLen int, fields map[int]string) ([]UserExcellData, []int, error) {
@@ -109,22 +191,41 @@ func ExcelReader(filePath string, rowLen int, fields map[int]string) ([]UserExce
 		var user UserExcellData
 
 		// Only assign values if the column exists
-		if len(row) > 0 { user.EmployeeID = row[0] }
-		if len(row) > 1 { user.FirstName = row[1] }
-		if len(row) > 2 { user.LastName = row[2] }
-		if len(row) > 3 { user.NickName = row[3] }
-		if len(row) > 4 { user.Role = row[4] }
-		if len(row) > 5 { user.Password = row[5] }
-		if len(row) > 6 { user.DepartmentName = row[6] }
-		if len(row) > 7 { user.PositionName = row[7] }
-		if len(row) > 8 { user.Phone = row[8] }
-		if len(row) > 9 { user.Email = row[9] }
+		if len(row) > 0 {
+			user.EmployeeID = row[0]
+		}
+		if len(row) > 1 {
+			user.FirstName = row[1]
+		}
+		if len(row) > 2 {
+			user.LastName = row[2]
+		}
+		if len(row) > 3 {
+			user.NickName = row[3]
+		}
+		if len(row) > 4 {
+			user.Role = row[4]
+		}
+		if len(row) > 5 {
+			user.Password = row[5]
+		}
+		if len(row) > 6 {
+			user.DepartmentName = row[6]
+		}
+		if len(row) > 7 {
+			user.PositionName = row[7]
+		}
+		if len(row) > 8 {
+			user.Phone = row[8]
+		}
+		if len(row) > 9 {
+			user.Email = row[9]
+		}
 
 		users = append(users, user)
 	}
 	return users, incompleteRows, nil
 }
-
 
 func EditExcell(departments, positions []string) (string, error) {
 	// Open the Excel file
