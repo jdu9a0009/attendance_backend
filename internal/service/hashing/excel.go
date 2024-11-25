@@ -226,6 +226,45 @@ func ExcelReader(filePath string, rowLen int, fields map[int]string) ([]UserExce
 	}
 	return users, incompleteRows, nil
 }
+func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]string, []int, error) {
+	sheetName := "Sheet1"
+	f, err := excelize.OpenFile(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var employeeIDs []string
+	var incompleteRows []int
+	for i, row := range rows {
+		if i == 0 {
+			// Skip the header row
+			continue
+		}
+
+		if len(row) < rowLen { // Check if the row has enough columns
+			incompleteRows = append(incompleteRows, i)
+			continue
+		}
+
+		// Collect only EmployeeID (column 0 in your data)
+		if len(row) > 0 && row[0] != "" {
+			employeeIDs = append(employeeIDs, row[0])
+		} else {
+			incompleteRows = append(incompleteRows, i)
+		}
+	}
+	return employeeIDs, incompleteRows, nil
+}
+
 
 func EditExcell(departments, positions []string) (string, error) {
 	// Open the Excel file

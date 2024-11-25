@@ -592,6 +592,7 @@ func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
+
 	fields := map[int]string{
 		0: "EmployeeID",
 		1: "FirstName",
@@ -602,10 +603,16 @@ func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (
 		6: "Email",
 	}
 	rowLen := 7
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen, fields)
+
+	employeeIDs, incompleteRows, err := hashing.ExcelReaderByDelete(tempFile.Name(), rowLen, fields)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
+
+	if len(employeeIDs) == 0 {
+		return 0, nil, nil // No IDs to process
+	}
+
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -618,29 +625,26 @@ func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (
 			_ = tx.Commit()
 		}
 	}()
-	deletedCount := 0
-	rowNum := 0
-	for _, data := range excelData {
-		rowNum++
 
-		q := r.NewDelete().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
+	// Format employee IDs for SQL query
+	employeeIDList := "'" + strings.Join(employeeIDs, "', '") + "'"
 
-		// Execute the delete query
-		result, err := q.Exec(ctx)
-		if err != nil {
-			incompleteRows = append(incompleteRows, rowNum) // Add to incomplete rows if deletion fails
-			continue
-		}
+	// Construct and execute the update query
+	q := r.NewUpdate().Table("users").
+		Set("deleted_at = NOW()").
+		Where(fmt.Sprintf("deleted_at IS NULL AND employee_id IN (%s)", employeeIDList))
 
-		rowsAffected, err := result.RowsAffected()
-		if err != nil {
-			return 0, nil, web.NewRequestError(errors.Wrap(err, "getting affected rows after delete"), http.StatusInternalServerError)
-		}
-
-		deletedCount += int(rowsAffected)
+	result, err := q.Exec(ctx)
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "executing update query"), http.StatusInternalServerError)
 	}
 
-	return deletedCount, incompleteRows, nil
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "getting affected rows after update"), http.StatusInternalServerError)
+	}
+
+	return int(rowsAffected), incompleteRows, nil
 }
 
 func (r Repository) GenerateUniqueEmployeeID(ctx context.Context) (*string, error) {
@@ -1268,10 +1272,12 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 	for rows.Next() {
 		var detail service.Employee // Use the Employee type from the service package
 		var nickName sql.NullString
+		var firstName sql.NullString
+		var lastName sql.NullString
 		if err = rows.Scan(
 			&detail.EmployeeID,
-			&detail.FirstName,
-			&detail.LastName,
+			&firstName,
+			&lastName,
 			&nickName,
 			&detail.DepartmentName,
 			&detail.PositionName,
@@ -1283,6 +1289,16 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 			detail.NickName = nickName.String
 		} else {
 			detail.NickName = ""
+		}
+		if firstName.Valid {
+			detail.FirstName = firstName.String
+		} else {
+			detail.FirstName = ""
+		}
+		if lastName.Valid {
+			detail.LastName = lastName.String
+		} else {
+			detail.LastName = ""
 		}
 
 		list = append(list, detail)
