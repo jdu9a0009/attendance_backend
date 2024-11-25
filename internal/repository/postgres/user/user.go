@@ -1091,11 +1091,6 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 }
 
 func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]DepartmentResult, int, error) {
-	_, err := r.CheckClaims(ctx)
-	if err != nil {
-		return nil, 0, err
-	}
-
 	// Pagination queries
 	var limitQuery, offsetQuery string
 	if filter.Page != nil && filter.Limit != nil {

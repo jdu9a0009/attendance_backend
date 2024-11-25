@@ -2,10 +2,13 @@ package user
 
 import (
 	"attendance/backend/foundation/web"
+	"attendance/backend/internal/pkg/config"
 	"attendance/backend/internal/repository/postgres/user"
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +16,9 @@ import (
 	"strconv"
 
 	"github.com/Azure/go-autorest/autorest/date"
+	"github.com/gorilla/websocket"
+	"github.com/jackc/pgx/v4"
+	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 type Controller struct {
@@ -363,32 +369,113 @@ func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-func (uc Controller) GetDashboardList(c *web.Context) error {
-	var filter user.Filter
+// WebSocket upgrader
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow all origins
+		return true
+	},
+}
 
-	if limit, ok := c.GetQueryFunc(reflect.Int, "limit").(*int); ok {
-		filter.Limit = limit
-	}
-	if offset, ok := c.GetQueryFunc(reflect.Int, "offset").(*int); ok {
-		filter.Offset = offset
-	}
-	if page, ok := c.GetQueryFunc(reflect.Int, "page").(*int); ok {
-		filter.Page = page
-	}
+// Handle WebSocket connection for real-time updates
 
-	if err := c.ValidParam(); err != nil {
-		return c.RespondError(err)
-	}
-	list, count, err := uc.user.GetDashboardList(c.Ctx, filter)
+// Create a function to connect to the database using pgx
+func ConnectDB(ctx context.Context, dsn string) (*pgx.Conn, error) {
+	conn, err := pgx.Connect(ctx, dsn)
 	if err != nil {
-		return c.RespondError(err)
+		return nil, fmt.Errorf("unable to connect to database: %v", err)
+	}
+	return conn, nil
+}
+
+// Update your waitForNotification function
+func waitForNotification(conn *pgx.Conn) (string, error) {
+	// Wait for the next notification
+	notification, err := conn.WaitForNotification(context.Background())
+	if err != nil {
+		return "", err
 	}
 
-	return c.Respond(map[string]interface{}{
-		"data": map[string]interface{}{
-			"results": list,
-			"count":   count,
-		},
-		"status": true,
-	}, http.StatusOK)
+	// Return the payload of the notification
+	return notification.Payload, nil
+}
+
+// Update your WebSocket handler
+func (uc Controller) GetDashboardListWS(w http.ResponseWriter, r *http.Request) {
+	log.Println("Attempting to upgrade connection to WebSocket...")
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket Upgrade Error: %v", err)
+		http.Error(w, "Could not open WebSocket connection", http.StatusBadRequest)
+		return
+	}
+	defer conn.Close()
+	log.Println("WebSocket connection established")
+
+	ctx := r.Context()
+	yamlConfig, err := config.NewConfig()
+	if err != nil {
+		log.Printf("Error loading configuration: %v", err)
+		return
+	}
+
+	dsn := fmt.Sprintf("postgres://%v:%v@%v:%v/%v?sslmode=disable", yamlConfig.DBUsername, yamlConfig.DBPassword, yamlConfig.DBHost, yamlConfig.DBPort, yamlConfig.DBName)
+	dbConn, err := ConnectDB(ctx, dsn)
+	if err != nil {
+		log.Printf("Database connection error: %v", err)
+		conn.WriteJSON(map[string]interface{}{"error": "Failed to connect to the database"})
+		return
+	}
+	defer dbConn.Close(ctx)
+
+	// Start listening for changes on the 'attendance_changes' channel
+	_, err = dbConn.Exec(ctx, `LISTEN attendance_changes`)
+	if err != nil {
+		log.Printf("Failed to start listening for attendance changes: %v", err)
+		conn.WriteJSON(map[string]interface{}{"error": "Failed to listen for database changes"})
+		return
+	}
+
+	// Send initial data
+	filter := user.Filter{}
+	data, _, err := uc.user.GetDashboardList(ctx, filter)
+	if err != nil {
+		log.Printf("Error fetching initial dashboard data: %v", err)
+		conn.WriteJSON(map[string]interface{}{"error": "Failed to load dashboard data"})
+		return
+	}
+	log.Printf("Initial dashboard data: %v", data)
+	conn.WriteJSON(map[string]interface{}{"data": data})
+
+	// Listen for notifications in a loop
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("WebSocket connection closed")
+			return
+		default:
+			notification, err := waitForNotification(dbConn)
+			if err != nil {
+				log.Printf("Error waiting for notification: %v", err)
+				continue
+			}
+
+			log.Printf("Received notification: %s", notification)
+
+			// Fetch updated dashboard data only once per notification
+			updatedData, _, err := uc.user.GetDashboardList(ctx, filter)
+			if err != nil {
+				log.Printf("Error fetching updated dashboard data: %v", err)
+				continue
+			}
+
+			// Send updated data to WebSocket client
+			if err := conn.WriteJSON(map[string]interface{}{"data": updatedData}); err != nil {
+				log.Printf("WebSocket write error: %v", err)
+				return
+			}
+		}
+	}
 }

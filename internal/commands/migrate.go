@@ -200,6 +200,24 @@ var scheme = []Scheme{
         1
 );`,
 	},
+	{
+		Index:       13,
+		Description: "Creating Trigger and Function fo Websocket",
+		Query: `CREATE OR REPLACE FUNCTION notify_attendance_change()
+                   RETURNS TRIGGER AS $$
+                   BEGIN
+                     PERFORM pg_notify('attendance_changes', json_build_object(
+                             'operation', TG_OP,
+                             'data', row_to_json(NEW)
+                         )::text);
+                         RETURN NEW;
+                     END;
+                     $$ LANGUAGE plpgsql;
+
+                CREATE TRIGGER attendance_changes_trigger
+                AFTER INSERT OR UPDATE ON attendance_period
+                FOR EACH ROW EXECUTE FUNCTION notify_attendance_change();`,
+	},
 }
 
 // Migrate creates the scheme in the database.
