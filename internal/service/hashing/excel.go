@@ -102,7 +102,7 @@ func IncrementEmployeeID(employeeID *string) error {
 	*employeeID = fmt.Sprintf("%s%04d", prefix, num) // Adjust padding if needed
 	return nil
 }
-func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeID *string) ([]UserExcellData, []int, error) {
+func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeID *string) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -159,7 +159,7 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 	return users, incompleteRows, nil
 }
 
-func ExcelReader(filePath string, rowLen int, fields map[int]string) ([]UserExcellData, []int, error) {
+func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -183,49 +183,35 @@ func ExcelReader(filePath string, rowLen int, fields map[int]string) ([]UserExce
 			continue
 		}
 
-		if len(row) < rowLen { // Check if the row has enough columns
+		// Check if the row has fewer columns than required
+		if len(row) < 8 {
+			incompleteRows = append(incompleteRows, i)
+			continue
+		}
+		// Map department and position
+		departmentID, okDept := departmentMap[row[4]]
+		positionID, okPos := positionMap[row[5]]
+		if !okDept || !okPos {
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
 
-		var user UserExcellData
-
-		// Only assign values if the column exists
-		if len(row) > 0 {
-			user.EmployeeID = row[0]
-		}
-		if len(row) > 1 {
-			user.FirstName = row[1]
-		}
-		if len(row) > 2 {
-			user.LastName = row[2]
-		}
-		if len(row) > 3 {
-			user.NickName = row[3]
-		}
-		if len(row) > 4 {
-			user.Role = row[4]
-		}
-		if len(row) > 5 {
-			user.Password = row[5]
-		}
-		if len(row) > 6 {
-			user.DepartmentName = row[6]
-		}
-		if len(row) > 7 {
-			user.PositionName = row[7]
-		}
-		if len(row) > 8 {
-			user.Phone = row[8]
-		}
-		if len(row) > 9 {
-			user.Email = row[9]
-		}
-
-		users = append(users, user)
+		// Add user data to the users slice
+		users = append(users, UserExcellData{
+			EmployeeID:   row[0],
+			FirstName:    row[1],
+			LastName:     row[2],
+			NickName:     row[3],
+			DepartmentID: departmentID,
+			PositionID:   positionID,
+			Phone:        row[6],
+			Email:        row[7],
+		})
 	}
+	fmt.Println("data: ", users)
 	return users, incompleteRows, nil
 }
+
 func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]string, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
@@ -264,7 +250,6 @@ func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]
 	}
 	return employeeIDs, incompleteRows, nil
 }
-
 
 func EditExcell(departments, positions []string) (string, error) {
 	// Open the Excel file

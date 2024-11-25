@@ -187,7 +187,7 @@ func (uc Controller) ExportTemplate(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	os.Remove("template.xls")
+	// os.Remove("template.xls")
 	return nil
 }
 

@@ -400,7 +400,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	}
 	employeeID, _ := r.GenerateUniqueEmployeeID(ctx)
 
-	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap, employeeID)
+	excelData, incompleteRows, err := hashing.ExcelReaderByCreate(tempFile.Name(), fields, departmentMap, positionMap, employeeID)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
@@ -447,124 +447,118 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
-		return 0, nil, err
+	  return 0, nil, err
 	}
-
+  
 	departmentMap, err := r.LoadDepartmentMap(ctx)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading department map"), http.StatusInternalServerError)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "loading department map"), http.StatusInternalServerError)
 	}
 	positionMap, err := r.LoadPositionMap(ctx)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
 	}
-
+  
 	if err := r.ValidateStruct(request.Excell); err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
 	}
-
+  
 	file, err := request.Excell.Open()
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
 	}
 	defer file.Close()
-
+  
 	tempFile, err := ioutil.TempFile("", "excel-*.xlsx")
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "creating temporary file"), http.StatusInternalServerError)
 	}
 	defer tempFile.Close()
 	defer os.Remove(tempFile.Name())
-
+  
 	_, err = io.Copy(tempFile, file)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
 	fields := map[int]string{
-		0: "EmployeeID",
-		1: "FirstName",
-		2: "LastName",
-		3: "DepartmentName",
-		4: "PositionName",
-		5: "Phone",
-		6: "Email",
+	  0: "EmployeeID",
+	  1: "FirstName",
+	  2: "LastName",
+	  3: "DepartmentName",
+	  4: "PositionName",
+	  5: "Phone",
+	  6: "Email",
 	}
-	rowLen := 7
-	excelData, incompleteRows, err := hashing.ExcelReader(tempFile.Name(), rowLen, fields)
+	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
 	// Start a transaction
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
+	  return 0, nil, web.NewRequestError(errors.Wrap(err, "starting transaction"), http.StatusInternalServerError)
 	}
 	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		} else {
-			_ = tx.Commit()
-		}
+	  if err != nil {
+		_ = tx.Rollback()
+	  } else {
+		_ = tx.Commit()
+	  }
 	}()
 	createdCount := 0
-	rowNum := 0
 	for _, data := range excelData {
-		rowNum++
-
-		departmentID, okDept := departmentMap[data.DepartmentName]
-		positionID, okPos := positionMap[data.PositionName]
-
-		if !okDept || !okPos {
-			incompleteRows = append(incompleteRows, rowNum)
-			continue
-		}
-		user := UpdateResponse{
-			EmployeeID:   &data.EmployeeID,
-			FirstName:    &data.FirstName,
-			LastName:     &data.LastName,
-			DepartmentID: &departmentID,
-			PositionID:   &positionID,
-			Phone:        &data.Phone,
-			Email:        &data.Email,
-			UpdatedAt:    time.Now(),
-			UpdatedBy:    claims.UserId,
-		}
-
-		if err := r.ValidateStruct(&user); err != nil {
-			return 0, nil, err
-		}
-
-		q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
-
-		if user.FirstName != nil {
-			q.Set("first_name=?", data.FirstName)
-		}
-		if user.LastName != nil {
-			q.Set("last_name=?", data.LastName)
-		}
-		q.Set("department_id=?", departmentID)
-		q.Set("position_id=?", positionID)
-		if user.Phone != nil {
-			q.Set("phone=?", data.Phone)
-		}
-		if user.Email != nil {
-			q.Set("email=?", data.Email)
-		}
-		q.Set("updated_at=?", time.Now())
-		q.Set("updated_by=?", claims.UserId)
-
-		// Execute the update query
-		_, err = q.Exec(ctx)
-		if err != nil {
-			return 0, nil, web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
-		}
-
-		createdCount++
+  
+	  user := UpdateResponse{
+		EmployeeID:   &data.EmployeeID,
+		FirstName:    &data.FirstName,
+		LastName:     &data.LastName,
+		DepartmentID: &data.DepartmentID,
+		PositionID:   &data.PositionID,
+		Phone:        &data.Phone,
+		Email:        &data.Email,
+		UpdatedAt:    time.Now(),
+		UpdatedBy:    claims.UserId,
+	  }
+  
+	  if err := r.ValidateStruct(&user); err != nil {
+		return 0, nil, err
+	  }
+  
+	  q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND employee_id = ?", data.EmployeeID)
+  
+	  if user.FirstName != nil {
+		q.Set("first_name=?", data.FirstName)
+	  }
+	  if user.LastName != nil {
+		q.Set("last_name=?", data.LastName)
+	  }
+	  if user.DepartmentID != nil {
+		q.Set("department_id=?", data.DepartmentID)
+	  }
+	  if user.PositionID != nil {
+		q.Set("position_id=?", data.PositionID)
+	  }
+	  if user.Phone != nil {
+		q.Set("phone=?", data.Phone)
+	  }
+	  if user.Email != nil {
+		q.Set("email=?", data.Email)
+	  }
+	  q.Set("updated_at=?", time.Now())
+	  q.Set("updated_by=?", claims.UserId)
+  
+	  // Execute the update query
+	  _, err = q.Exec(ctx)
+	  if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
+	  }
+  
+	  createdCount++
 	}
-
+  
 	return createdCount, incompleteRows, nil
-}
-
+  }
+  
 func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	_, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
