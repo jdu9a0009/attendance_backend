@@ -18,6 +18,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/gorilla/websocket"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
@@ -379,15 +380,14 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// Handle WebSocket connection for real-time updates
+var dbPool *pgxpool.Pool
 
-// Create a function to connect to the database using pgx
-func ConnectDB(ctx context.Context, dsn string) (*pgx.Conn, error) {
-	conn, err := pgx.Connect(ctx, dsn)
+func ConnectDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.Connect(ctx, dsn)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to database: %v", err)
+		return nil, err
 	}
-	return conn, nil
+	return pool, nil
 }
 
 // Update your waitForNotification function
@@ -402,7 +402,6 @@ func waitForNotification(conn *pgx.Conn) (string, error) {
 	return notification.Payload, nil
 }
 
-// Update your WebSocket handler
 func (uc Controller) GetDashboardListWS(w http.ResponseWriter, r *http.Request) {
 	log.Println("Attempting to upgrade connection to WebSocket...")
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -421,14 +420,24 @@ func (uc Controller) GetDashboardListWS(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	dsn := fmt.Sprintf("postgres://%v:%v@%v:%v/%v?sslmode=disable", yamlConfig.DBUsername, yamlConfig.DBPassword, yamlConfig.DBHost, yamlConfig.DBPort, yamlConfig.DBName)
-	dbConn, err := ConnectDB(ctx, dsn)
+	if dbPool == nil {
+		dsn := fmt.Sprintf("postgres://%v:%v@%v:%v/%v?sslmode=disable", yamlConfig.DBUsername, yamlConfig.DBPassword, yamlConfig.DBHost, yamlConfig.DBPort, yamlConfig.DBName)
+		dbPool, err = ConnectDB(ctx, dsn)
+		if err != nil {
+			log.Printf("Database connection error: %v", err)
+			conn.WriteJSON(map[string]interface{}{"error": "Failed to connect to the database"})
+			return
+		}
+	}
+
+	// Use a connection from the pool
+	dbConn, err := dbPool.Acquire(ctx)
 	if err != nil {
-		log.Printf("Database connection error: %v", err)
-		conn.WriteJSON(map[string]interface{}{"error": "Failed to connect to the database"})
+		log.Printf("Failed to acquire database connection: %v", err)
+		conn.WriteJSON(map[string]interface{}{"error": "Failed to acquire database connection"})
 		return
 	}
-	defer dbConn.Close(ctx)
+	defer dbConn.Release()
 
 	// Start listening for changes on the 'attendance_changes' channel
 	_, err = dbConn.Exec(ctx, `LISTEN attendance_changes`)
@@ -456,7 +465,7 @@ func (uc Controller) GetDashboardListWS(w http.ResponseWriter, r *http.Request) 
 			log.Println("WebSocket connection closed")
 			return
 		default:
-			notification, err := waitForNotification(dbConn)
+			notification, err := waitForNotification(dbConn.Conn())
 			if err != nil {
 				log.Printf("Error waiting for notification: %v", err)
 				continue

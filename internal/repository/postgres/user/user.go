@@ -438,7 +438,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		users = append(users, user)
 	}
 
-	const batchSize = 20
+	const batchSize = 100
 
 	var insertedCount int
 	for i := 0; i < len(users); i += batchSize {
@@ -520,6 +520,9 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 			_ = tx.Commit()
 		}
 	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute) // Adjust as needed
+	defer cancel()
+
 	createdCount := 0
 	for _, data := range excelData {
 
@@ -562,7 +565,6 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		q.Set("updated_at=?", time.Now())
 		q.Set("updated_by=?", claims.UserId)
 
-		
 		// Execute the update query
 		_, err = q.Exec(ctx)
 		if err != nil {
