@@ -17,7 +17,6 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/gorilla/websocket"
-	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
@@ -390,18 +389,25 @@ func ConnectDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Update your waitForNotification function
-func waitForNotification(conn *pgx.Conn) (string, error) {
-	// Wait for the next notification
-	notification, err := conn.WaitForNotification(context.Background())
+func waitForNotification(ctx context.Context, conn *pgxpool.Conn, channel string) (string, error) {
+	_, err := conn.Exec(ctx, fmt.Sprintf(`LISTEN %s`, channel))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to listen on channel %s: %v", channel, err)
 	}
 
-	// Return the payload of the notification
-	return notification.Payload, nil
+	for {
+		select {
+		case <-ctx.Done():
+			return "", context.Canceled
+		default:
+			notification, err := conn.Conn().WaitForNotification(ctx)
+			if err != nil {
+				return "", err
+			}
+			return notification.Payload, nil
+		}
+	}
 }
-
 func (uc Controller) GetDashboardListWS(w http.ResponseWriter, r *http.Request) {
 	log.Println("Attempting to upgrade connection to WebSocket...")
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -413,7 +419,9 @@ func (uc Controller) GetDashboardListWS(w http.ResponseWriter, r *http.Request) 
 	defer conn.Close()
 	log.Println("WebSocket connection established")
 
-	ctx := r.Context()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	yamlConfig, err := config.NewConfig()
 	if err != nil {
 		log.Printf("Error loading configuration: %v", err)
@@ -465,7 +473,7 @@ func (uc Controller) GetDashboardListWS(w http.ResponseWriter, r *http.Request) 
 			log.Println("WebSocket connection closed")
 			return
 		default:
-			notification, err := waitForNotification(dbConn.Conn())
+			notification, err := waitForNotification(ctx, dbConn, "attendance_changes")
 			if err != nil {
 				log.Printf("Error waiting for notification: %v", err)
 				continue
