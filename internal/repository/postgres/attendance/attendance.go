@@ -77,7 +77,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		limitQuery = fmt.Sprintf("LIMIT %d", *filter.Limit)
 	}
 
-	groupByQuery := `GROUP BY u.employee_id, u.first_name,u.last_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time`
+	groupByQuery := `GROUP BY u.employee_id, u.first_name,u.last_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.forget_leave,a.come_time, a.leave_time`
 	orderQuery := "ORDER BY u.employee_id DESC" // Order by user's name or any other field
 
 	if filter.Offset != nil {
@@ -95,6 +95,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
     p.name AS position_name,
     a.work_day,
     a.status,
+	a.forget_leave,
     TO_CHAR(a.come_time, 'HH24:MI') AS come_time,
     TO_CHAR(a.leave_time, 'HH24:MI') AS leave_time,
     COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
@@ -123,6 +124,7 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 		var detail GetListResponse
 		var totalMinutes int
 		var status sql.NullBool
+		var forgetLeave sql.NullBool
 		err = rows.Scan(
 			&detail.EmployeeID,
 			&detail.Fullname,
@@ -132,6 +134,7 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 			&detail.Position,
 			&detail.WorkDay,
 			&status,
+			&forgetLeave,
 			&detail.ComeTime,
 			&detail.LeaveTime,
 			&totalMinutes,
@@ -144,9 +147,13 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 		if status.Valid {
 			statusValue = status.Bool
 		}
+		var forgetLeaveValue bool = false
+		if forgetLeave.Valid {
+			forgetLeaveValue = status.Bool
+		}
 
-		// Assign the address of statusValue to detail.Status
 		detail.Status = &statusValue
+		detail.ForgetLeave = &forgetLeaveValue
 
 		hours := totalMinutes / 60
 		minutes := totalMinutes % 60
@@ -198,6 +205,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 			p.name,
 			a.work_day,
 			a.status,
+			a.forget_leave,
 			TO_CHAR(a.come_time, 'HH24:MI'),
 			TO_CHAR(a.leave_time, 'HH24:MI'),
 			COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
@@ -224,6 +232,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		&detail.Position,
 		&detail.WorkDay,
 		&detail.Status,
+		&detail.ForgetLeave,
 		&detail.ComeTime,
 		&detail.LeaveTime,
 		&totalMinutes,
@@ -434,9 +443,9 @@ func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *str
 	}
 
 	// Update the LeaveTime for the incomplete record
-	err = r.updateAttendanceLeaveTime(ctx, attendanceID, claims.UserId, workEndTime)
+	err = r.updateAttendanceLeaveTimeForgetLeave(ctx, attendanceID, claims.UserId, workEndTime)
 	if err != nil {
-		return fmt.Errorf("failed to update LeaveTime: %w", err)
+		return fmt.Errorf("failed to update LeaveTime and Forget Leave Status: %w", err)
 	}
 
 	// Update the work period for the incomplete record
@@ -444,8 +453,6 @@ func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *str
 	if err != nil {
 		return fmt.Errorf("failed to update work period: %w", err)
 	}
-
-	fmt.Println("Completed fixing incomplete attendance.")
 	return nil
 }
 
@@ -587,12 +594,24 @@ func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims,
 
 func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userId int, leaveTimeStr string) error {
 	currentTime := time.Now()
-	fmt.Println("Updated attendance table")
 	_, err := r.NewUpdate().
 		Table("attendance").
 		Where("deleted_at IS NULL AND id = ?", id).
 		Set("leave_time = ?", leaveTimeStr).
 		Set("status = ?", false).
+		Set("updated_at = ?", currentTime).
+		Set("updated_by = ?", userId).
+		Exec(ctx)
+	return err
+}
+func (r Repository) updateAttendanceLeaveTimeForgetLeave(ctx context.Context, id int, userId int, leaveTimeStr string) error {
+	currentTime := time.Now()
+	_, err := r.NewUpdate().
+		Table("attendance").
+		Where("deleted_at IS NULL AND id = ?", id).
+		Set("leave_time = ?", leaveTimeStr).
+		Set("status = ?", false).
+		Set("forget_leave = ?", true).
 		Set("updated_at = ?", currentTime).
 		Set("updated_by = ?", userId).
 		Exec(ctx)

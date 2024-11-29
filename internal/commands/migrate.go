@@ -127,6 +127,7 @@ var scheme = []Scheme{
             work_day DATE NOT NULL,
             leave_time TIME,
             status BOOLEAN DEFAULT true,
+		    forget_leave BOOLEAN DEFAULT false,
             created_at TIMESTAMP DEFAULT NOW(),
             created_by INT REFERENCES users(id),
             updated_at TIMESTAMP,

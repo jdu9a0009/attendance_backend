@@ -27,6 +27,7 @@ type GetListResponse struct {
 	EmployeeID   *string `json:"employee_id"`
 	Fullname     *string `json:"full_name"`
 	Status       *bool   `json:"status"`
+	ForgetLeave  *bool   `json:"forget_leave"`
 	WorkDay      *string `json:"work_day"`
 	ComeTime     *string `json:"come_time,omitempty"`
 	LeaveTime    *string `json:"leave_time,omitempty"`
@@ -42,6 +43,7 @@ type GetDetailByIdResponse struct {
 	EmployeeID   *string `json:"employee_id"`
 	Fullname     *string `json:"full_name"`
 	Status       *bool   `json:"status"`
+	ForgetLeave  *bool   `json:"forget_leave"`
 	WorkDay      *string `json:"work_day"`
 	ComeTime     *string `json:"come_time,omitempty"`
 	LeaveTime    *string `json:"leave_time,omitempty"`
@@ -121,11 +123,11 @@ type UpdateRequest struct {
 	LeaveTime string `json:"leave_time" form:"leave_time"`
 }
 type GetStatisticResponse struct {
-	TotalEmployee   *int `json:"total_employee" bun:"total_employee"`
-	OnTime          *int `json:"ontime" bun:"ontime"`
-	Absent          *int `json:"absent" bun:"absent"`
-	LateArrival     *int `json:"late_arrival" bun:"late_arrivale"`
-	
+	TotalEmployee *int `json:"total_employee" bun:"total_employee"`
+	OnTime        *int `json:"ontime" bun:"ontime"`
+	Absent        *int `json:"absent" bun:"absent"`
+	LateArrival   *int `json:"late_arrival" bun:"late_arrivale"`
+
 	EarlyDepartures *int `json:"early_departures" bun:"early_departures"`
 	EarlyCome       *int `json:"early_come" bun:"early_come"`
 	OverTime        *int `json:"over_time" bun:"over_time"`
