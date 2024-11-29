@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/xuri/excelize/v2"
@@ -80,29 +79,7 @@ type UserExcellData struct {
 	Email          string
 }
 
-func IncrementEmployeeID(employeeID *string) error {
-	if employeeID == nil {
-		return fmt.Errorf("employeeID is nil")
-	}
-
-	// Assuming your employeeID is like "DK0120"
-	prefix := (*employeeID)[:2]  // Get the prefix "DK"
-	numPart := (*employeeID)[2:] // Get the numeric part "0120"
-
-	// Convert the numeric part to an integer
-	num, err := strconv.Atoi(numPart)
-	if err != nil {
-		return fmt.Errorf("invalid employeeID format: %v", err)
-	}
-
-	// Increment the numeric part
-	num++
-
-	// Format back to "DK" + incremented number with zero padding
-	*employeeID = fmt.Sprintf("%s%04d", prefix, num) // Adjust padding if needed
-	return nil
-}
-func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeID *string) ([]UserExcellData, []int, error) {
+func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -131,7 +108,6 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
-		err = IncrementEmployeeID(employeeID)
 		if err != nil {
 			fmt.Println("error on creating employee_id")
 		}
@@ -143,7 +119,7 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 		}
 
 		users = append(users, UserExcellData{
-			EmployeeID:   *employeeID,
+			EmployeeID:   row[0],
 			FirstName:    row[1],
 			LastName:     row[2],
 			NickName:     row[3],
@@ -208,7 +184,6 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 			Email:        row[7],
 		})
 	}
-	fmt.Println("data: ", users)
 	return users, incompleteRows, nil
 }
 

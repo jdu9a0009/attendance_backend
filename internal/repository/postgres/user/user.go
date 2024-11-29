@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 
 	"github.com/jung-kurt/gofpdf/v2"
 
@@ -275,7 +274,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
-	if err := r.ValidateStruct(&request, "Password", "Role", "FirstName,LastName"); err != nil {
+	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "Role", "FirstName,LastName"); err != nil {
 		return CreateResponse{}, err
 	}
 	var deptExists bool
@@ -301,17 +300,11 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
 	}
 
-	// Generate unique EmployeeID
-	employeeID, err := r.GenerateUniqueEmployeeID(ctx)
-	if err != nil {
-		return CreateResponse{}, err
-	}
-
 	response.Role = role
 	response.FirstName = request.FirstName
 	response.LastName = request.LastName
 	response.NickName = request.NickName
-	response.EmployeeID = employeeID
+	response.EmployeeID = request.EmployeeID
 	response.DepartmentID = request.DepartmentID
 	response.Password = &hashedPassword
 	response.PositionID = request.PositionID
@@ -328,28 +321,6 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	response.Password = nil
 
 	return response, nil
-}
-func IncrementEmployeeID(employeeID *string) error {
-	if employeeID == nil {
-		return fmt.Errorf("employeeID is nil")
-	}
-
-	// Assuming your employeeID is like "DK0120"
-	prefix := (*employeeID)[:2]  // Get the prefix "DK"
-	numPart := (*employeeID)[2:] // Get the numeric part "0120"
-
-	// Convert the numeric part to an integer
-	num, err := strconv.Atoi(numPart)
-	if err != nil {
-		return fmt.Errorf("invalid employeeID format: %v", err)
-	}
-
-	// Increment the numeric part
-	num++
-
-	// Format back to "DK" + incremented number with zero padding
-	*employeeID = fmt.Sprintf("%s%04d", prefix, num) // Adjust padding if needed
-	return nil
 }
 
 func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
@@ -388,6 +359,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "copying excel file"), http.StatusInternalServerError)
 	}
 	fields := map[int]string{
+		0: "EmployeeID",
 		1: "FirstName",
 		2: "LastName",
 		3: "NickName",
@@ -398,13 +370,10 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		8: "Phone",
 		9: "Email",
 	}
-	employeeID, _ := r.GenerateUniqueEmployeeID(ctx)
-
-	excelData, incompleteRows, err := hashing.ExcelReaderByCreate(tempFile.Name(), fields, departmentMap, positionMap, employeeID)
+	excelData, incompleteRows, err := hashing.ExcelReaderByCreate(tempFile.Name(), fields, departmentMap, positionMap)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute) // Adjust as needed
 	defer cancel()
 
@@ -525,7 +494,6 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 
 	createdCount := 0
 	for _, data := range excelData {
-
 		user := UpdateResponse{
 			EmployeeID:   &data.EmployeeID,
 			FirstName:    &data.FirstName,
@@ -658,32 +626,6 @@ func (r Repository) DeleteByExcell(ctx context.Context, request ExcellRequest) (
 
 	return int(rowsAffected), incompleteRows, nil
 }
-
-func (r Repository) GenerateUniqueEmployeeID(ctx context.Context) (*string, error) {
-	var highestID string
-
-	// Using a raw SQL query to fetch the highest existing employee ID
-	query := `SELECT employee_id FROM users  where role='EMPLOYEE'  ORDER BY employee_id DESC LIMIT 1`
-	err := r.NewRaw(query).Scan(ctx, &highestID)
-	fmt.Println("Err:", err)
-	var newID string
-	if highestID == "" {
-		// If there are no existing IDs, start with the first one
-		newID = "DK0001"
-	} else {
-		// Increment the highest ID
-		numberPart := highestID[2:] // Get the numeric part
-		number, err := strconv.Atoi(numberPart)
-		if err != nil {
-			return nil, errors.New("invalid highest employee ID format")
-		}
-		number++ // Increment the number
-		newID = fmt.Sprintf("DK%04d", number)
-	}
-	fmt.Println("Newid: ", newID)
-	return &newID, nil
-}
-
 func GenerateQRCode(employeeID string, filename string) error {
 	// Generate the QR code
 	qrCode, err := qrcode.New(employeeID, qrcode.Medium)

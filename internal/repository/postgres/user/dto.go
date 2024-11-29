@@ -131,6 +131,7 @@ type IncompleteUser struct {
 }
 
 type CreateRequest struct {
+	EmployeeID   *string `json:"employee_id"   form:"employee_id"`
 	Password     *string `json:"password"   form:"password"`
 	Role         *string `json:"role" form:"role"`
 	FirstName    *string `json:"first_name"  form:"first_name"`
