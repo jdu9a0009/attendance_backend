@@ -299,7 +299,6 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	if (role != "EMPLOYEE") && (role != "ADMIN") {
 		return CreateResponse{}, web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
 	}
-
 	response.Role = role
 	response.FirstName = request.FirstName
 	response.LastName = request.LastName
