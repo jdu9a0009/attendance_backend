@@ -8,6 +8,7 @@ import (
 	"attendance/backend/internal/repository/postgres/companyInfo"
 	"attendance/backend/internal/repository/postgres/department"
 	"attendance/backend/internal/repository/postgres/position"
+	"log"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -113,7 +114,12 @@ func (r Router) Init() error {
 	r.Get("/api/v1/user/statistics", userController.GetStatistics, middleware.Authenticate(r.auth))
 	r.Get("/api/v1/user/monthly", userController.GetMonthlyStatistics, middleware.Authenticate(r.auth))
 	r.Get("/api/v1/user/dashboard", userController.GetEmployeeDashboard, middleware.Authenticate(r.auth))
-	r.Get("/api/v1/user/dashboardlist", userController.GetDashboardList, middleware.Authenticate(r.auth))
+	r.GET("/api/v1/user/dashboardlist", func(c *gin.Context) {
+		w := c.Writer
+		r := c.Request
+		log.Println("WebSocket route hit")
+		userController.GetDashboardListSSE(w, r)
+	})
 
 	// #department
 	r.Get("/api/v1/department/list", departmentController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleDashboard))

@@ -2,10 +2,14 @@ package user
 
 import (
 	"attendance/backend/foundation/web"
+	"attendance/backend/internal/pkg/config"
 	"attendance/backend/internal/repository/postgres/user"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,6 +17,7 @@ import (
 	"strconv"
 
 	"github.com/Azure/go-autorest/autorest/date"
+	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
@@ -364,32 +369,128 @@ func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 	}, http.StatusOK)
 }
 
-func (uc Controller) GetDashboardList(c *web.Context) error {
-	var filter user.Filter
+var dbPool *pgxpool.Pool
 
-	if limit, ok := c.GetQueryFunc(reflect.Int, "limit").(*int); ok {
-		filter.Limit = limit
-	}
-	if offset, ok := c.GetQueryFunc(reflect.Int, "offset").(*int); ok {
-		filter.Offset = offset
-	}
-	if page, ok := c.GetQueryFunc(reflect.Int, "page").(*int); ok {
-		filter.Page = page
-	}
-
-	if err := c.ValidParam(); err != nil {
-		return c.RespondError(err)
-	}
-	list, count, err := uc.user.GetDashboardList(c.Ctx, filter)
+func ConnectDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.Connect(ctx, dsn)
 	if err != nil {
-		return c.RespondError(err)
+		return nil, err
+	}
+	return pool, nil
+}
+
+// GetDashboardListSSE streams data to the client via Server-Sent Events (SSE)
+func (uc Controller) GetDashboardListSSE(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
 	}
 
-	return c.Respond(map[string]interface{}{
-		"data": map[string]interface{}{
-			"results": list,
-			"count":   count,
-		},
-		"status": true,
-	}, http.StatusOK)
+	ctx := r.Context()
+
+	// Initialize database pool if not already done
+	if dbPool == nil {
+		yamlConfig, err := config.NewConfig()
+		if err != nil {
+			log.Printf("Error loading configuration: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		dsn := fmt.Sprintf("postgres://%v:%v@%v:%v/%v?sslmode=disable",
+			yamlConfig.DBUsername, yamlConfig.DBPassword, yamlConfig.DBHost, yamlConfig.DBPort, yamlConfig.DBName)
+		dbPool, err = ConnectDB(ctx, dsn)
+		if err != nil {
+			log.Printf("Database connection error: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	dbConn, err := dbPool.Acquire(ctx)
+	if err != nil {
+		log.Printf("Failed to acquire database connection: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer dbConn.Release()
+
+	// Start listening for database notifications
+	_, err = dbConn.Exec(ctx, "LISTEN attendance_changes")
+	if err != nil {
+		log.Printf("Failed to set up LISTEN: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Send initial data to the client
+	go func() {
+		var filter user.Filter
+		// You can extract filters from the request query if needed
+
+		list, count, err := uc.user.GetDashboardList(ctx, filter)
+		if err != nil {
+			log.Printf("Error fetching dashboard list: %v", err)
+			return
+		}
+
+		data := map[string]interface{}{
+			"data": map[string]interface{}{
+				"results": list,
+				"count":   count,
+			},
+			"status": true,
+		}
+		jsonData, _ := json.Marshal(data)
+
+		// Send the data
+		fmt.Fprintf(w, "data: %s\n\n", jsonData)
+		flusher.Flush()
+	}()
+
+	// Wait for database notifications and send updates
+	for {
+		notification, err := dbConn.Conn().WaitForNotification(ctx)
+		if err != nil {
+			if ctx.Err() != nil { // Handle client disconnect
+				log.Println("Client disconnected.")
+				break
+			}
+			log.Printf("Error waiting for notification: %v", err)
+			break
+		}
+
+		if notification.Channel == "attendance_changes" {
+			log.Println("Attendance changed notification received.")
+
+			var filter user.Filter
+			// Add your filter setup here if needed
+
+			list, count, err := uc.user.GetDashboardList(ctx, filter)
+			if err != nil {
+				log.Printf("Error fetching updated dashboard list: %v", err)
+				continue
+			}
+
+			data := map[string]interface{}{
+				"data": map[string]interface{}{
+					"results": list,
+					"count":   count,
+				},
+				"status": true,
+			}
+			jsonData, _ := json.Marshal(data)
+
+			// Send the updated data
+			fmt.Fprintf(w, "data: %s\n\n", jsonData)
+			flusher.Flush()
+		}
+	}
+
+	log.Println("SSE connection closed.")
 }
