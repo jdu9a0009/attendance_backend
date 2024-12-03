@@ -147,11 +147,12 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 		if status.Valid {
 			statusValue = status.Bool
 		}
+		
 		var forgetLeaveValue bool = false
 		if forgetLeave.Valid {
-			forgetLeaveValue = status.Bool
+			forgetLeaveValue = forgetLeave.Bool 
 		}
-
+		
 		detail.Status = &statusValue
 		detail.ForgetLeave = &forgetLeaveValue
 
@@ -418,6 +419,7 @@ func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (C
 func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *string, claims auth.Claims) error {
 	var workEndTime, lastWorkDay string
 	var attendanceID int
+	workDay := time.Now().Format("2006-01-02")
 
 	// Fetch company's default end time
 	query := `SELECT end_time FROM company_info ORDER BY created_at DESC LIMIT 1`
@@ -429,10 +431,10 @@ func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *str
 	// Fetch the most recent attendance record
 	query = `SELECT id, work_day 
 	         FROM attendance 
-	         WHERE employee_id = ?
+	         WHERE employee_id = ? and work_day < ?
 	         ORDER BY work_day DESC NULLS LAST, created_at DESC 
 	         LIMIT 1`
-	err = r.NewRaw(query, employeeID).Scan(ctx, &attendanceID, &lastWorkDay)
+	err = r.NewRaw(query, employeeID, workDay).Scan(ctx, &attendanceID, &lastWorkDay)
 	if err != nil {
 		// If no attendance record exists, skip fixing and return nil
 		if errors.Is(err, sql.ErrNoRows) {
