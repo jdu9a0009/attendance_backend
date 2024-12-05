@@ -28,6 +28,7 @@ type GetListResponse struct {
 	Fullname     *string `json:"full_name"`
 	Status       *bool   `json:"status"`
 	ForgetLeave  *bool   `json:"forget_leave"`
+	NickName     string  `json:"nick_name"`
 	WorkDay      *string `json:"work_day"`
 	ComeTime     *string `json:"come_time,omitempty"`
 	LeaveTime    *string `json:"leave_time,omitempty"`

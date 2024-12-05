@@ -77,7 +77,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		limitQuery = fmt.Sprintf("LIMIT %d", *filter.Limit)
 	}
 
-	groupByQuery := `GROUP BY u.employee_id, u.first_name,u.last_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.forget_leave,a.come_time, a.leave_time`
+	groupByQuery := `GROUP BY u.employee_id, u.first_name,u.last_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.forget_leave,u.nick_name,a.come_time, a.leave_time`
 	orderQuery := "ORDER BY u.employee_id DESC" // Order by user's name or any other field
 
 	if filter.Offset != nil {
@@ -93,6 +93,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
     d.name AS department_name,
     u.position_id,
     p.name AS position_name,
+	u.nick_name,
     a.work_day,
     a.status,
 	a.forget_leave,
@@ -124,6 +125,7 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 		var detail GetListResponse
 		var totalMinutes int
 		var status sql.NullBool
+		var NickName sql.NullString
 		var forgetLeave sql.NullBool
 		err = rows.Scan(
 			&detail.EmployeeID,
@@ -132,6 +134,7 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 			&detail.Department,
 			&detail.PositionID,
 			&detail.Position,
+			&NickName,
 			&detail.WorkDay,
 			&status,
 			&forgetLeave,
@@ -147,14 +150,19 @@ LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 		if status.Valid {
 			statusValue = status.Bool
 		}
-		
+		var nicknameValue string = ""
+		if NickName.Valid {
+			nicknameValue = NickName.String
+		}
+
 		var forgetLeaveValue bool = false
 		if forgetLeave.Valid {
-			forgetLeaveValue = forgetLeave.Bool 
+			forgetLeaveValue = forgetLeave.Bool
 		}
-		
+
 		detail.Status = &statusValue
 		detail.ForgetLeave = &forgetLeaveValue
+		detail.NickName = nicknameValue
 
 		hours := totalMinutes / 60
 		minutes := totalMinutes % 60
