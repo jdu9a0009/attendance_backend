@@ -81,7 +81,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	orderQuery := "ORDER BY u.employee_id DESC" // Order by user's name or any other field
 
 	if filter.Offset != nil {
-		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset)
+		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset) 
 	}
 	// today := time.Now().Format("2006-01-02")
 
