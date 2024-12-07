@@ -1,6 +1,7 @@
 package user
 
 import (
+	"attendance/backend/internal/repository/postgres/companyInfo"
 	"attendance/backend/internal/repository/postgres/user"
 	"context"
 )
@@ -24,4 +25,7 @@ type User interface {
 	ExportTemplate(ctx context.Context) (string, error)
 	UpdateColumns(ctx context.Context, request user.UpdateRequest) error
 	Delete(ctx context.Context, id int) error
+}
+type CompanyInfo interface {
+	GetNewTableColor(ctx context.Context) (companyInfo.GetNewTableColorResponse, error)
 }

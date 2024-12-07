@@ -81,13 +81,13 @@ func (r Router) Init() error {
 	attendancePostgres := attendance.NewRepository(r.postgresDB)
 
 	// controller
-	userController := user_controller.NewController(userPostgres)
+	userController := user_controller.NewController(userPostgres, companyInfoPostgres)
 	authController := auth_controller.NewController(userPostgres)
 	departmentController := department_controller.NewController(departmentPostgres)
 	positionController := position_controller.NewController(positionPostgres)
 	companyInfoController := companyInfo_controller.NewController(companyInfoPostgres)
 
-	attendanceController := attendance_controller.NewController(attendancePostgres)
+	attendanceController := attendance_controller.NewController(attendancePostgres, companyInfoPostgres)
 
 	fileC := file.NewController(r.App, r.fileServerBasePath)
 

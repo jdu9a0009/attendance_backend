@@ -1,8 +1,9 @@
 package attendance
 
 import (
-	"context"
 	"attendance/backend/internal/repository/postgres/attendance"
+	"attendance/backend/internal/repository/postgres/companyInfo"
+	"context"
 
 	"github.com/Azure/go-autorest/autorest/date"
 )
@@ -10,7 +11,7 @@ import (
 type Attendance interface {
 	GetList(ctx context.Context, filter attendance.Filter) ([]attendance.GetListResponse, int, error)
 	GetDetailById(ctx context.Context, id int) (attendance.GetDetailByIdResponse, error)
-	GetHistoryById(ctx context.Context, employee_id string, date date.Date) ([]attendance.GetHistoryByIdResponse,int, error)
+	GetHistoryById(ctx context.Context, employee_id string, date date.Date) ([]attendance.GetHistoryByIdResponse, int, error)
 
 	UpdateAll(ctx context.Context, request attendance.UpdateRequest) error
 	UpdateColumns(ctx context.Context, request attendance.UpdateRequest) error
@@ -23,4 +24,7 @@ type Attendance interface {
 	CreateByQRCode(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, string, error)
 	CreateByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
 	ExitByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
+}
+type CompanyInfo interface {
+	GetAttendanceColor(ctx context.Context) (companyInfo.GetAttendanceColorResponse, error)
 }

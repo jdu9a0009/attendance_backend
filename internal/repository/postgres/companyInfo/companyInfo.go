@@ -37,9 +37,13 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	q.Set("end_time = ?", request.EndTime)
 	q.Set("late_time = ?", request.LateTime)
 	q.Set("over_end_time = ?", request.OverEndTime)
-	q.Set("come_color=?", request.ComeColor)
-	q.Set("leave_color=?", request.LeaveColor)
+	q.Set("come_time_color=?", request.ComeTimeColor)
+	q.Set("leave_time_color=?", request.LeaveTimeColor)
 	q.Set("forget_time_color=?", request.ForgetTimeColor)
+	q.Set("present_color=?", request.PresentColor)
+	q.Set("apsent_color=?", request.ApsentColor)
+	q.Set("new_present_color=?", request.NewPresentColor)
+	q.Set("new_apsent_color=?", request.NewApsentColor)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
@@ -59,11 +63,46 @@ func (r Repository) GetInfo(ctx context.Context) (GetInfoResponse, error) {
 		Order("created_at DESC").
 		Limit(1).
 		Scan(ctx)
-
 	if err != nil {
 
 		return GetInfoResponse{}, &web.Error{
 			Err:    errors.New("company data not found!"),
+			Status: http.StatusUnauthorized,
+		}
+	}
+	return detail, nil
+}
+
+func (r Repository) GetAttendanceColor(ctx context.Context) (GetAttendanceColorResponse, error) {
+	var detail GetAttendanceColorResponse
+	err := r.NewSelect().
+		Model(&detail).
+		Where("deleted_at IS NULL").
+		Order("created_at DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+
+		return GetAttendanceColorResponse{}, &web.Error{
+			Err:    errors.New("company  attendance colors not found!"),
+			Status: http.StatusUnauthorized,
+		}
+	}
+	return detail, nil
+}
+
+func (r Repository) GetNewTableColor(ctx context.Context) (GetNewTableColorResponse, error) {
+	var detail GetNewTableColorResponse
+	err := r.NewSelect().
+		Model(&detail).
+		Where("deleted_at IS NULL").
+		Order("created_at DESC").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+
+		return GetNewTableColorResponse{}, &web.Error{
+			Err:    errors.New("company  New Table colors not found!"),
 			Status: http.StatusUnauthorized,
 		}
 	}

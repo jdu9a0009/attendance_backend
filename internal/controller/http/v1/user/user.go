@@ -22,11 +22,12 @@ import (
 )
 
 type Controller struct {
-	user User
+	user         User
+	company_Info CompanyInfo
 }
 
-func NewController(user User) *Controller {
-	return &Controller{user}
+func NewController(user User, company_Info CompanyInfo) *Controller {
+	return &Controller{user, company_Info}
 }
 
 // user
@@ -438,8 +439,17 @@ func (uc Controller) GetDashboardListSSE(w http.ResponseWriter, r *http.Request)
 			log.Printf("Error fetching dashboard list: %v", err)
 			return
 		}
+		colors, err := uc.company_Info.GetNewTableColor(ctx)
+		if err != nil {
+			log.Printf("Error fetching dashboard list: %v", err)
+			return
+		}
 
 		data := map[string]interface{}{
+			"Colors": map[string]interface{}{
+				"new_present_color": colors.NewPresentColor,
+				"new_apsent_color":  colors.NewApsentColor,
+			},
 			"data": map[string]interface{}{
 				"results": list,
 				"count":   count,

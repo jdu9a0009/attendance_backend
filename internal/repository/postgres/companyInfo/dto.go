@@ -24,23 +24,46 @@ type UpdateRequest struct {
 	EndTime         string                `json:"end_time" form:"end_time"`
 	LateTime        string                `json:"late_time" form:"late_time"`
 	OverEndTime     string                `json:"over_end_time" form:"over_end_time"`
-	ComeColor       string                `json:"come_color" form:"come_color"`
-	LeaveColor      string                `json:"leave_color" form:"leave_color"`
+	ComeTimeColor   string                `json:"come_time_color" form:"come_time_color"`
+	LeaveTimeColor  string                `json:"leave_time_color" form:"leave_time_color"`
 	ForgetTimeColor string                `json:"forget_time_color" form:"forget_time_color"`
+	PresentColor    string                `json:"present_color" form:"present_color"`
+	ApsentColor     string                `json:"apsent_color" form:"apsent_color"`
+	NewPresentColor string                `json:"new_present_color" form:"new_present_color"`
+	NewApsentColor  string                `json:"new_apsent_color" form:"new_apsent_color"`
 }
 type GetInfoResponse struct {
 	bun.BaseModel `bun:"table:company_info"`
 
-	ID              int     `json:"id" `
-	CompanyName     string  `json:"company_name" `
-	Url             string  `json:"url" `
-	Latitude        float64 `json:"latitude" `
-	Longitude       float64 `json:"longitude" `
-	StartTime       string  `json:"start_time" `
-	EndTime         string  `json:"end_time" `
-	LateTime        string  `json:"late_time" `
-	OverEndTime     string  `json:"over_end_time" `
-	ComeColor       string  `json:"come_color"`
-	LeaveColor      string  `json:"leave_color"`
-	ForgetTimeColor string  `json:"forget_time_color"`
+	ID              int     `json:"id"`
+	CompanyName     string  `json:"company_name"`
+	Url             string  `json:"url"`
+	Latitude        float64 `json:"latitude"`
+	Longitude       float64 `json:"longitude"`
+	StartTime       string  `json:"start_time"`
+	EndTime         string  `json:"end_time"`
+	LateTime        string  `json:"late_time"`
+	OverEndTime     string  `json:"over_end_time"`
+	ComeColor       string  `json:"come_time_color" bun:"come_time_color"`
+	LeaveColor      string  `json:"leave_time_color" bun:"leave_time_color"`
+	ForgetTimeColor string  `json:"forget_time_color" bun:"forget_time_color"`
+	PresentColor    string  `json:"present_color" bun:"present_color"`
+	ApsentColor     string  `json:"apsent_color" bun:"apsent_color"`
+	NewPresentColor string  `json:"new_present_color" bun:"new_present_color"`
+	NewApsentColor  string  `json:"new_apsent_color" bun:"new_apsent_color"`
+}
+
+type GetAttendanceColorResponse struct {
+	bun.BaseModel `bun:"table:company_info"`
+
+	ComeColor       string `json:"come_time_color" bun:"come_time_color"`
+	LeaveColor      string `json:"leave_time_color" bun:"leave_time_color"`
+	ForgetTimeColor string `json:"forget_time_color" bun:"forget_time_color"`
+	PresentColor    string `json:"present_color" bun:"present_color"`
+	ApsentColor     string `json:"apsent_color" bun:"apsent_color"`
+}
+type GetNewTableColorResponse struct {
+	bun.BaseModel   `bun:"table:company_info"`
+	NewPresentColor string `json:"new_present_color" bun:"new_present_color"`
+	NewApsentColor  string `json:"new_apsent_color" bun:"new_apsent_color"`
 }

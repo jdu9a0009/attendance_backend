@@ -1,24 +1,26 @@
 package attendance
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/repository/postgres/attendance"
+
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"reflect"
 	"strconv"
-	"attendance/backend/foundation/web"
-	"attendance/backend/internal/repository/postgres/attendance"
 
 	"github.com/Azure/go-autorest/autorest/date"
 )
 
 type Controller struct {
-	attendance Attendance
+	attendance   Attendance
+	company_Info CompanyInfo
 }
 
-func NewController(attendance Attendance) *Controller {
-	return &Controller{attendance}
+func NewController(attendance Attendance, company_Info CompanyInfo) *Controller {
+	return &Controller{attendance, company_Info}
 }
 
 type OfficeLocation struct {
@@ -84,11 +86,25 @@ func (uc Controller) GetList(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
+	colors, err := uc.company_Info.GetAttendanceColor(c.Ctx)
+	if err != nil {
+		return c.RespondError(err)
+	}
+
 	return c.Respond(map[string]interface{}{
+
+		"Colors": map[string]interface{}{
+			"present_color":     colors.PresentColor,
+			"apsent_color":      colors.ApsentColor,
+			"come_time_color":   colors.ComeColor,
+			"leave_time_color":  colors.LeaveColor,
+			"forget_time_color": colors.ForgetTimeColor,
+		},
 		"data": map[string]interface{}{
 			"results": list,
 			"count":   count,
 		},
+
 		"status": true,
 	}, http.StatusOK)
 }
