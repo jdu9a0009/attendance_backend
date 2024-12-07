@@ -156,13 +156,16 @@ var scheme = []Scheme{
         CREATE TABLE company_info (
             id SERIAL PRIMARY KEY,
             company_name VARCHAR(250) NOT NULL,
-			url VARCHAR(100) NOT NULL,
+			url VARCHAR(100),
 			latitude FLOAT NOT NULL,
 			longitude FLOAT NOT NULL,
             start_time TIME,
 			end_time TIME,
 			late_time TIME,
 			over_end_time TIME,
+			come_color varchar(200),
+			leave_color varchar(200),
+			forget_time_color varchar(200),
             created_at TIMESTAMP DEFAULT NOW(),
             created_by INT REFERENCES users(id),
             updated_at TIMESTAMP,
@@ -185,6 +188,9 @@ var scheme = []Scheme{
         end_time,
         late_time,
         over_end_time,
+		come_color,
+		leave_color,
+		forget_time_color,
         created_by,
         updated_by
     ) VALUES (
@@ -197,6 +203,9 @@ var scheme = []Scheme{
         '18:00:00',
         '09:20:00',
         '22:30:00',
+		'#e33935',
+		'#fbfbfc',
+		'#f8f79e',
         1,
         1
 );`,

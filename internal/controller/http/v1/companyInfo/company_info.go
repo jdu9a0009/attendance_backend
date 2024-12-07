@@ -1,11 +1,11 @@
 package companyInfo
 
 import (
-	"net/http"
-	"reflect"
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/repository/postgres/companyInfo"
 	"attendance/backend/internal/service"
+	"net/http"
+	"reflect"
 )
 
 type Controller struct {
@@ -27,7 +27,7 @@ func (uc Controller) UpdateAll(c *web.Context) error {
 
 	var request companyInfo.UpdateRequest
 
-	if err := c.BindFunc(&request, "company_name", "logo", "latitude", "longitude"); err != nil {
+	if err := c.BindFunc(&request, "company_name", "latitude", "longitude"); err != nil {
 		return c.RespondError(err)
 	}
 

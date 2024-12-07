@@ -1,5 +1,10 @@
 # How to Run the Backend
 
+## Clone on your local  not server
+
+
+- How to clone attendance_backend  [cloning steps](clone-attendnace-backend.md)
+
 ## Prerequisites
 
 - Install Docker 
@@ -19,18 +24,13 @@
 
 ## Setting Up Environment
 
-1. **Set a Postgresql usernama and password**:
+1. **Set a Postgresql username and password Creat Database**:
 To Set a Postgresql Username And Password  Write Command One by One.
     ```terminal  
 sudo -i -u postgres
 psql
-    ```
-
-1. **Create a Postgresql Database**:
-Create a Postgresql database .
-    ```terminal firstly  navigate  your postgresql, then write this query to create database
-    
-  CREATE DATABASE IF NOT EXISTS attendances;
+CREATE USER your_user WITH PASSWORD 'your_password';
+CREATE DATABASE IF NOT EXISTS attendances;
     ```
 
 2. **Write Environment Variables**:
@@ -48,16 +48,18 @@ Write database dependencies that yours;
   - **base_url**: "https://164.90.180.81:8080/api/v1" //just change host
   - **jwt_key**: "attendancePanel" // recommend dont change
 
-3.  **Run the database migration**:
-Migrate the `database.sql` file. Open git bash or terminal and navigate to the backend directory. Run the following command:
 
-    ```terminal
-    mysql -u root -p < backend/database.sql
-    ```
-
-4.  **Run the database migration  And Run Server **:
-Migrate the `database.sql` file. Open git bash or terminal and navigate to the backend directory. Run the following command:
+3.  **Run the database migration  And  Server **:
+ Open attendance_backend file VS Code or other. Open the terminal and run the following command:
 
     ```terminal
     make run
     ```
+4.  **Local changes Update to Server**:
+ If you change smth on your local  code and update it on server just push it on main branch , CI/CD pipeline Automatic update your server:
+
+    ```terminal
+  git add .
+  git commit -m "Describe your changes"
+  git push origin main
+       ```

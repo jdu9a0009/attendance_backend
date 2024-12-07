@@ -1,11 +1,11 @@
 package companyInfo
 
 import (
+	"attendance/backend/foundation/web"
+	"attendance/backend/internal/pkg/repository/postgresql"
 	"context"
 	"net/http"
 	"time"
-	"attendance/backend/foundation/web"
-	"attendance/backend/internal/pkg/repository/postgresql"
 
 	"github.com/pkg/errors"
 )
@@ -19,7 +19,7 @@ func NewRepository(database *postgresql.Database) *Repository {
 }
 
 func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error {
-	if err := r.ValidateStruct(&request, "company_name", "url", "latitude", "longitude"); err != nil {
+	if err := r.ValidateStruct(&request, "company_name", "latitude", "longitude"); err != nil {
 		return err
 	}
 
@@ -37,6 +37,9 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	q.Set("end_time = ?", request.EndTime)
 	q.Set("late_time = ?", request.LateTime)
 	q.Set("over_end_time = ?", request.OverEndTime)
+	q.Set("come_color=?", request.ComeColor)
+	q.Set("leave_color=?", request.LeaveColor)
+	q.Set("forget_time_color=?", request.ForgetTimeColor)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
