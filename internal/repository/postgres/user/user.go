@@ -210,7 +210,6 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 			return nil, 0, web.NewRequestError(errors.Wrap(err, "scanning user count"), http.StatusBadRequest)
 		}
 	}
-
 	return list, count, nil
 }
 

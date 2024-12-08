@@ -75,6 +75,11 @@ That's it! Your forked repository should now be up-to-date with the latest chang
    - Click on the "Compare & pull request" button.
    - Provide a clear title and description for your pull request.
 
+3. **Create a Pull Request**
+   - Go to your repository on GitHub.
+   - Click on the "Compare & pull request" button.
+   - Provide a clear title and description for your pull request.
+
 
 
 By following these steps, you can contribute effectively to the `jdu9a0009/attendance_backend` repository.

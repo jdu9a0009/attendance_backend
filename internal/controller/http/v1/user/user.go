@@ -448,7 +448,7 @@ func (uc Controller) GetDashboardListSSE(w http.ResponseWriter, r *http.Request)
 		data := map[string]interface{}{
 			"Colors": map[string]interface{}{
 				"new_present_color": colors.NewPresentColor,
-				"new_apsent_color":  colors.NewAbsentColor,
+				"new_absent_color":  colors.NewAbsentColor,
 			},
 			"data": map[string]interface{}{
 				"results": list,
