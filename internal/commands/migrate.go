@@ -167,9 +167,9 @@ var scheme = []Scheme{
 			leave_time_color varchar(200),
 			forget_time_color varchar(200),
 			present_color varchar(200),
-			apsent_color varchar(200),
+			absent_color varchar(200),
 			new_present_color varchar(200),
-			new_apsent_color(200),
+			new_absent_color(200),
             created_at TIMESTAMP DEFAULT NOW(),
             created_by INT REFERENCES users(id),
             updated_at TIMESTAMP,
@@ -196,9 +196,9 @@ var scheme = []Scheme{
 		leave_time_color,
 		forget_time_color,
 		present_color,
-		apsent_color,
+		absent_color,
 		new_present_color,
-		new_apsent_color,
+		new_absent_color,
         created_by,
         updated_by
     ) VALUES (

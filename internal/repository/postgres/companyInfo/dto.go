@@ -28,9 +28,9 @@ type UpdateRequest struct {
 	LeaveTimeColor  string                `json:"leave_time_color" form:"leave_time_color"`
 	ForgetTimeColor string                `json:"forget_time_color" form:"forget_time_color"`
 	PresentColor    string                `json:"present_color" form:"present_color"`
-	ApsentColor     string                `json:"apsent_color" form:"apsent_color"`
+	AbsentColor     string                `json:"absent_color" form:"absent_color"`
 	NewPresentColor string                `json:"new_present_color" form:"new_present_color"`
-	NewApsentColor  string                `json:"new_apsent_color" form:"new_apsent_color"`
+	NewAbsentColor  string                `json:"new_absent_color" form:"new_absent_color"`
 }
 type GetInfoResponse struct {
 	bun.BaseModel `bun:"table:company_info"`
@@ -48,9 +48,9 @@ type GetInfoResponse struct {
 	LeaveColor      string  `json:"leave_time_color" bun:"leave_time_color"`
 	ForgetTimeColor string  `json:"forget_time_color" bun:"forget_time_color"`
 	PresentColor    string  `json:"present_color" bun:"present_color"`
-	ApsentColor     string  `json:"apsent_color" bun:"apsent_color"`
+	AbsentColor     string  `json:"absent_color" bun:"absent_color"`
 	NewPresentColor string  `json:"new_present_color" bun:"new_present_color"`
-	NewApsentColor  string  `json:"new_apsent_color" bun:"new_apsent_color"`
+	NewAbsentColor  string  `json:"new_absent_color" bun:"new_absent_color"`
 }
 
 type GetAttendanceColorResponse struct {
@@ -60,10 +60,10 @@ type GetAttendanceColorResponse struct {
 	LeaveColor      string `json:"leave_time_color" bun:"leave_time_color"`
 	ForgetTimeColor string `json:"forget_time_color" bun:"forget_time_color"`
 	PresentColor    string `json:"present_color" bun:"present_color"`
-	ApsentColor     string `json:"apsent_color" bun:"apsent_color"`
+	AbsentColor     string `json:"absent_color" bun:"absent_color"`
 }
 type GetNewTableColorResponse struct {
 	bun.BaseModel   `bun:"table:company_info"`
 	NewPresentColor string `json:"new_present_color" bun:"new_present_color"`
-	NewApsentColor  string `json:"new_apsent_color" bun:"new_apsent_color"`
+	NewAbsentColor  string `json:"new_absent_color" bun:"new_absent_color"`
 }

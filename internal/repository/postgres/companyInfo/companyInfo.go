@@ -41,9 +41,9 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	q.Set("leave_time_color=?", request.LeaveTimeColor)
 	q.Set("forget_time_color=?", request.ForgetTimeColor)
 	q.Set("present_color=?", request.PresentColor)
-	q.Set("apsent_color=?", request.ApsentColor)
+	q.Set("absent_color=?", request.AbsentColor)
 	q.Set("new_present_color=?", request.NewPresentColor)
-	q.Set("new_apsent_color=?", request.NewApsentColor)
+	q.Set("new_absent_color=?", request.NewAbsentColor)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
