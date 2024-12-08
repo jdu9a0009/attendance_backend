@@ -67,7 +67,7 @@ func (r Repository) GetInfo(ctx context.Context) (GetInfoResponse, error) {
 
 		return GetInfoResponse{}, &web.Error{
 			Err:    errors.New("company data not found!"),
-			Status: http.StatusUnauthorized,
+			Status: http.StatusNotFound,
 		}
 	}
 	return detail, nil
