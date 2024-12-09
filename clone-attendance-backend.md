@@ -1,4 +1,4 @@
-## How to Contribute to `apuri_kaihatsu`
+## How to Contribute to `attendance_backend`
 
 ### Setting up Your Local Development Environment
 
@@ -75,11 +75,42 @@ That's it! Your forked repository should now be up-to-date with the latest chang
    - Click on the "Compare & pull request" button.
    - Provide a clear title and description for your pull request.
 
-3. **Create a Pull Request**
-   - Go to your repository on GitHub.
-   - Click on the "Compare & pull request" button.
-   - Provide a clear title and description for your pull request.
+3. **Configure Docker and Server Settings for GitHub Actions**
+ 
+## To enable secure and efficient CI/CD pipelines, sensitive variables like Docker credentials and server access must be set up as secrets in GitHub Actions. Follow these steps to configure the required secrets:
 
+1.  Open GitHub Actions Secrets
+   # Go to your repository on GitHub.
+   # Click on Settings > Secrets and variables > Actions.
 
+2. Add the Required Secrets
+Set up the following secrets with the appropriate values:
+```
+# Secret Name	Description
+DOCKER_USERNAME	Your Docker Hub username
+DOCKER_PASSWORD	Your Docker Hub password
+SERVER_HOST	The IP or hostname of the target server
+SERVER_USER	The username for accessing the server
+SERVER_PASSWORD	The password for the server user
+```
+# Steps to Add Secrets:
 
+# Click "New repository secret".
+Enter the secret name (e.g., DOCKER_USERNAME).
+Paste the corresponding value into the input field.
+# Click "Add secret".
+Repeat these steps for each secret listed above.
+
+3. Use the Secrets in GitHub Actions
+Once the secrets are added, they can be referenced in your workflow files. Below is an example configuration:
+
+```
+
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  SERVER_HOST: ${{ secrets.SERVER_HOST }}
+  SERVER_USER: ${{ secrets.SERVER_USER }}
+  SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+```
+# After that change ,when u push your code to github it automatically update server
 By following these steps, you can contribute effectively to the `jdu9a0009/attendance_backend` repository.

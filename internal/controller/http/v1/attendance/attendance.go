@@ -95,7 +95,7 @@ func (uc Controller) GetList(c *web.Context) error {
 
 		"Colors": map[string]interface{}{
 			"present_color":     colors.PresentColor,
-			"apsent_color":      colors.AbsentColor,
+			"absent_color":      colors.AbsentColor,
 			"come_time_color":   colors.ComeColor,
 			"leave_time_color":  colors.LeaveColor,
 			"forget_time_color": colors.ForgetTimeColor,
