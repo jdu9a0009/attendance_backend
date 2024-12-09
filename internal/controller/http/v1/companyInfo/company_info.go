@@ -12,7 +12,7 @@ type Controller struct {
 	companyInfo CompanyInfo
 }
 
-const companyDir = "company_info"
+const companyDir = "company_info" 
 
 func NewController(companyInfo CompanyInfo) *Controller {
 	return &Controller{companyInfo}
