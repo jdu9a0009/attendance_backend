@@ -184,7 +184,7 @@ func (uc Controller) GetPieChartStatistics(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-	colors, err := uc.company_Info.GetAttendanceColor(c.Ctx)
+	colors, err := uc.company_Info.GetAttendanceColor(c.Ctx) 
 	if err != nil {
 		return c.RespondError(err)
 	}
