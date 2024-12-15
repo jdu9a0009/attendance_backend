@@ -90,7 +90,8 @@ func (uc Controller) GetList(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-
+	fmt.Println("Absent color: ", colors.AbsentColor)
+	fmt.Println("Presnt color: ", colors.PresentColor)
 	return c.Respond(map[string]interface{}{
 
 		"Colors": map[string]interface{}{
@@ -184,14 +185,17 @@ func (uc Controller) GetPieChartStatistics(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-	colors, err := uc.company_Info.GetAttendanceColor(c.Ctx) 
+	colors, err := uc.company_Info.GetAttendanceColor(c.Ctx)
 	if err != nil {
 		return c.RespondError(err)
 	}
+	fmt.Println("colors absent:", colors.AbsentColor)
+	fmt.Println("colors present:", colors.PresentColor)
+
 	return c.Respond(map[string]interface{}{
 		"Colors": map[string]interface{}{
-			"present_color":     colors.PresentColor,
-			"absent_color":      colors.AbsentColor,
+			"present_color": colors.PresentColor,
+			"absent_color":  colors.AbsentColor,
 		},
 		"data":   response,
 		"status": true,

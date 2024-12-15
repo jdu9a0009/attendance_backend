@@ -1,16 +1,57 @@
+# version: '3'
+# services:
+#   backend:
+#      build: "./"
+#      restart: always
+#      container_name: attendance-app
+#      labels:
+#        logging: "promtail"
+#        logging_jobname: "containerlogs"
+#      ports:
+#         - "8080:8080"
+#      networks:
+#        - app
+# networks:
+#   app:
+#     external: true
+
 version: '3'
 services:
   backend:
-     build: "./"
-     restart: always
-     container_name: attendance-app
-     labels:
-       logging: "promtail"
-       logging_jobname: "containerlogs"
-     ports:
-        - "8080:8080"
-     networks:
-       - app
+    build: "./"
+    restart: always
+    container_name: attendance-app
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
+    ports:
+      - "8080:8080"
+    networks:
+      - app
+    environment:
+      DB_HOST: "db"
+      DB_PORT: 5432
+      DB_USERNAME: "postgres"
+      DB_PASSWORD: "password1"
+      DB_NAME: "attendances"
+  
+  db:
+    image: postgres:latest
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "password1"
+      POSTGRES_DB: "attendances"
+    ports:
+      - "5431:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - app
+
 networks:
   app:
-    external: true
+
+volumes:
+  db_data:
