@@ -157,7 +157,7 @@ type UpdateRequest struct {
 	Role         *string `json:"role"       form:"role"`
 	FirstName    *string `json:"first_name"  form:"first_name"`
 	LastName     *string `json:"last_name"  form:"last_name"`
-	NickName     string  `json:"nick_name"  form:"nick_name"`
+	NickName     *string  `json:"nick_name"  form:"nick_name"`
 	DepartmentID *int    `json:"department_id" form:"department_id"`
 	PositionID   *int    `json:"position_id" form:"position_id"`
 	Phone        *string `json:"phone" form:"phone"`

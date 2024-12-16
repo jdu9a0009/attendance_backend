@@ -803,7 +803,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if request.LastName != nil {
 		q.Set("last_name = ?", request.LastName)
 	}
-	if request.NickName != "" {
+	if request.NickName != nil {
 		q.Set("nick_name = ?", request.NickName)
 	}
 	if request.DepartmentID != nil {
