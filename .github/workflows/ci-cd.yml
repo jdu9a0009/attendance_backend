@@ -34,7 +34,7 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/attendance:latest
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build-and-push  # Bu bosqichni oldingi build tugagandan keyin ishlaydi
 
     steps:
