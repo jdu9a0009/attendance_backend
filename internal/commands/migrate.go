@@ -79,6 +79,7 @@ var scheme = []Scheme{
             id serial primary key,
             name text not null,
 			display_number int not null,
+			department_nickname text ,
             created_at timestamp default now(),
             created_by int references users(id),
             updated_at timestamp,

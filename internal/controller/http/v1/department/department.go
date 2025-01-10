@@ -3,6 +3,7 @@ package department
 import (
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/repository/postgres/department"
+	"fmt"
 	"net/http"
 	"reflect"
 )
@@ -76,11 +77,12 @@ func (uc Controller) Create(c *web.Context) error {
 	if err := c.BindFunc(&request, "Name", "DisplayNumber"); err != nil {
 		return c.RespondError(err)
 	}
-
+	fmt.Println("requested nickname:", request.Nickname)
 	response, err := uc.department.Create(c.Ctx, request)
 	if err != nil {
 		return c.RespondError(err)
 	}
+	fmt.Println("response nickname:", response.Nickname)
 
 	return c.Respond(map[string]interface{}{
 		"data":   response,

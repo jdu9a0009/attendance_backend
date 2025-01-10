@@ -70,7 +70,8 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		SELECT 
 			id,
 			name,
-			display_number
+			display_number,
+			department_nickname
 		FROM department
 
 		%s %s %s %s %s
@@ -91,7 +92,8 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		if err = rows.Scan(
 			&detail.ID,
 			&detail.Name,
-			&detail.DisplayNumber); err != nil {
+			&detail.DisplayNumber,
+			&detail.NickName); err != nil {
 			return nil, 0, 0, web.NewRequestError(errors.Wrap(err, "scanning department list"), http.StatusBadRequest)
 		}
 
@@ -151,7 +153,8 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		SELECT
 			id,
 			name,
-			display_number
+			display_number,
+			department_nickname
 		FROM
 		    department
 	
@@ -164,6 +167,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		&detail.ID,
 		&detail.Name,
 		&detail.DisplayNumber,
+		&detail.NickName,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -226,6 +230,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	var response CreateResponse
 	response.Name = request.Name
 	response.DisplayNumber = request.DisplayNumber
+	response.Nickname = request.Nickname
 	response.CreatedAt = time.Now()
 	response.CreatedBy = claims.UserId
 
@@ -310,6 +315,9 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	}
 	if request.DisplayNumber != 0 {
 		q.Set("display_number = ?", request.DisplayNumber)
+	}
+	if request.Nickname != nil {
+		q.Set("department_nickname = ?", request.Nickname)
 	}
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
