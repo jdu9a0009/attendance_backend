@@ -9,9 +9,7 @@ import (
 	"attendance/backend/internal/repository/postgres/department"
 	"attendance/backend/internal/repository/postgres/position"
 	"log"
-	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
@@ -57,15 +55,8 @@ func NewRouter(
 
 func (r Router) Init() error {
 
-	// Configure CORS
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://admin.eduflow.uz", "https://api.eduflow.uz", "http://localhost:3000"}, // Explicitly allow your frontend URL
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                                            // Only the methods you're using
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Disposition"}, // Expose any custom headers like file download
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	r.Use(middleware.CORSMiddleware())
+
 	r.OPTIONS("/api/v1/user/qrcode", func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "https://attendance.eduflow.uz") // Update to your allowed origins
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
