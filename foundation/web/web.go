@@ -9,7 +9,6 @@ import (
 
 	"attendance/backend/docs"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -51,19 +50,6 @@ type App struct {
 // NewApp creates an App value that handle a set of routes for the application.
 func NewApp(shutdown chan os.Signal, defaultLang string, mw ...Middleware) *App {
 	engine := gin.Default()
-
-	// cors
-	engine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"*"},
-		AllowHeaders:     []string{"*"},
-		ExposeHeaders:    []string{"*"},
-		AllowCredentials: true,
-		AllowOriginFunc: func(origin string) bool {
-			return true
-		},
-		MaxAge: 12 * time.Hour,
-	}))
 
 	//swagger settings
 	docs.SwaggerInfo.Schemes = []string{"http", "https"}
