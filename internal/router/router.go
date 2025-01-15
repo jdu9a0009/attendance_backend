@@ -1,6 +1,7 @@
 package router
 
 import (
+	"attendance/backend/docs"
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/auth"
 	"attendance/backend/internal/controller/http/v1/file"
@@ -24,6 +25,9 @@ import (
 	department_controller "attendance/backend/internal/controller/http/v1/department"
 	position_controller "attendance/backend/internal/controller/http/v1/position"
 	user_controller "attendance/backend/internal/controller/http/v1/user"
+
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 type Router struct {
@@ -55,7 +59,15 @@ func NewRouter(
 
 func (r Router) Init() error {
 
+	r.HandleMethodNotAllowed = true
 	r.Use(middleware.CORSMiddleware())
+
+	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler), func(ctx *gin.Context) {
+		docs.SwaggerInfo.Host = ctx.Request.Host
+		if ctx.Request.TLS != nil {
+			docs.SwaggerInfo.Schemes = []string{"https"}
+		}
+	})
 
 	// - postgresql
 	userPostgres := user.NewRepository(r.postgresDB)

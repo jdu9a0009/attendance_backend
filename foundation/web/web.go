@@ -7,11 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"attendance/backend/docs"
-
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // ctxKey represents the type of value for the context key.
@@ -50,16 +46,6 @@ type App struct {
 // NewApp creates an App value that handle a set of routes for the application.
 func NewApp(shutdown chan os.Signal, defaultLang string, mw ...Middleware) *App {
 	engine := gin.Default()
-
-	//swagger settings
-	docs.SwaggerInfo.Schemes = []string{"http", "https"}
-
-	engine.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler), func(c *gin.Context) {
-		docs.SwaggerInfo.Host = c.Request.Host
-		if c.Request.TLS != nil {
-			docs.SwaggerInfo.Schemes = []string{"https"}
-		}
-	})
 
 	//engine.Static("/media", "./media")
 
