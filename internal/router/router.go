@@ -59,7 +59,7 @@ func (r Router) Init() error {
 
 	// Configure CORS
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://admin.eduflow.uz", "https://api.eduflow.uz", "http://localhost:3000"}, // Explicitly allow your frontend URL
+		AllowOrigins:     []string{"https://attendance.eduflow.uz", "https://api.eduflow.uz", "http://localhost:3000"}, // Explicitly allow your frontend URL
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},                                            // Only the methods you're using
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Disposition"}, // Expose any custom headers like file download
