@@ -10,7 +10,6 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
-	github.com/gorilla/websocket v1.5.3
 	github.com/jung-kurt/gofpdf/v2 v2.17.3
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.6.1

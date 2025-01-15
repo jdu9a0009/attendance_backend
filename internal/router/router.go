@@ -56,13 +56,6 @@ func NewRouter(
 func (r Router) Init() error {
 
 	r.Use(middleware.CORSMiddleware())
- 
-	r.OPTIONS("/api/v1/user/qrcode", func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "https://attendance.eduflow.uz") // Update to your allowed origins
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
-		c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		c.Status(204) // No content for preflight
-	})
 
 	// - postgresql
 	userPostgres := user.NewRepository(r.postgresDB)
