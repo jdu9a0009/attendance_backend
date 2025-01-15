@@ -56,7 +56,7 @@ func NewRouter(
 func (r Router) Init() error {
 
 	r.Use(middleware.CORSMiddleware())
-
+ 
 	r.OPTIONS("/api/v1/user/qrcode", func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "https://attendance.eduflow.uz") // Update to your allowed origins
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
