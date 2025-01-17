@@ -59,8 +59,6 @@ func NewRouter(
 
 func (r Router) Init() error {
 
-	r.HandleMethodNotAllowed = true
-	r.Use(middleware.CORSMiddleware())
 
 	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler), func(ctx *gin.Context) {
 		docs.SwaggerInfo.Host = ctx.Request.Host

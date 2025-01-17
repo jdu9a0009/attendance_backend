@@ -1067,6 +1067,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
                     COALESCE(a.status, false) AS status,
                     d.id AS department_id,
                     d.name AS department_name,
+					d.department_nickname,
                     d.display_number
                 FROM
                        department AS d
@@ -1094,12 +1095,14 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 
 	for rows.Next() {
 		var (
-			detail         GetDashboardlist
-			departmentID   int
-			displayNumber  sql.NullInt64
-			userID         sql.NullInt64
-			departmentName sql.NullString
-			nickName       sql.NullString
+			detail             GetDashboardlist
+			departmentID       int
+			displayNumber      sql.NullInt64
+			userID             sql.NullInt64
+			departmentName     sql.NullString
+			departmentNickName sql.NullString
+
+			nickName sql.NullString
 		)
 
 		// Scan the row with individual fields
@@ -1111,6 +1114,7 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 			&detail.Status,
 			&departmentID,
 			&departmentName,
+			&departmentNickName,
 			&displayNumber,
 		)
 		detail.DepartmentID = &departmentID
@@ -1127,6 +1131,11 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 		if departmentName.Valid {
 			detail.DepartmentName = &departmentName.String
 		}
+		if departmentNickName.Valid {
+			detail.DepartmentNickName = departmentNickName.String
+		} else {
+			detail.NickName = ""
+		}
 		if displayNumber.Valid {
 			dn := int(displayNumber.Int64)
 			detail.DisplayNumber = &dn
@@ -1142,9 +1151,10 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 				deptResult.Employees = append(deptResult.Employees, detail)
 			} else {
 				departmentMap[*detail.DepartmentID] = &DepartmentResult{
-					DepartmentName: detail.DepartmentName,
-					DisplayNumber:  *detail.DisplayNumber,
-					Employees:      []GetDashboardlist{detail},
+					DepartmentName:     detail.DepartmentName,
+					DisplayNumber:      *detail.DisplayNumber,
+					DepartmentNickName: detail.DepartmentNickName,
+					Employees:          []GetDashboardlist{detail},
 				}
 			}
 		}

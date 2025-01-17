@@ -68,19 +68,21 @@ type ExcellUpload struct {
 	Url    string                `json:"url" form:"-"`
 }
 type DepartmentResult struct {
-	DepartmentName *string            `json:"department_name"`
-	DisplayNumber  int                `json:"display_number"`
-	Employees      []GetDashboardlist `json:"result"`
+	DepartmentName     *string            `json:"department_name"`
+	DisplayNumber      int                `json:"display_number"`
+	DepartmentNickName string             `json:"department_nickname"`
+	Employees          []GetDashboardlist `json:"result"`
 }
 type GetDashboardlist struct {
-	ID             *int    `json:"id"`
-	EmployeeID     *string `json:"employee_id"`
-	DepartmentID   *int    `json:"department_id"`
-	DepartmentName *string `json:"department_name"` // Use sql.NullString
-	DisplayNumber  *int    `json:"display_number"`  // Use sql.NullInt32
-	LastName       *string `json:"last_name"`
-	NickName       string  `json:"nick_name"`
-	Status         *bool   `json:"status"`
+	ID                 *int    `json:"id"`
+	EmployeeID         *string `json:"employee_id"`
+	DepartmentID       *int    `json:"department_id"`
+	DepartmentName     *string `json:"department_name"`     // Use sql.NullString
+	DepartmentNickName string  `json:"department_nickname"` // Use sql.NullString
+	DisplayNumber      *int    `json:"display_number"`      // Use sql.NullInt32
+	LastName           *string `json:"last_name"`
+	NickName           string  `json:"nick_name"`
+	Status             *bool   `json:"status"`
 }
 
 type GetDepartmentlist struct {
