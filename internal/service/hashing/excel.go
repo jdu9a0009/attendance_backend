@@ -164,9 +164,10 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
+
 		// Map department and position
-		departmentID, okDept := departmentMap[row[4]]
-		positionID, okPos := positionMap[row[5]]
+		departmentID, okDept := departmentMap[row[6]]
+		positionID, okPos := positionMap[row[7]]
 		if !okDept || !okPos {
 			incompleteRows = append(incompleteRows, i)
 			continue
@@ -186,6 +187,8 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 			Email:        row[9],
 		})
 	}
+	fmt.Println("users:", users)
+
 	return users, incompleteRows, nil
 }
 
