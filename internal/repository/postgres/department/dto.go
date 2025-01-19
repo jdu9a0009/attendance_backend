@@ -50,5 +50,5 @@ type UpdateRequest struct {
 	ID            int     `json:"id" form:"id"`
 	Name          *string `json:"name" form:"name"`
 	DisplayNumber int     `json:"display_number" form:"display_number"`
-	Nickname      *int    `json:"department_nickname" form:"department_nickname"`
+	Nickname      *string `json:"department_nickname" form:"department_nickname"`
 }

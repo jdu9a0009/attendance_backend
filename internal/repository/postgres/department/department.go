@@ -256,7 +256,24 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 	// Check if the department name already exists
 	var DepartmentName bool
-	query := `SELECT CASE WHEN (SELECT id FROM department WHERE name = ? AND deleted_at IS NULL) IS NOT NULL THEN true ELSE false END`
+	// Query to check if the department exists and is not deleted
+	query := `
+          SELECT CASE 
+	            WHEN (SELECT id FROM department WHERE id = ? AND deleted_at IS NULL) IS NOT NULL 
+	            THEN true 
+                ELSE false 
+          END`
+
+	var exists bool
+	if err := r.QueryRowContext(ctx, query, request.ID).Scan(&exists); err != nil {
+		return web.NewRequestError(errors.Wrap(err, "department existence check"), http.StatusInternalServerError)
+	}
+
+	if !exists {
+		return web.NewRequestError(errors.New("department not found or deleted"), http.StatusNotFound)
+	}
+
+	query = `SELECT CASE WHEN (SELECT id FROM department WHERE name = ? AND deleted_at IS NULL) IS NOT NULL THEN true ELSE false END`
 	if err := r.QueryRowContext(ctx, query, *request.Name).Scan(&DepartmentName); err != nil {
 		return web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusBadRequest)
 	}
@@ -319,6 +336,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if request.Nickname != nil {
 		q.Set("department_nickname = ?", request.Nickname)
 	}
+	fmt.Println("Request:", request.Nickname)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 

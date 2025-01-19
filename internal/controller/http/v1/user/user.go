@@ -234,9 +234,9 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	}
 
 	return c.Respond(map[string]interface{}{
-		"Successfully Users":           response,
-		"Incomplete  Users Excell Row": incomplete,
-		"status":                       true,
+		"成功した従業員数":   response,
+		"不完全な従業員のエクセル行": incomplete,
+		"ステータス":         true,
 	}, http.StatusOK)
 }
 
