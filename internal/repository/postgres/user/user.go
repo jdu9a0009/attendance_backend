@@ -499,8 +499,8 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 			EmployeeID:   &data.EmployeeID,
 			FirstName:    &data.FirstName,
 			LastName:     &data.LastName,
-			NickName:     data.NickName,
-			Role:         data.Role,
+			NickName:     &data.NickName,
+			Role:         &data.Role,
 			DepartmentID: &data.DepartmentID,
 			PositionID:   &data.PositionID,
 			Phone:        &data.Phone,
@@ -521,10 +521,10 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		if user.LastName != nil {
 			q.Set("last_name=?", data.LastName)
 		}
-		if user.NickName != "" {
+		if user.NickName != nil {
 			q.Set("nick_name=?", data.NickName)
 		}
-		if user.Role != "" {
+		if user.Role != nil {
 			q.Set("role=?", data.Role)
 		}
 		if user.DepartmentID != nil {
@@ -814,7 +814,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if request.LastName != nil {
 		q.Set("last_name = ?", request.LastName)
 	}
-	if request.NickName != "" {
+	if request.NickName != nil {
 		q.Set("nick_name = ?", request.NickName)
 	}
 	if request.DepartmentID != nil {
