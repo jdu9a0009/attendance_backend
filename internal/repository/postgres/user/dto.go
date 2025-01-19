@@ -120,6 +120,7 @@ type UpdateResponse struct {
 	FirstName    *string   `json:"first_name"  bun:"first_name"`
 	LastName     *string   `json:"last_name"  bun:"last_name"`
 	NickName     string    `json:"nick_name"  bun:"nick_name"`
+	Role         string    `json:"role" bun:"role"`
 	DepartmentID *int      `json:"department_id" bun:"department_id"`
 	PositionID   *int      `json:"position_id" bun:"position_id"`
 	Phone        *string   `json:"phone" bun:"phone"`

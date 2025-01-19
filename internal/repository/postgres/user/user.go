@@ -358,8 +358,8 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 	}
 	fields := map[int]string{
 		0: "EmployeeID",
-		1: "FirstName",
-		2: "LastName",
+		1: "LastName",
+		2: "Firstname",
 		3: "NickName",
 		4: "Role",
 		5: "Password",
@@ -464,12 +464,15 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 	}
 	fields := map[int]string{
 		0: "EmployeeID",
-		1: "FirstName",
-		2: "LastName",
-		3: "DepartmentName",
-		4: "PositionName",
-		5: "Phone",
-		6: "Email",
+		1: "LastName",
+		2: "Firstname",
+		3: "NickName",
+		4: "Role",
+		5: "Password",
+		6: "DepartmentName",
+		7: "PositionName",
+		8: "Phone",
+		9: "Email",
 	}
 	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap)
 	if err != nil {
@@ -496,6 +499,8 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 			EmployeeID:   &data.EmployeeID,
 			FirstName:    &data.FirstName,
 			LastName:     &data.LastName,
+			NickName:     data.NickName,
+			Role:         data.Role,
 			DepartmentID: &data.DepartmentID,
 			PositionID:   &data.PositionID,
 			Phone:        &data.Phone,
@@ -515,6 +520,12 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		}
 		if user.LastName != nil {
 			q.Set("last_name=?", data.LastName)
+		}
+		if user.NickName != "" {
+			q.Set("nick_name=?", data.NickName)
+		}
+		if user.Role != "" {
+			q.Set("role=?", data.Role)
 		}
 		if user.DepartmentID != nil {
 			q.Set("department_id=?", data.DepartmentID)

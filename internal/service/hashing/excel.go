@@ -66,8 +66,8 @@ func ExcelDog(data ExcelData) (string, error) {
 
 type UserExcellData struct {
 	EmployeeID     string
-	FirstName      string
 	LastName       string
+	FirstName      string
 	NickName       string
 	Role           string
 	Password       string
@@ -120,8 +120,8 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 
 		users = append(users, UserExcellData{
 			EmployeeID:   row[0],
-			FirstName:    row[1],
-			LastName:     row[2],
+			LastName:     row[1],
+			FirstName:    row[2],
 			NickName:     row[3],
 			Role:         row[4],
 			Password:     row[5],
@@ -175,13 +175,15 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 		// Add user data to the users slice
 		users = append(users, UserExcellData{
 			EmployeeID:   row[0],
-			FirstName:    row[1],
-			LastName:     row[2],
+			LastName:     row[1],
+			FirstName:    row[2],
 			NickName:     row[3],
+			Role:         row[4],
+			Password:     row[5],
 			DepartmentID: departmentID,
 			PositionID:   positionID,
-			Phone:        row[6],
-			Email:        row[7],
+			Phone:        row[8],
+			Email:        row[9],
 		})
 	}
 	return users, incompleteRows, nil
