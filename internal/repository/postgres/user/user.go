@@ -360,6 +360,93 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	return response, nil
 }
 
+func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) error {
+	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
+	if err != nil {
+		return err
+	}
+
+	if err := r.ValidateStruct(&request, "ID"); err != nil {
+		return err
+	}
+
+	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND id = ? ", request.ID)
+
+	if request.EmployeeID != nil {
+		userIdStatus := true
+		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.EmployeeID, request.ID)).Scan(&userIdStatus); err != nil {
+			return web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
+		}
+		if userIdStatus {
+			return web.NewRequestError(errors.Wrap(errors.New(""), "employee_id is used"), http.StatusInternalServerError)
+		}
+		q.Set("employee_id = ?", request.EmployeeID)
+	}
+
+	var deptExists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&deptExists)
+	if err != nil || !deptExists {
+		return web.NewRequestError(errors.New("invalid department ID"), http.StatusBadRequest)
+	}
+
+	var posExists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM position WHERE id = ? AND deleted_at IS NULL)", request.PositionID).Scan(&posExists)
+	if err != nil || !posExists {
+		return web.NewRequestError(errors.New("invalid position ID"), http.StatusBadRequest)
+	}
+	if request.Role != nil {
+		role := strings.ToUpper(*request.Role)
+		if (role != "EMPLOYEE") && (role != "ADMIN") {
+			return web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
+		}
+		q.Set("role = ?", role)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
+	}
+	hashedPassword := string(hash)
+
+	if request.FirstName != nil {
+		q.Set("first_name = ?", request.FirstName)
+	}
+
+	if request.LastName != nil {
+		q.Set("last_name = ?", request.LastName)
+	}
+	if request.NickName != nil {
+		q.Set("nick_name = ?", request.NickName)
+	}
+	if request.DepartmentID != nil {
+		q.Set("department_id = ?", request.DepartmentID)
+	}
+	if request.PositionID != nil {
+		q.Set("position_id=?", request.PositionID)
+	}
+	if request.Phone != nil {
+		q.Set("phone=?", request.Phone)
+	}
+	if request.Password != "" {
+		q.Set("password=?", hashedPassword)
+	}
+	if request.Email != nil {
+		q.Set("email=?", request.Email)
+	}
+	q.Set("updated_at = ?", time.Now())
+	q.Set("updated_by = ?", claims.UserId)
+
+	_, err = q.Exec(ctx)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
+	}
+
+	return nil
+}
+
+func (r Repository) Delete(ctx context.Context, id int) error {
+	return r.DeleteRow(ctx, "users", id)
+}
+
 func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -808,82 +895,6 @@ func (r *Repository) GetQrCodeList(ctx context.Context) (string, error) {
 	}
 
 	return pdfFilename, nil
-}
-
-func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) error {
-	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
-	if err != nil {
-		return err
-	}
-
-	if err := r.ValidateStruct(&request, "ID"); err != nil {
-		return err
-	}
-
-	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND id = ? ", request.ID)
-
-	if request.EmployeeID != nil {
-		userIdStatus := true
-		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.EmployeeID, request.ID)).Scan(&userIdStatus); err != nil {
-			return web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
-		}
-		if userIdStatus {
-			return web.NewRequestError(errors.Wrap(errors.New(""), "employee_id is used"), http.StatusInternalServerError)
-		}
-		q.Set("employee_id = ?", request.EmployeeID)
-	}
-
-	if request.Role != nil {
-		role := strings.ToUpper(*request.Role)
-		if (role != "EMPLOYEE") && (role != "ADMIN") {
-			return web.NewRequestError(errors.New("incorrect role. role should be EMPLOYEE or ADMIN"), http.StatusBadRequest)
-		}
-		q.Set("role = ?", role)
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(request.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
-	}
-	hashedPassword := string(hash)
-
-	if request.FirstName != nil {
-		q.Set("first_name = ?", request.FirstName)
-	}
-
-	if request.LastName != nil {
-		q.Set("last_name = ?", request.LastName)
-	}
-	if request.NickName != nil {
-		q.Set("nick_name = ?", request.NickName)
-	}
-	if request.DepartmentID != nil {
-		q.Set("department_id = ?", request.DepartmentID)
-	}
-	if request.PositionID != nil {
-		q.Set("position_id=?", request.PositionID)
-	}
-	if request.Phone != nil {
-		q.Set("phone=?", request.Phone)
-	}
-	if request.Password != "" {
-		q.Set("password=?", hashedPassword)
-	}
-	if request.Email != nil {
-		q.Set("email=?", request.Email)
-	}
-	q.Set("updated_at = ?", time.Now())
-	q.Set("updated_by = ?", claims.UserId)
-
-	_, err = q.Exec(ctx)
-	if err != nil {
-		return web.NewRequestError(errors.Wrap(err, "updating user"), http.StatusBadRequest)
-	}
-
-	return nil
-}
-
-func (r Repository) Delete(ctx context.Context, id int) error {
-	return r.DeleteRow(ctx, "users", id)
 }
 
 func (r Repository) GetMonthlyStatistics(ctx context.Context, request MonthlyStatisticRequest) (MonthlyStatisticResponse, error) {
