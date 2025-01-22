@@ -99,10 +99,10 @@ func (r Router) Init() error {
 	r.Get("/api/v1/user/export_employee", userController.ExportEmployee, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/user/export_template", userController.ExportTemplate, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
-	r.Post("/api/v1/user/create", userController.CreateUser, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateEmailAndPhoneInput())
+	r.Post("/api/v1/user/create", userController.CreateUser, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateEmailAndPhoneInput(), middleware.ValidateHalfWidthInput())
 	r.Post("/api/v1/user/create_excell", userController.CreateUserByExcell, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
-	r.Patch("/api/v1/user/:id", userController.UpdateUserColumns, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateEmailAndPhoneInput())
+	r.Patch("/api/v1/user/:id", userController.UpdateUserColumns, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateEmailAndPhoneInput(), middleware.ValidateHalfWidthInput())
 	r.Delete("/api/v1/user/:id", userController.DeleteUser, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/user/statistics", userController.GetStatistics, middleware.Authenticate(r.auth))
 	r.Get("/api/v1/user/monthly", userController.GetMonthlyStatistics, middleware.Authenticate(r.auth))
@@ -130,7 +130,7 @@ func (r Router) Init() error {
 	r.Delete("/api/v1/position/:id", positionController.Delete, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	// #companyInfo
 	r.Get("/api/v1/company_info/list", companyInfoController.GetInfo, middleware.Authenticate(r.auth, auth.RoleAdmin))
-	r.Put("/api/v1/company_info/:id", companyInfoController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Put("/api/v1/company_info/:id", companyInfoController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateHalfWidthInput())
 
 	// #attendance
 	r.Get("/api/v1/attendance/list", attendanceController.GetList, middleware.Authenticate(r.auth, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard))
@@ -139,8 +139,8 @@ func (r Router) Init() error {
 	r.Post("/api/v1/attendance/createbyphone", attendanceController.CreateByPhone, middleware.Authenticate(r.auth))
 	r.Post("/api/v1/attendance/createbyqrcode", attendanceController.CreateByQRCode, middleware.Authenticate(r.auth))
 	r.Patch("/api/v1/attendance/exitbyphone", attendanceController.ExitByPhone, middleware.Authenticate(r.auth))
-	r.Put("/api/v1/attendance/:id", attendanceController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin))
-	r.Patch("/api/v1/attendance/:id", attendanceController.UpdateColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Put("/api/v1/attendance/:id", attendanceController.UpdateAll, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateHalfWidthInput())
+	r.Patch("/api/v1/attendance/:id", attendanceController.UpdateColumns, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateHalfWidthInput())
 	r.Delete("/api/v1/attendance/:id", attendanceController.Delete, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/attendance", attendanceController.GetStatistics, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/attendance/piechart", attendanceController.GetPieChartStatistics, middleware.Authenticate(r.auth, auth.RoleAdmin))

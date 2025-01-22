@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 func Authenticate(a *auth.Auth, role ...string) web.Middleware {
@@ -76,6 +78,38 @@ func ValidateEmailAndPhoneInput() web.Middleware {
 
 			if !phoneRegex.MatchString(phone) {
 				return c.RespondError(web.NewRequestError(errors.New("無効な電話番号形式"), http.StatusBadRequest))
+			}
+
+			// Proceed to the next handler if validation passes.
+			return handler(c)
+		}
+	}
+}
+
+// isHalfWidth checks if a string contains only half-width characters.
+func isHalfWidth(s string) bool {
+	// Normalize the string to NFC form.
+	normalized := norm.NFC.String(s)
+	for _, r := range normalized {
+		// Full-width character detection
+		if r >= '\uFF01' && r <= '\uFF60' || r >= '\uFFE0' && r <= '\uFFEF' {
+			return false
+		}
+	}
+	return true
+}
+
+func ValidateHalfWidthInput() web.Middleware {
+	return func(handler web.Handler) web.Handler {
+		return func(c *web.Context) error {
+			// Iterate over form values and validate each one.
+			for _, values := range c.Request.Form {
+				for _, value := range values {
+					if !isHalfWidth(value) {
+						return c.RespondError(web.NewRequestError(
+							errors.New("入力は半角文字のみ使用可能"), http.StatusBadRequest))
+					}
+				}
 			}
 
 			// Proceed to the next handler if validation passes.
