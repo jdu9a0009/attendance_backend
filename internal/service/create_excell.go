@@ -12,6 +12,7 @@ type Employee struct {
 	FirstName      string
 	LastName       string
 	NickName       string
+	Role           string
 	DepartmentName string
 	PositionName   string
 	Phone          string

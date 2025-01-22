@@ -18,8 +18,8 @@ type Filter struct {
 }
 
 type SignInRequest struct {
-	EmployeeID string `json:"employee_id" form:"employee_id"`
 	Password   string `json:"password" form:"password"`
+	EmployeeID string `json:"employee_id" form:"employee_id"`
 }
 
 type AuthClaims struct {
@@ -119,8 +119,8 @@ type UpdateResponse struct {
 	EmployeeID   *string   `json:"employee_id"   bun:"employee_id"`
 	FirstName    *string   `json:"first_name"  bun:"first_name"`
 	LastName     *string   `json:"last_name"  bun:"last_name"`
-	NickName     *string    `json:"nick_name"  bun:"nick_name"`
-	Role         *string    `json:"role" bun:"role"`
+	NickName     *string   `json:"nick_name"  bun:"nick_name"`
+	Role         *string   `json:"role" bun:"role"`
 	DepartmentID *int      `json:"department_id" bun:"department_id"`
 	PositionID   *int      `json:"position_id" bun:"position_id"`
 	Phone        *string   `json:"phone" bun:"phone"`
@@ -160,7 +160,7 @@ type UpdateRequest struct {
 	Role         *string `json:"role"       form:"role"`
 	FirstName    *string `json:"first_name"  form:"first_name"`
 	LastName     *string `json:"last_name"  form:"last_name"`
-	NickName     *string  `json:"nick_name"  form:"nick_name"`
+	NickName     *string `json:"nick_name"  form:"nick_name"`
 	DepartmentID *int    `json:"department_id" form:"department_id"`
 	PositionID   *int    `json:"position_id" form:"position_id"`
 	Phone        *string `json:"phone" form:"phone"`

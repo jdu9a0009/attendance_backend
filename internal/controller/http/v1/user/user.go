@@ -163,7 +163,7 @@ func (uc Controller) ExportEmployee(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-	os.Remove("employee_list.xlsx")
+	// os.Remove("employee_list.xlsx")
 	return nil
 }
 func (uc Controller) ExportTemplate(c *web.Context) error {
@@ -234,7 +234,7 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 	}
 
 	return c.Respond(map[string]interface{}{
-		"成功した従業員数":   response,
+		"成功した従業員数":      response,
 		"不完全な従業員のエクセル行": incomplete,
 		"ステータス":         true,
 	}, http.StatusOK)

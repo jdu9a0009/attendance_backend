@@ -6,5 +6,7 @@ import (
 )
 
 type User interface {
-	GetByEmployeeID(ctx context.Context, login string) (entity.User, error)
+	GetByEmployeeID(ctx context.Context, login string) (*entity.User, error)
+	GetByEmployeeEmail(ctx context.Context, login string) (*entity.User, error)
+
 }

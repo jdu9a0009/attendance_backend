@@ -59,7 +59,6 @@ func NewRouter(
 
 func (r Router) Init() error {
 
-
 	r.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler), func(ctx *gin.Context) {
 		docs.SwaggerInfo.Host = ctx.Request.Host
 		if ctx.Request.TLS != nil {
@@ -100,7 +99,7 @@ func (r Router) Init() error {
 	r.Get("/api/v1/user/export_employee", userController.ExportEmployee, middleware.Authenticate(r.auth, auth.RoleAdmin))
 	r.Get("/api/v1/user/export_template", userController.ExportTemplate, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
-	r.Post("/api/v1/user/create", userController.CreateUser, middleware.Authenticate(r.auth, auth.RoleAdmin))
+	r.Post("/api/v1/user/create", userController.CreateUser, middleware.Authenticate(r.auth, auth.RoleAdmin), middleware.ValidateEmailAndPhoneInput())
 	r.Post("/api/v1/user/create_excell", userController.CreateUserByExcell, middleware.Authenticate(r.auth, auth.RoleAdmin))
 
 	r.Patch("/api/v1/user/:id", userController.UpdateUserColumns, middleware.Authenticate(r.auth, auth.RoleAdmin))

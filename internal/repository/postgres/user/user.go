@@ -49,17 +49,29 @@ func NewRepository(database *postgresql.Database) *Repository {
 	return &Repository{Database: database}
 }
 
-func (r Repository) GetByEmployeeID(ctx context.Context, employee_id string) (entity.User, error) {
+func (r Repository) GetByEmployeeID(ctx context.Context, employee_id string) (*entity.User, error) {
 	var detail entity.User
 	err := r.NewSelect().Model(&detail).Where("employee_id = ? AND deleted_at IS NULL", employee_id).Scan(ctx)
 
 	if err != nil {
-		return entity.User{}, &web.Error{
+		return &entity.User{}, &web.Error{
 			Err:    errors.New("employee not found!"),
 			Status: http.StatusUnauthorized,
 		}
 	}
-	return detail, err
+	return &detail, err
+}
+func (r Repository) GetByEmployeeEmail(ctx context.Context, email string) (*entity.User, error) {
+	var detail entity.User
+	err := r.NewSelect().Model(&detail).Where("email = ? AND deleted_at IS NULL", email).Scan(ctx)
+
+	if err != nil {
+		return &entity.User{}, &web.Error{
+			Err:    errors.New("employee not found!"),
+			Status: http.StatusUnauthorized,
+		}
+	}
+	return &detail, err
 }
 
 func (r Repository) GetFullName(ctx context.Context) (GetFullName, error) {
@@ -276,6 +288,20 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "Role", "FirstName,LastName"); err != nil {
 		return CreateResponse{}, err
 	}
+
+	// Check if the EmployeeID  already exists
+	EmployeeID := true
+	if err := r.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT CASE WHEN 
+							(SELECT employee_id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL) IS NOT NULL 
+							THEN true ELSE false END`, *request.EmployeeID)).Scan(&EmployeeID); err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "employee_id name check"), http.StatusInternalServerError)
+	}
+
+	if EmployeeID {
+		return CreateResponse{}, web.NewRequestError(errors.New("社員番号はすでに使用されています。"), http.StatusBadRequest)
+	}
+
 	var deptExists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&deptExists)
 	if err != nil || !deptExists {
@@ -287,6 +313,19 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	if err != nil || !posExists {
 		return CreateResponse{}, web.NewRequestError(errors.New("invalid position ID"), http.StatusBadRequest)
 	}
+	// Check if the Email  already exists
+	Email := true
+	if err := r.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT CASE WHEN 
+							(SELECT email FROM users WHERE email = '%s' AND deleted_at IS NULL) IS NOT NULL 
+							THEN true ELSE false END`, *request.Email)).Scan(&Email); err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "email name check"), http.StatusInternalServerError)
+	}
+
+	if Email {
+		return CreateResponse{}, web.NewRequestError(errors.New("メールアドレス はすでに使用されています。"), http.StatusBadRequest)
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
@@ -1215,9 +1254,10 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 	query := `
 	SELECT 
 		u.employee_id,
-		u.first_name,
 		u.last_name,
+		u.first_name,
 		u.nick_name,
+		u.role,
 		d.name as department_name,
 		p.name as position_name,
 		u.phone,
@@ -1244,9 +1284,10 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 		var lastName sql.NullString
 		if err = rows.Scan(
 			&detail.EmployeeID,
-			&firstName,
 			&lastName,
+			&firstName,
 			&nickName,
+			&detail.Role,
 			&detail.DepartmentName,
 			&detail.PositionName,
 			&detail.Phone,
@@ -1271,6 +1312,21 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 
 		list = append(list, detail)
 	}
+	departments := []string{}
+	positions := []string{}
+
+	query = `SELECT name FROM department  where deleted_at is null  ORDER BY display_number ASC`
+	err = r.NewRaw(query).Scan(ctx, &departments)
+	if err != nil {
+		return "", web.NewRequestError(errors.Wrap(err, "fetching departments list"), http.StatusInternalServerError)
+	}
+
+	queryy := `SELECT name FROM position  where deleted_at is null `
+	err = r.NewRaw(queryy).Scan(ctx, &positions)
+	if err != nil {
+		return "", web.NewRequestError(errors.Wrap(err, "fetching position list"), http.StatusInternalServerError)
+	}
+
 	xlsxFilename := "employee_list.xlsx"
 	if err := service.AddDataToExcel(list, xlsxFilename); err != nil {
 		return "", fmt.Errorf("failed to create xlsx: %v", err)

@@ -13,4 +13,5 @@ type User struct {
 	PositionID   *int    `json:"position_id"   bun:"position_id"`
 	Password     *string `json:"password"   bun:"password"`
 	Role         *string `json:"role"       bun:"role"`
+	Email        *string `json:"email" bun:"email"`
 }

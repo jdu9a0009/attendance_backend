@@ -3,17 +3,19 @@ package auth
 import (
 	"attendance/backend/foundation/web"
 	"attendance/backend/internal/commands"
+	"attendance/backend/internal/entity"
 	"attendance/backend/internal/repository/postgres/user"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// build is the git version of this hard_skill. It is set using build flags in the makefile.
 var (
-	errIncorrectEmployeeIdOrPassword = errors.New("incorrect employee id or password")
+	errIncorrectPassword   = errors.New("社員番号またはメールアドレス が間違っています")
+	errIncorrectEmployeeId = errors.New("パスワードが間違っています")
 )
 
 type Controller struct {
@@ -22,6 +24,13 @@ type Controller struct {
 
 func NewController(user User) *Controller {
 	return &Controller{user: user}
+}
+
+// Helper function to check if a string is a valid email
+func isValidEmail(email string) bool {
+	const emailRegex = `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
+	re := regexp.MustCompile(emailRegex)
+	return re.MatchString(email)
 }
 
 // @Description SignIn User
@@ -44,31 +53,41 @@ func (uc Controller) SignIn(c *web.Context) error {
 		})
 	}
 
-	detail, err := uc.user.GetByEmployeeID(c.Ctx, data.EmployeeID)
-	if err != nil {
-		fmt.Println("Error retrieving user by EmployeeID:", err)
+	var detail *entity.User
+	if isValidEmail(data.EmployeeID) {
+		// Fetch user by Email
+		detail, err = uc.user.GetByEmployeeEmail(c.Ctx, data.EmployeeID)
+	} else {
+		// Fetch user by EmployeeID
+		detail, err = uc.user.GetByEmployeeID(c.Ctx, data.EmployeeID)
+	}
+
+	if err != nil || detail == nil {
+		fmt.Println("User not found or invalid credentials for Identifier:", data.EmployeeID)
 		return c.RespondError(&web.Error{
-			Err:    errIncorrectEmployeeIdOrPassword,
+			Err:    errIncorrectPassword,
 			Status: http.StatusUnauthorized,
 		})
 	}
 
 	if detail.Password == nil {
-		fmt.Println("User not found for EmployeeID:", data.EmployeeID)
+		fmt.Println("Password not found for Identifier:", data.EmployeeID)
 		return c.RespondError(&web.Error{
-			Err:    errIncorrectEmployeeIdOrPassword,
+			Err:    errIncorrectEmployeeId,
 			Status: http.StatusNotFound,
 		})
 	}
 
+	// Verify password
 	if err = bcrypt.CompareHashAndPassword([]byte(*detail.Password), []byte(data.Password)); err != nil {
-		fmt.Println("Incorrect password for EmployeeID:", data.EmployeeID)
+		fmt.Println("Incorrect password for Identifier:", data.EmployeeID)
 		return c.RespondError(&web.Error{
-			Err:    errIncorrectEmployeeIdOrPassword,
-			Status: http.StatusUnauthorized, // Changed to 403 to reflect forbidden access
+			Err:    errIncorrectEmployeeId,
+			Status: http.StatusUnauthorized,
 		})
 	}
 
+	// Generate tokens
 	accessToken, refreshToken, err := commands.GenToken(user.AuthClaims{
 		ID:   detail.ID,
 		Role: *detail.Role,
@@ -93,6 +112,15 @@ func (uc Controller) SignIn(c *web.Context) error {
 	}, http.StatusOK)
 }
 
+// @Description Refresh Token
+// @Summary Refresh Token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param refresh body user.RefreshTokenRequest true "Refresh Token"
+// @Success 200 {object} web.ErrorResponse
+// @Failure 400,404,500,401 {object} web.ErrorResponse
+// @Router /api/v1/refresh-token [post]
 func (uc Controller) RefreshToken(c *web.Context) error {
 	var data user.RefreshTokenRequest
 
