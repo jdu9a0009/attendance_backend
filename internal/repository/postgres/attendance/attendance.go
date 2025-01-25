@@ -36,7 +36,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	if filter.Search != nil {
 		search := strings.Replace(*filter.Search, " ", "", -1)
 		search = strings.Replace(search, "'", "''", -1)
-		whereQuery += fmt.Sprintf(` AND (u.employee_id ILIKE '%s' OR u.full_name ILIKE '%s')`, "%"+search+"%", "%"+search+"%")
+		whereQuery += fmt.Sprintf(` AND (u.employee_id ILIKE '%s' OR u.last_name ILIKE '%s')`, "%"+search+"%", "%"+search+"%")
 	}
 
 	if filter.DepartmentID != nil {
@@ -207,7 +207,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		SELECT
 			a.id,
 			a.employee_id,
-			u.full_name,
+            CONCAT(u.first_name, ' ', u.last_name) AS full_name,
 			u.department_id,
 			d.name,
 			u.position_id,
@@ -224,7 +224,7 @@ func (r Repository) GetDetailById(ctx context.Context, id int) (GetDetailByIdRes
 		LEFT JOIN position p ON u.position_id = p.id
 		LEFT JOIN attendance_period  as ap ON ap.attendance_id=a.id
 		WHERE a.deleted_at IS NULL AND a.id = %d 
-		GROUP BY a.id, a.employee_id, u.full_name, u.department_id, d.name, 
+		GROUP BY a.id, a.employee_id, full_name, u.department_id, d.name, 
 	    u.position_id, p.name, a.work_day, a.status, a.come_time, a.leave_time
 	`, id)
 
@@ -269,7 +269,7 @@ func (r Repository) GetHistoryById(ctx context.Context, employeeID string, date 
 	query := `
 		SELECT
 			a.employee_id,
-			u.full_name,
+		    CONCAT(u.first_name, ' ', u.last_name) AS full_name,
 			a.status,
 			a.work_day,
 			TO_CHAR(ap.come_time, 'HH24:MI') as come_time,
@@ -279,7 +279,7 @@ func (r Repository) GetHistoryById(ctx context.Context, employeeID string, date 
 		LEFT JOIN users u ON a.employee_id = u.employee_id 
 		LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
 		WHERE u.deleted_at IS NULL AND a.deleted_at IS NULL AND u.role = 'EMPLOYEE' AND a.employee_id = ? AND ap.work_day = ?
-		GROUP BY a.employee_id, u.full_name, a.status, a.work_day, ap.come_time, ap.leave_time
+		GROUP BY a.employee_id, full_name, a.status, a.work_day, ap.come_time, ap.leave_time
 		ORDER BY ap.come_time, ap.leave_time
 	`
 

@@ -119,7 +119,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		search = strings.Replace(search, "'", "", -1)
 
 		whereQuery += fmt.Sprintf(` AND
-		u.employee_id ilike '%s' OR u.full_name ilike '%s'`, "%"+search+"%", "%"+search+"%")
+		u.employee_id ilike '%s' OR u.last_name ilike '%s'`, "%"+search+"%", "%"+search+"%")
 	}
 	if filter.DepartmentID != nil {
 		whereQuery += fmt.Sprintf(` AND u.department_id = %d`, *filter.DepartmentID)
