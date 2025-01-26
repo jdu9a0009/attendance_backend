@@ -77,16 +77,17 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		limitQuery = fmt.Sprintf("LIMIT %d", *filter.Limit)
 	}
 
-	groupByQuery := `GROUP BY u.employee_id, u.first_name,u.last_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.forget_leave,u.nick_name,a.come_time, a.leave_time`
+	groupByQuery := `GROUP BY  u.employee_id, u.first_name,u.last_name, u.department_id, d.name, u.position_id, p.name, a.work_day, a.status, a.forget_leave,u.nick_name,a.come_time, a.leave_time`
 	orderQuery := "ORDER BY u.employee_id DESC" // Order by user's name or any other field
 
 	if filter.Offset != nil {
-		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset) 
+		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset)
 	}
 	// today := time.Now().Format("2006-01-02")
 
-	query := fmt.Sprintf(`SELECT
-
+	query := fmt.Sprintf(`
+	
+	SELECT
     u.employee_id,
     CONCAT(u.first_name, ' ', u.last_name) AS full_name,
     u.department_id,
@@ -101,7 +102,7 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
     TO_CHAR(a.leave_time, 'HH24:MI') AS leave_time,
     COALESCE(SUM(EXTRACT(EPOCH FROM (ap.leave_time - ap.come_time)) / 60)::INT, 0) AS total_minutes
 FROM users u
-LEFT JOIN attendance a ON u.employee_id = a.employee_id AND a.work_day = %s AND a.deleted_at IS NULL
+LEFT  JOIN attendance a ON u.employee_id = a.employee_id AND a.work_day = %s AND a.deleted_at IS NULL
 LEFT JOIN department d ON u.department_id = d.id
 LEFT JOIN position p ON u.position_id = p.id
 LEFT JOIN attendance_period ap ON ap.attendance_id = a.id
@@ -351,6 +352,14 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
 		return CreateResponse{}, err
 	}
+	var exists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE employee_id = ? AND deleted_at IS NULL)", request.EmployeeID).Scan(&exists)
+	if !exists {
+		return CreateResponse{}, web.NewRequestError(errors.New("無効または削除された社員番号"), http.StatusBadRequest)
+	}
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "checking EmployeeID existence"), http.StatusInternalServerError)
+	}
 
 	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID)
 	if err != nil {
@@ -362,7 +371,7 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	}
 
 	if existingAttendance.ComeTime != nil {
-		return CreateResponse{}, web.NewRequestError(errors.New("まず退勤してください"), http.StatusBadRequest)
+		return CreateResponse{}, web.NewRequestError(errors.New("すでに出勤済みです。"), http.StatusBadRequest)
 	}
 	err = r.fixIncompleteAttendance(ctx, request.EmployeeID, claims)
 	if err != nil {
@@ -378,20 +387,28 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Crea
 	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
 		return CreateResponse{}, err
 	}
+	var exists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE employee_id = ? AND deleted_at IS NULL)", request.EmployeeID).Scan(&exists)
+	if !exists {
+		return CreateResponse{}, web.NewRequestError(errors.New("無効または削除された社員番号"), http.StatusBadRequest)
+	}
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "checking EmployeeID existence"), http.StatusInternalServerError)
+	}
 
 	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID)
 	if err != nil {
 		return CreateResponse{}, err
 	}
 	if existingAttendance.ComeTime != nil && existingAttendance.LeaveTime != nil {
-		return CreateResponse{}, web.NewRequestError(errors.New("まず退勤してください"), http.StatusBadRequest)
+		return CreateResponse{}, web.NewRequestError(errors.New("出勤していません"), http.StatusBadRequest)
 	}
 
 	if existingAttendance.ComeTime != nil {
 		return r.handleExistingAttendance(ctx, claims, existingAttendance, request.EmployeeID)
 	}
 
-	return CreateResponse{}, web.NewRequestError(errors.New("まず退勤してください"), http.StatusBadRequest)
+	return CreateResponse{}, web.NewRequestError(errors.New("出勤していません"), http.StatusBadRequest)
 }
 
 func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, string, error) {
@@ -401,6 +418,15 @@ func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (C
 	}
 	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
 		return CreateResponse{}, "", err
+	}
+
+	var exists bool
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE employee_id = ? AND deleted_at IS NULL)", request.EmployeeID).Scan(&exists)
+	if !exists {
+		return CreateResponse{},"", web.NewRequestError(errors.New("無効または削除された社員番号"), http.StatusBadRequest)
+	}
+	if err != nil {
+		return CreateResponse{}, "", web.NewRequestError(errors.Wrap(err, "checking EmployeeID existence"), http.StatusInternalServerError)
 	}
 
 	existingAttendance, err := r.getExistingAttendance(ctx, request.EmployeeID)

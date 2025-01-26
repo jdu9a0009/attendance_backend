@@ -1,15 +1,18 @@
 package hashing
 
 import (
+	"attendance/backend/foundation/web"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 
 	"github.com/pkg/errors"
 	"github.com/xuri/excelize/v2"
+	"golang.org/x/text/unicode/norm"
 )
 
 type ExcelData struct {
@@ -79,7 +82,7 @@ type UserExcellData struct {
 	Email          string
 }
 
-func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int) ([]UserExcellData, []int, error) {
+func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeIDList []string) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -96,8 +99,19 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 		return nil, nil, err
 	}
 
+	// Regex patterns for email and phone validation
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	phoneRegex := regexp.MustCompile(`^\+?\d*$`)
+
+	existingEmployeeIDs := make(map[string]struct{})
+	for _, id := range employeeIDList {
+		existingEmployeeIDs[id] = struct{}{}
+	}
+
 	var users []UserExcellData
 	var incompleteRows []int
+	localEmployeeIDSet := make(map[string]int) // To track duplicate IDs within the file
+
 	for i, row := range rows {
 		if i == 0 {
 			// Skip the header row
@@ -108,9 +122,7 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
-		if err != nil {
-			fmt.Println("error on creating employee_id")
-		}
+
 		departmentID, okDept := departmentMap[row[6]]
 		positionID, okPos := positionMap[row[7]]
 		if !okDept || !okPos {
@@ -118,8 +130,43 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 			continue
 		}
 
+		employeeID := row[0]
+
+		// Check if employee ID contains only half-width characters
+		if !isHalfWidth(employeeID) {
+			incompleteRows = append(incompleteRows, i) // Invalid employee ID format
+			continue
+		}
+
+		// Check if employee ID is already in the local or global set
+		if _, exists := existingEmployeeIDs[employeeID]; exists {
+			incompleteRows = append(incompleteRows, i) // Already exists in the database
+			continue
+		}
+
+		if _, exists := localEmployeeIDSet[employeeID]; exists {
+			incompleteRows = append(incompleteRows, i) // Duplicate within the file
+			continue
+		}
+
+		// Validate email and phone
+		email := row[9]
+		phone := row[8]
+		if !emailRegex.MatchString(email) {
+			incompleteRows = append(incompleteRows, i) // Invalid email format
+			continue
+		}
+
+		if !phoneRegex.MatchString(phone) {
+			incompleteRows = append(incompleteRows, i) // Invalid phone format
+			continue
+		}
+
+		// Add the employee ID to the local set
+		localEmployeeIDSet[employeeID] = i
+
 		users = append(users, UserExcellData{
-			EmployeeID:   row[0],
+			EmployeeID:   employeeID,
 			LastName:     row[1],
 			FirstName:    row[2],
 			NickName:     row[3],
@@ -127,14 +174,13 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 			Password:     row[5],
 			DepartmentID: departmentID,
 			PositionID:   positionID,
-			Phone:        row[8],
-			Email:        row[9],
+			Phone:        phone,
+			Email:        email,
 		})
 	}
 
 	return users, incompleteRows, nil
 }
-
 func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)
@@ -229,6 +275,38 @@ func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]
 		}
 	}
 	return employeeIDs, incompleteRows, nil
+}
+
+// isHalfWidth checks if a string contains only half-width characters.
+func isHalfWidth(s string) bool {
+	// Normalize the string to NFC form.
+	normalized := norm.NFC.String(s)
+	for _, r := range normalized {
+		// Full-width character detection
+		if r >= '\uFF01' && r <= '\uFF60' || r >= '\uFFE0' && r <= '\uFFEF' {
+			return false
+		}
+	}
+	return true
+}
+
+func ValidateHalfWidthInput() web.Middleware {
+	return func(handler web.Handler) web.Handler {
+		return func(c *web.Context) error {
+			// Iterate over form values and validate each one.
+			for _, values := range c.Request.Form {
+				for _, value := range values {
+					if !isHalfWidth(value) {
+						return c.RespondError(web.NewRequestError(
+							errors.New("入力は半角文字のみ使用可能"), http.StatusBadRequest))
+					}
+				}
+			}
+
+			// Proceed to the next handler if validation passes.
+			return handler(c)
+		}
+	}
 }
 
 func EditExcell(departments, positions []string) (string, error) {

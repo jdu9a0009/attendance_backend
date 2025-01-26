@@ -215,12 +215,13 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	}
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
-	if err != nil {
-		return web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
-	}
 	if !exists {
 		return web.NewRequestError(errors.New("無効または削除された部門ID"), http.StatusBadRequest)
 	}
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
+	}
+
 
 	q := r.NewUpdate().Table("position").Where("deleted_at IS NULL AND id = ?", request.ID)
 

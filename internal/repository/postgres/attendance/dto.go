@@ -19,7 +19,6 @@ type Filter struct {
 }
 
 type GetListResponse struct {
-	ID           int     `json:"id"`
 	DepartmentID *int    `json:"department_id"`
 	Department   *string `json:"department"`
 	PositionID   *int    `json:"position_id"`

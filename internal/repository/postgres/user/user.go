@@ -447,6 +447,7 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 	return r.DeleteRow(ctx, "users", id)
 }
 
+
 func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
 	if err != nil {
@@ -465,6 +466,27 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
 	}
 
+	employeeIDList := []string{}
+	rows, err := r.QueryContext(ctx, "SELECT employee_id,email FROM users WHERE role='EMPLOYEE' AND deleted_at IS NULL")
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "getting EmployeeIDList "), http.StatusInternalServerError)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var employeeID string
+		if err := rows.Scan(&employeeID); err != nil {
+			return 0, nil, web.NewRequestError(errors.Wrap(err, "scanning EmployeeIDList "), http.StatusInternalServerError)
+		}
+		employeeIDList = append(employeeIDList, employeeID)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "iterating over rows"), http.StatusInternalServerError)
+	}
+
+	if err != nil {
+		return 0, nil, web.NewRequestError(errors.Wrap(err, "getting EmployeeIDList "), http.StatusInternalServerError)
+	}
 	file, err := request.Excell.Open()
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "opening excel file"), http.StatusBadRequest)
@@ -494,7 +516,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		8: "Phone",
 		9: "Email",
 	}
-	excelData, incompleteRows, err := hashing.ExcelReaderByCreate(tempFile.Name(), fields, departmentMap, positionMap)
+	excelData, incompleteRows, err := hashing.ExcelReaderByCreate(tempFile.Name(), fields, departmentMap, positionMap, employeeIDList)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
