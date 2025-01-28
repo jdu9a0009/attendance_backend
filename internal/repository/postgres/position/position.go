@@ -180,6 +180,13 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
+	// Trim spaces from user input fields
+	*request.Name = strings.TrimSpace(*request.Name)
+
+	// Check if any of the fields are empty
+	if *request.Name == "" {
+		return CreateResponse{}, web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
+	}
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
 	if err != nil {
@@ -213,6 +220,13 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if err != nil {
 		return err
 	}
+	// Trim spaces from user input fields
+	*request.Name = strings.TrimSpace(*request.Name)
+
+	// Check if any of the fields are empty
+	if *request.Name == "" {
+		return web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
+	}
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
 	if !exists {
@@ -221,7 +235,6 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if err != nil {
 		return web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
 	}
-
 
 	q := r.NewUpdate().Table("position").Where("deleted_at IS NULL AND id = ?", request.ID)
 
@@ -242,6 +255,13 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if err := r.ValidateStruct(&request, "ID"); err != nil {
 		return err
 	}
+			// Trim spaces from user input fields
+			*request.Name = strings.TrimSpace(*request.Name)
+		
+			// Check if any of the fields are empty
+			if *request.Name == "" {
+				return   web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
+			}
 
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {

@@ -191,6 +191,14 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
+	// Trim spaces from user input fields
+	*request.Name = strings.TrimSpace(*request.Name)
+
+	// Check if any of the fields are empty
+	if *request.Name == "" {
+		return CreateResponse{}, web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
+	}
+
 	// Check if the departmDisplayNumberent name already exists
 	DepartmentName := true
 	if err := r.QueryRowContext(ctx,
@@ -249,6 +257,13 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		return err
 	}
 
+	// Trim spaces from user input fields
+	*request.Name = strings.TrimSpace(*request.Name)
+
+	// Check if any of the fields are empty
+	if *request.Name == "" {
+		return web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
+	}
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
 		return err
