@@ -128,7 +128,6 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 		employeeID := strings.TrimSpace(row[0])
 		lastName := strings.TrimSpace(row[1])
 		firstName := strings.TrimSpace(row[2])
-		nickName := strings.TrimSpace(row[3])
 		role := strings.TrimSpace(row[4])
 		password := strings.TrimSpace(row[5])
 		department := strings.TrimSpace(row[6])
@@ -139,7 +138,7 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 		// Check mandatory fields
 		if employeeID == "" || lastName == "" || firstName == "" || role == "" || password == "" || department == "" || position == "" {
 			incompleteRows = append(incompleteRows, i)
-			
+
 		}
 
 		// Check department and position mapping
@@ -182,7 +181,7 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 			EmployeeID:   employeeID,
 			LastName:     lastName,
 			FirstName:    firstName,
-			NickName:     nickName,
+			NickName:     row[3],
 			Role:         role,
 			Password:     password,
 			DepartmentID: departmentID,

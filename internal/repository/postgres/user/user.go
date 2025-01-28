@@ -289,14 +289,11 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	*request.EmployeeID = strings.TrimSpace(*request.EmployeeID)
 	*request.FirstName = strings.TrimSpace(*request.FirstName)
 	*request.LastName = strings.TrimSpace(*request.LastName)
-	request.NickName = strings.TrimSpace(request.NickName)
 	*request.Password = strings.TrimSpace(*request.Password)
-	*request.Phone = strings.TrimSpace(*request.Phone)
 	*request.Email = strings.TrimSpace(*request.Email)
 
 	// Check if any of the fields are empty
-	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" || request.NickName == "" ||
-		*request.Password == "" || *request.Phone == "" || *request.Email == "" {
+	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" ||*request.Password == "" || *request.Email == "" {
 		return CreateResponse{}, web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
 
