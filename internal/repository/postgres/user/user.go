@@ -285,11 +285,27 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, err
 	}
 
+	// Trim spaces from user input fields
+	*request.EmployeeID = strings.TrimSpace(*request.EmployeeID)
+	*request.FirstName = strings.TrimSpace(*request.FirstName)
+	*request.LastName = strings.TrimSpace(*request.LastName)
+	request.NickName = strings.TrimSpace(request.NickName)
+	*request.Password = strings.TrimSpace(*request.Password)
+	*request.Phone = strings.TrimSpace(*request.Phone)
+	*request.Email = strings.TrimSpace(*request.Email)
+
+	// Check if any of the fields are empty
+	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" || request.NickName == "" ||
+		*request.Password == "" || *request.Phone == "" || *request.Email == "" {
+		return CreateResponse{}, web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
+	}
+
+	// Validate struct for required fields
 	if err := r.ValidateStruct(&request, "EmployeeID", "Password", "Role", "FirstName,LastName"); err != nil {
 		return CreateResponse{}, err
 	}
 
-	// Check if the EmployeeID  already exists
+	// Check if the EmployeeID already exists
 	EmployeeID := true
 	if err := r.QueryRowContext(ctx,
 		fmt.Sprintf(`SELECT CASE WHEN 
@@ -302,18 +318,21 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, web.NewRequestError(errors.New("社員番号はすでに使用されています。"), http.StatusBadRequest)
 	}
 
+	// Check if department exists
 	var deptExists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&deptExists)
 	if err != nil || !deptExists {
 		return CreateResponse{}, web.NewRequestError(errors.New("invalid department ID"), http.StatusBadRequest)
 	}
 
+	// Check if position exists
 	var posExists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM position WHERE id = ? AND deleted_at IS NULL)", request.PositionID).Scan(&posExists)
 	if err != nil || !posExists {
 		return CreateResponse{}, web.NewRequestError(errors.New("invalid position ID"), http.StatusBadRequest)
 	}
-	// Check if the Email  already exists
+
+	// Check if the email already exists
 	Email := true
 	if err := r.QueryRowContext(ctx,
 		fmt.Sprintf(`SELECT CASE WHEN 
@@ -326,12 +345,14 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, web.NewRequestError(errors.New("メールアドレス はすでに使用されています。"), http.StatusBadRequest)
 	}
 
+	// Hash the password
 	hash, err := bcrypt.GenerateFromPassword([]byte(*request.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "hashing password"), http.StatusInternalServerError)
 	}
 	hashedPassword := string(hash)
 
+	// Set user role
 	var response CreateResponse
 	role := strings.ToUpper(*request.Role)
 	if (role != "EMPLOYEE") && (role != "ADMIN") {
@@ -350,11 +371,13 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	response.CreatedAt = time.Now()
 	response.CreatedBy = claims.UserId
 
+	// Insert into database
 	_, err = r.NewInsert().Model(&response).Returning("id").Exec(ctx, &response.ID)
 	if err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "creating user"), http.StatusBadRequest)
 	}
 
+	// Clear the password before returning the response
 	response.Password = nil
 
 	return response, nil
@@ -368,6 +391,20 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 	if err := r.ValidateStruct(&request, "ID"); err != nil {
 		return err
+	}
+
+	// Trim spaces from user input fields
+	*request.EmployeeID = strings.TrimSpace(*request.EmployeeID)
+	*request.FirstName = strings.TrimSpace(*request.FirstName)
+	*request.LastName = strings.TrimSpace(*request.LastName)
+	*request.NickName = strings.TrimSpace(*request.NickName)
+	*request.Phone = strings.TrimSpace(*request.Phone)
+	*request.Email = strings.TrimSpace(*request.Email)
+
+	// Check if any of the fields are empty
+	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" || *request.NickName == "" ||
+		*request.Phone == "" || *request.Email == "" {
+		return web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
 
 	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND id = ? ", request.ID)
@@ -446,7 +483,6 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 func (r Repository) Delete(ctx context.Context, id int) error {
 	return r.DeleteRow(ctx, "users", id)
 }
-
 
 func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (int, []int, error) {
 	claims, err := r.CheckClaims(ctx, auth.RoleAdmin)
