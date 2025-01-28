@@ -220,7 +220,7 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 		}
 
 		// Check if the row has fewer columns than required
-		if len(row) < 8 {
+		if len(row) < 10 {
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
@@ -247,7 +247,6 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 			Email:        row[9],
 		})
 	}
-	fmt.Println("users:", users)
 
 	return users, incompleteRows, nil
 }

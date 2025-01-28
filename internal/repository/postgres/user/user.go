@@ -1351,6 +1351,8 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 		var nickName sql.NullString
 		var firstName sql.NullString
 		var lastName sql.NullString
+		var phone sql.NullString
+
 		if err = rows.Scan(
 			&detail.EmployeeID,
 			&lastName,
@@ -1359,7 +1361,7 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 			&detail.Role,
 			&detail.DepartmentName,
 			&detail.PositionName,
-			&detail.Phone,
+			&phone,
 			&detail.Email); err != nil {
 			return "", web.NewRequestError(errors.Wrap(err, "scanning user list"), http.StatusBadRequest)
 		}
@@ -1377,6 +1379,11 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 			detail.LastName = lastName.String
 		} else {
 			detail.LastName = ""
+		}
+		if phone.Valid {
+			detail.Phone = phone.String
+		} else {
+			detail.Phone = ""
 		}
 
 		list = append(list, detail)
@@ -1396,12 +1403,12 @@ func (r *Repository) ExportEmployee(ctx context.Context) (string, error) {
 		return "", web.NewRequestError(errors.Wrap(err, "fetching position list"), http.StatusInternalServerError)
 	}
 
-	xlsxFilename := "employee_list.xlsx"
-	if err := service.AddDataToExcel(list, xlsxFilename); err != nil {
-		return "", fmt.Errorf("failed to create xlsx: %v", err)
+	file, err := service.AddDataToExcel(list, departments, positions)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
 	}
+	return file, nil
 
-	return xlsxFilename, nil
 }
 
 func (r Repository) ExportTemplate(ctx context.Context) (string, error) {

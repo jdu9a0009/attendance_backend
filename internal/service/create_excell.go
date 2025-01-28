@@ -9,66 +9,83 @@ import (
 
 type Employee struct {
 	EmployeeID     string
-	FirstName      string
-	LastName       string
-	NickName       string
-	Role           string
-	DepartmentName string
-	PositionName   string
-	Phone          string
-	Email          string
+	LastName       string // 姓
+	FirstName      string // 名
+	NickName       string // 表示名
+	Role           string // 権限
+	Password       string // パスワード
+	DepartmentName string // 部署
+	PositionName   string // 役職
+	Phone          string // 電話番号
+	Email          string // メールアドレス
 }
 
-func AddDataToExcel(employees []Employee, fileName string) error {
+func AddDataToExcel(employees []Employee, departments, positions []string) (string, error) {
+	templateFileName := "employee_list.xlsx"
+
 	var f *excelize.File
-	// var err error
-	sheet := "Sheet1"
+
 	// Check if file exists
-	if _, err := os.Stat(fileName); os.IsNotExist(err) {
-		// File does not exist, create a new one
+	if _, err := os.Stat(templateFileName); os.IsNotExist(err) {
+		// Create a new file if the template doesn't exist
 		f = excelize.NewFile()
-		f.SetSheetName("Sheet1", sheet)
-
-		// Set headers in the first row
-		headers := []string{"Employee ID", "FirstName", "LastName", "NickName", "Department Name", "Position Name", "Phone Number", "Email"}
-		for i, header := range headers {
-			cell := fmt.Sprintf("%c1", 'A'+i)
-			f.SetCellValue(sheet, cell, header)
-		}
+		f.NewSheet("Employees")
+		f.NewSheet("部署") // Departments
+		f.NewSheet("役職") // Positions
 	} else {
-		// File exists, open it
-		f, err = excelize.OpenFile(fileName)
+		// Open the existing template file
+		f, err = excelize.OpenFile(templateFileName)
 		if err != nil {
-			return fmt.Errorf("error opening file: %w", err)
+			return "", fmt.Errorf("failed to open template file: %w", err)
+		}
+	}
+	defer f.Close()
+
+	// Write Employee Data to the "Employees" sheet
+	employeeSheet := "Employees"
+	f.SetSheetName("Sheet1", employeeSheet)
+	headers := []string{"EmployeeID", "姓", "名", "表示名", "権限", "パスワード", "部署", "役職", "電話番号", "メールアドレス"}
+	for i, header := range headers {
+		cell := fmt.Sprintf("%c1", 'A'+i)
+		if err := f.SetCellValue(employeeSheet, cell, header); err != nil {
+			return "", fmt.Errorf("failed to write header in Employees sheet: %w", err)
 		}
 	}
 
-	// Find the next empty row
-	rowNum := 2
-	for {
-		cell, _ := f.GetCellValue(sheet, fmt.Sprintf("A%d", rowNum))
-		if cell == "" {
-			break
+	for i, emp := range employees {
+		row := i + 2 // Start from the second row
+		values := []interface{}{emp.EmployeeID, emp.LastName, emp.FirstName, emp.NickName, emp.Role, emp.Password, emp.DepartmentName, emp.PositionName, emp.Phone, emp.Email}
+		for j, value := range values {
+			cell := fmt.Sprintf("%c%d", 'A'+j, row)
+			if err := f.SetCellValue(employeeSheet, cell, value); err != nil {
+				return "", fmt.Errorf("failed to write employee data: %w", err)
+			}
 		}
-		rowNum++
 	}
 
-	// Populate rows with data starting from the next empty row
-	for _, entry := range employees {
-		f.SetCellValue(sheet, fmt.Sprintf("A%d", rowNum), entry.EmployeeID)
-		f.SetCellValue(sheet, fmt.Sprintf("B%d", rowNum), entry.FirstName)
-		f.SetCellValue(sheet, fmt.Sprintf("C%d", rowNum), entry.LastName)
-		f.SetCellValue(sheet, fmt.Sprintf("D%d", rowNum), entry.NickName)
-		f.SetCellValue(sheet, fmt.Sprintf("E%d", rowNum), entry.DepartmentName)
-		f.SetCellValue(sheet, fmt.Sprintf("F%d", rowNum), entry.PositionName)
-		f.SetCellValue(sheet, fmt.Sprintf("G%d", rowNum), entry.Phone)
-		f.SetCellValue(sheet, fmt.Sprintf("H%d", rowNum), entry.Email)
-		rowNum++
+	// Write Department Data to the "部署" sheet
+	departmentSheet := "部署"
+	for i, dept := range departments {
+		cell := fmt.Sprintf("A%d", i+1) // Start from the first row
+		if err := f.SetCellValue(departmentSheet, cell, dept); err != nil {
+			return "", fmt.Errorf("failed to write department data: %w", err)
+		}
+	}
+
+	// Write Position Data to the "役職" sheet
+	positionSheet := "役職"
+	for i, pos := range positions {
+		cell := fmt.Sprintf("A%d", i+1) // Start from the first row
+		if err := f.SetCellValue(positionSheet, cell, pos); err != nil {
+			return "", fmt.Errorf("failed to write position data: %w", err)
+		}
 	}
 
 	// Save the file
-	if err := f.SaveAs(fileName); err != nil {
-		return fmt.Errorf("error saving file: %w", err)
+	if err := f.SaveAs(templateFileName); err != nil {
+		return "", fmt.Errorf("failed to save the Excel file: %w", err)
 	}
-	return nil
+
+	return "employee_list.xlsx", nil
+
 }
