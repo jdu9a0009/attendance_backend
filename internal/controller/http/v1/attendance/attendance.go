@@ -50,6 +50,11 @@ var OfficeLocations = []OfficeLocation{
 		Longitude: 69.2322304,
 		Radius:    3000.0,
 	},
+	{
+		Latitude:  40.650891,
+		Longitude: 72.574660,
+		Radius:    3000.0,
+	},
 }
 
 func (uc Controller) GetList(c *web.Context) error {

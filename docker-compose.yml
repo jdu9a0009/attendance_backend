@@ -44,7 +44,7 @@ services:
       POSTGRES_PASSWORD: "password1"
       POSTGRES_DB: "attendances"
     ports:
-      - "5431:5432"
+      - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     networks:
