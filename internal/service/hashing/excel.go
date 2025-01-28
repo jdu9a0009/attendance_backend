@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/xuri/excelize/v2"
@@ -123,14 +124,31 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 			continue
 		}
 
-		departmentID, okDept := departmentMap[row[6]]
-		positionID, okPos := positionMap[row[7]]
+		// Trim spaces
+		employeeID := strings.TrimSpace(row[0])
+		lastName := strings.TrimSpace(row[1])
+		firstName := strings.TrimSpace(row[2])
+		nickName := strings.TrimSpace(row[3])
+		role := strings.TrimSpace(row[4])
+		password := strings.TrimSpace(row[5])
+		department := strings.TrimSpace(row[6])
+		position := strings.TrimSpace(row[7])
+		email := strings.TrimSpace(row[9])
+		phone := strings.TrimSpace(row[8])
+
+		// Check mandatory fields
+		if employeeID == "" || lastName == "" || firstName == "" || role == "" || password == "" || department == "" || position == "" {
+			incompleteRows = append(incompleteRows, i)
+			
+		}
+
+		// Check department and position mapping
+		departmentID, okDept := departmentMap[department]
+		positionID, okPos := positionMap[position]
 		if !okDept || !okPos {
 			incompleteRows = append(incompleteRows, i)
 			continue
 		}
-
-		employeeID := row[0]
 
 		// Check if employee ID contains only half-width characters
 		if !isHalfWidth(employeeID) {
@@ -139,25 +157,19 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 		}
 
 		// Check if employee ID is already in the local or global set
-		if _, exists := existingEmployeeIDs[employeeID]; exists {
-			incompleteRows = append(incompleteRows, i) // Already exists in the database
+		if _, exists := existingEmployeeIDs[employeeID]; exists || localEmployeeIDSet[employeeID] != 0 {
+			incompleteRows = append(incompleteRows, i) // Duplicate employee ID
 			continue
 		}
 
-		if _, exists := localEmployeeIDSet[employeeID]; exists {
-			incompleteRows = append(incompleteRows, i) // Duplicate within the file
-			continue
-		}
-
-		// Validate email and phone
-		email := row[9]
-		phone := row[8]
-		if !emailRegex.MatchString(email) {
+		// Validate email if provided
+		if email != "" && !emailRegex.MatchString(email) {
 			incompleteRows = append(incompleteRows, i) // Invalid email format
 			continue
 		}
 
-		if !phoneRegex.MatchString(phone) {
+		// Validate phone if provided
+		if phone != "" && !phoneRegex.MatchString(phone) {
 			incompleteRows = append(incompleteRows, i) // Invalid phone format
 			continue
 		}
@@ -165,13 +177,14 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 		// Add the employee ID to the local set
 		localEmployeeIDSet[employeeID] = i
 
+		// Append the user data
 		users = append(users, UserExcellData{
 			EmployeeID:   employeeID,
-			LastName:     row[1],
-			FirstName:    row[2],
-			NickName:     row[3],
-			Role:         row[4],
-			Password:     row[5],
+			LastName:     lastName,
+			FirstName:    firstName,
+			NickName:     nickName,
+			Role:         role,
+			Password:     password,
 			DepartmentID: departmentID,
 			PositionID:   positionID,
 			Phone:        phone,
@@ -181,6 +194,7 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 
 	return users, incompleteRows, nil
 }
+
 func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int) ([]UserExcellData, []int, error) {
 	sheetName := "Sheet1"
 	f, err := excelize.OpenFile(filePath)

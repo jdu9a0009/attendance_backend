@@ -508,10 +508,10 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "getting EmployeeIDList "), http.StatusInternalServerError)
 	}
 	defer rows.Close()
-
 	for rows.Next() {
-		var employeeID string
-		if err := rows.Scan(&employeeID); err != nil {
+		var employeeID, email string
+		// Scan both columns into variables
+		if err := rows.Scan(&employeeID, &email); err != nil {
 			return 0, nil, web.NewRequestError(errors.Wrap(err, "scanning EmployeeIDList "), http.StatusInternalServerError)
 		}
 		employeeIDList = append(employeeIDList, employeeID)
