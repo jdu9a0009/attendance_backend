@@ -31,29 +31,9 @@ type OfficeLocation struct {
 
 var OfficeLocations = []OfficeLocation{
 	{
-		Latitude:  41.3330625,
-		Longitude: 69.2550781,
-		Radius:    4000.0,
-	},
-	{
-		Latitude:  41.319006,
-		Longitude: 69.303411,
-		Radius:    3000.0,
-	},
-	{
-		Latitude:  35.7031509,
-		Longitude: 139.7745439,
-		Radius:    3000.0,
-	},
-	{
-		Latitude:  41.2844032,
-		Longitude: 69.2322304,
-		Radius:    3000.0,
-	},
-	{
-		Latitude:  40.650891,
-		Longitude: 72.574660,
-		Radius:    3000.0,
+		Latitude:  71.3330625,
+		Longitude: 19.2550781,
+		Radius:    100.0,
 	},
 }
 
