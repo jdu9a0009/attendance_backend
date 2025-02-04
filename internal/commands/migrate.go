@@ -170,7 +170,7 @@ var scheme = []Scheme{
 			present_color varchar(200),
 			absent_color varchar(200),
 			new_present_color varchar(200),
-			new_absent_color(200),
+			new_absent_color varchar(200),
             created_at TIMESTAMP DEFAULT NOW(),
             created_by INT REFERENCES users(id),
             updated_at TIMESTAMP,
