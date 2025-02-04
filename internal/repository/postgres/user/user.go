@@ -293,7 +293,7 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	*request.Email = strings.TrimSpace(*request.Email)
 
 	// Check if any of the fields are empty
-	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" ||*request.Password == "" || *request.Email == "" {
+	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" || *request.Password == "" || *request.Email == "" {
 		return CreateResponse{}, web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
 
@@ -390,17 +390,8 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		return err
 	}
 
-	// Trim spaces from user input fields
-	*request.EmployeeID = strings.TrimSpace(*request.EmployeeID)
-	*request.FirstName = strings.TrimSpace(*request.FirstName)
-	*request.LastName = strings.TrimSpace(*request.LastName)
-	*request.NickName = strings.TrimSpace(*request.NickName)
-	*request.Phone = strings.TrimSpace(*request.Phone)
-	*request.Email = strings.TrimSpace(*request.Email)
-
 	// Check if any of the fields are empty
-	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" || *request.NickName == "" ||
-		*request.Phone == "" || *request.Email == "" {
+	if *request.EmployeeID == "" || *request.FirstName == "" || *request.LastName == "" || *request.Email == "" {
 		return web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
 
@@ -412,9 +403,19 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 			return web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
 		}
 		if userIdStatus {
-			return web.NewRequestError(errors.Wrap(errors.New(""), "employee_id is used"), http.StatusInternalServerError)
+			return web.NewRequestError(errors.Wrap(errors.New(""), "社員番号はすでに使用されています。"), http.StatusBadRequest)
 		}
 		q.Set("employee_id = ?", request.EmployeeID)
+	}
+	if request.Email != nil {
+		emailStatus := true
+		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE email = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.Email, request.ID)).Scan(&emailStatus); err != nil {
+			return web.NewRequestError(errors.Wrap(err, "email check"), http.StatusInternalServerError)
+		}
+		if emailStatus {
+			return web.NewRequestError(errors.Wrap(errors.New(""), "メールアドレス はすでに使用されています。"), http.StatusBadRequest)
+		}
+		q.Set("email = ?", request.Email)
 	}
 
 	var deptExists bool
@@ -463,9 +464,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if request.Password != "" {
 		q.Set("password=?", hashedPassword)
 	}
-	if request.Email != nil {
-		q.Set("email=?", request.Email)
-	}
+
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
@@ -476,7 +475,6 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 	return nil
 }
-
 func (r Repository) Delete(ctx context.Context, id int) error {
 	return r.DeleteRow(ctx, "users", id)
 }
