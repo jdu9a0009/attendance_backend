@@ -187,6 +187,8 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 	if *request.Name == "" {
 		return CreateResponse{}, web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
+
+	// Check if the department exists
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
 	if err != nil {
@@ -196,8 +198,16 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, web.NewRequestError(errors.New("無効または削除された部門ID"), http.StatusBadRequest)
 	}
 
-	var response CreateResponse
+	// Check if the position name already exists for this department
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM position WHERE name = ? AND department_id = ? AND deleted_at IS NULL)", request.Name, request.DepartmentID).Scan(&exists)
+	if err != nil {
+		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "checking position duplication"), http.StatusInternalServerError)
+	}
+	if exists {
+		return CreateResponse{}, web.NewRequestError(errors.New("この部門にはすでに同じ名前の役職があります。"), http.StatusBadRequest)
+	}
 
+	var response CreateResponse
 	response.Name = request.Name
 	response.DepartmentID = request.DepartmentID
 	response.CreatedAt = time.Now()
@@ -220,6 +230,7 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if err != nil {
 		return err
 	}
+
 	// Trim spaces from user input fields
 	*request.Name = strings.TrimSpace(*request.Name)
 
@@ -227,19 +238,30 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if *request.Name == "" {
 		return web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
+
+	// Check if the department exists
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
+	if err != nil {
+		return web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
+	}
 	if !exists {
 		return web.NewRequestError(errors.New("無効または削除された部門ID"), http.StatusBadRequest)
 	}
+
+	// Check if the new name is already used in the same department by another record
+	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM position WHERE name = ? AND department_id = ? AND id != ? AND deleted_at IS NULL)", request.Name, request.DepartmentID, request.ID).Scan(&exists)
 	if err != nil {
-		return web.NewRequestError(errors.Wrap(err, "checking department existence"), http.StatusInternalServerError)
+		return web.NewRequestError(errors.Wrap(err, "checking position duplication"), http.StatusInternalServerError)
+	}
+	if exists {
+		return web.NewRequestError(errors.New("この部門にはすでに同じ名前の役職があります。"), http.StatusBadRequest)
 	}
 
 	q := r.NewUpdate().Table("position").Where("deleted_at IS NULL AND id = ?", request.ID)
 
 	q.Set("name = ?", request.Name)
-	q.Set("department_id=?", request.DepartmentID)
+	q.Set("department_id = ?", request.DepartmentID)
 	q.Set("updated_at = ?", time.Now())
 	q.Set("updated_by = ?", claims.UserId)
 
@@ -255,18 +277,22 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if err := r.ValidateStruct(&request, "ID"); err != nil {
 		return err
 	}
-			// Trim spaces from user input fields
-			*request.Name = strings.TrimSpace(*request.Name)
-		
-			// Check if any of the fields are empty
-			if *request.Name == "" {
-				return   web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
-			}
 
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
 		return err
 	}
+
+	// Trim spaces from user input fields
+	if request.Name != nil {
+		*request.Name = strings.TrimSpace(*request.Name)
+
+		if *request.Name == "" {
+			return web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
+		}
+	}
+
+	// Check if the department exists
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&exists)
 	if err != nil {
@@ -274,6 +300,17 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	}
 	if !exists {
 		return web.NewRequestError(errors.New("無効または削除された部門ID"), http.StatusBadRequest)
+	}
+
+	// Check if the new name is already used in the same department by another record
+	if request.Name != nil && request.DepartmentID != nil {
+		err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM position WHERE name = ? AND department_id = ? AND id != ? AND deleted_at IS NULL)", request.Name, request.DepartmentID, request.ID).Scan(&exists)
+		if err != nil {
+			return web.NewRequestError(errors.Wrap(err, "checking position duplication"), http.StatusInternalServerError)
+		}
+		if exists {
+			return web.NewRequestError(errors.New("この部門にはすでに同じ名前の役職があります。"), http.StatusBadRequest)
+		}
 	}
 
 	q := r.NewUpdate().Table("position").Where("deleted_at IS NULL AND id = ?", request.ID)
@@ -295,6 +332,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 	return nil
 }
+
 
 func (r Repository) Delete(ctx context.Context, id int) error {
 	var exists bool

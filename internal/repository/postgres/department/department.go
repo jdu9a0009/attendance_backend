@@ -199,16 +199,15 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 		return CreateResponse{}, web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
 
-	// Check if the departmDisplayNumberent name already exists
-	DepartmentName := true
+	// Check if the department name already exists
+	var exists bool
 	if err := r.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT CASE WHEN 
-						(SELECT id FROM department WHERE name = '%s' AND deleted_at IS NULL) IS NOT NULL 
-						THEN true ELSE false END`, *request.Name)).Scan(&DepartmentName); err != nil {
+		`SELECT EXISTS (SELECT 1 FROM department WHERE name = ? AND deleted_at IS NULL)`,
+		*request.Name).Scan(&exists); err != nil {
 		return CreateResponse{}, web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusInternalServerError)
 	}
 
-	if DepartmentName {
+	if exists {
 		return CreateResponse{}, web.NewRequestError(errors.New("部門名はすでに使用されています。"), http.StatusBadRequest)
 	}
 
@@ -251,7 +250,10 @@ func (r Repository) Create(ctx context.Context, request CreateRequest) (CreateRe
 }
 
 func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) error {
-
+	claims, err := r.CheckClaims(ctx)
+	if err != nil {
+		return err
+	}
 	// Validate request ID
 	if err := r.ValidateStruct(&request, "ID"); err != nil {
 		return err
@@ -264,33 +266,17 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if *request.Name == "" {
 		return web.NewRequestError(errors.New("必須項目は空欄にできません、またはスペースのみを含むことはできません。"), http.StatusBadRequest)
 	}
-	claims, err := r.CheckClaims(ctx)
-	if err != nil {
-		return err
-	}
 
 	// Check if the department name already exists
-	var DepartmentName bool
-	// Query to check if the department exists and is not deleted
-	query := `
-          SELECT CASE 
-	            WHEN (SELECT id FROM department WHERE id = ? AND deleted_at IS NULL) IS NOT NULL 
-	            THEN true 
-                ELSE false 
-          END`
-
 	var exists bool
-	if err := r.QueryRowContext(ctx, query, request.ID).Scan(&exists); err != nil {
-		return web.NewRequestError(errors.Wrap(err, "department existence check"), http.StatusInternalServerError)
+	if err := r.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM department WHERE name = ? AND deleted_at IS NULL)`,
+		*request.Name).Scan(&exists); err != nil {
+		return web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusInternalServerError)
 	}
 
-	if !exists {
-		return web.NewRequestError(errors.New("department not found or deleted"), http.StatusNotFound)
-	}
-
-	query = `SELECT CASE WHEN (SELECT id FROM department WHERE name = ? AND deleted_at IS NULL) IS NOT NULL THEN true ELSE false END`
-	if err := r.QueryRowContext(ctx, query, *request.Name).Scan(&DepartmentName); err != nil {
-		return web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusBadRequest)
+	if exists {
+		return web.NewRequestError(errors.New("部門名はすでに使用されています。"), http.StatusBadRequest)
 	}
 
 	// Get the last display number from the department table
