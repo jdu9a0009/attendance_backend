@@ -84,7 +84,7 @@ type UserExcellData struct {
 }
 
 func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeIDList []string) ([]UserExcellData, []int, error) {
-	sheetName := "Employees"
+	sheetName := "従業員"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return nil, nil, err
@@ -195,7 +195,7 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 }
 
 func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int) ([]UserExcellData, []int, error) {
-	sheetName := "Employees"
+	sheetName := "従業員"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return nil, nil, err
@@ -251,7 +251,7 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 }
 
 func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]string, []int, error) {
-	sheetName := "Employees"
+	sheetName := "従業員"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return nil, nil, err
