@@ -396,17 +396,6 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	}
 
 	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND id = ? ", request.ID)
-
-	if request.EmployeeID != nil {
-		userIdStatus := true
-		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.EmployeeID, request.ID)).Scan(&userIdStatus); err != nil {
-			return web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
-		}
-		if userIdStatus {
-			return web.NewRequestError(errors.Wrap(errors.New(""), "社員番号はすでに使用されています。"), http.StatusBadRequest)
-		}
-		q.Set("employee_id = ?", request.EmployeeID)
-	}
 	if request.Email != nil {
 		emailStatus := true
 		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE email = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.Email, request.ID)).Scan(&emailStatus); err != nil {
@@ -416,6 +405,16 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 			return web.NewRequestError(errors.Wrap(errors.New(""), "メールアドレス はすでに使用されています。"), http.StatusBadRequest)
 		}
 		q.Set("email = ?", request.Email)
+	}
+	if request.EmployeeID != nil {
+		userIdStatus := true
+		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.EmployeeID, request.ID)).Scan(&userIdStatus); err != nil {
+			return web.NewRequestError(errors.Wrap(err, "employee_id check"), http.StatusInternalServerError)
+		}
+		if userIdStatus {
+			return web.NewRequestError(errors.Wrap(errors.New(""), "社員番号はすでに使用されています。"), http.StatusBadRequest)
+		}
+		q.Set("employee_id = ?", request.EmployeeID)
 	}
 
 	var deptExists bool
@@ -499,40 +498,40 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 
 	employeeIDMap := make(map[string]struct{})
 	emailMap := make(map[string]struct{})
-	
-	rows, err := r.QueryContext(ctx, 
+
+	rows, err := r.QueryContext(ctx,
 		"SELECT employee_id, email FROM users WHERE role='EMPLOYEE' AND deleted_at IS NULL")
 	if err != nil {
 		return 0, nil, web.NewRequestError(
-			errors.Wrap(err, "getting employee data"), 
+			errors.Wrap(err, "getting employee data"),
 			http.StatusInternalServerError,
 		)
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var employeeID, email string
-		
+
 		if err := rows.Scan(&employeeID, &email); err != nil {
 			return 0, nil, web.NewRequestError(
-				errors.Wrap(err, "scanning employee data"), 
+				errors.Wrap(err, "scanning employee data"),
 				http.StatusInternalServerError,
 			)
 		}
-		
+
 		// Employee ID ni mapga qo'shish
 		employeeIDMap[employeeID] = struct{}{}
-		
+
 		// Email bo'sh bo'lmaganda mapga qo'shish
 		if email != "" {
 			emailMap[email] = struct{}{}
 		}
 	}
-	
+
 	// Iteratsiya xatolari uchun tekshirish
 	if err := rows.Err(); err != nil {
 		return 0, nil, web.NewRequestError(
-			errors.Wrap(err, "database iteration error"), 
+			errors.Wrap(err, "database iteration error"),
 			http.StatusInternalServerError,
 		)
 	}
@@ -565,7 +564,7 @@ func (r Repository) CreateByExcell(ctx context.Context, request ExcellRequest) (
 		8: "Phone",
 		9: "Email",
 	}
-	excelData, incompleteRows, err := hashing.ExcelReaderByCreate(tempFile.Name(), fields, departmentMap, positionMap, employeeIDMap,emailMap)
+	excelData, incompleteRows, err := hashing.ExcelReaderByCreate(tempFile.Name(), fields, departmentMap, positionMap, employeeIDMap, emailMap)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
@@ -640,40 +639,40 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 
 	employeeIDMap := make(map[string]struct{})
 	emailMap := make(map[string]struct{})
-	
-	rows, err := r.QueryContext(ctx, 
+
+	rows, err := r.QueryContext(ctx,
 		"SELECT employee_id, email FROM users WHERE role='EMPLOYEE' AND deleted_at IS NULL")
 	if err != nil {
 		return 0, nil, web.NewRequestError(
-			errors.Wrap(err, "getting employee data"), 
+			errors.Wrap(err, "getting employee data"),
 			http.StatusInternalServerError,
 		)
 	}
 	defer rows.Close()
-	
+
 	for rows.Next() {
 		var employeeID, email string
-		
+
 		if err := rows.Scan(&employeeID, &email); err != nil {
 			return 0, nil, web.NewRequestError(
-				errors.Wrap(err, "scanning employee data"), 
+				errors.Wrap(err, "scanning employee data"),
 				http.StatusInternalServerError,
 			)
 		}
-		
+
 		// Employee ID ni mapga qo'shish
 		employeeIDMap[employeeID] = struct{}{}
-		
+
 		// Email bo'sh bo'lmaganda mapga qo'shish
 		if email != "" {
 			emailMap[email] = struct{}{}
 		}
 	}
-	
+
 	// Iteratsiya xatolari uchun tekshirish
 	if err := rows.Err(); err != nil {
 		return 0, nil, web.NewRequestError(
-			errors.Wrap(err, "database iteration error"), 
+			errors.Wrap(err, "database iteration error"),
 			http.StatusInternalServerError,
 		)
 	}
@@ -710,7 +709,7 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		8: "Phone",
 		9: "Email",
 	}
-	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap,employeeIDMap,emailMap)
+	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap, employeeIDMap, emailMap)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
