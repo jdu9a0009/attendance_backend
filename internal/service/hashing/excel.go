@@ -83,178 +83,252 @@ type UserExcellData struct {
 	Email          string
 }
 
-func ExcelReaderByCreate(filePath string,  fields map[int]string,  departmentMap, positionMap map[string]int, employeeIDMap, existingEmailMap map[string]struct{} ) ([]UserExcellData, []int, error) {
-    sheetName := "従業員"
-    f, err := excelize.OpenFile(filePath)
-    if err != nil {
-        return nil, nil, err
-    }
-    defer f.Close()
+func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeIDMap, existingEmailMap map[string]struct{}) ([]UserExcellData, []int, error) {
+	sheetName := "従業員"
+	f, err := excelize.OpenFile(filePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
 
-    rows, err := f.GetRows(sheetName)
-    if err != nil {
-        return nil, nil, err
-    }
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		return nil, nil, err
+	}
 
-    emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-    phoneRegex := regexp.MustCompile(`^\+?\d+$`)
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	phoneRegex := regexp.MustCompile(`^\+?\d+$`)
 
-    var users []UserExcellData
-    var incompleteRows []int
-    localEmployeeIDs := make(map[string]int)  // Track IDs in current file
-    localEmails := make(map[string]int)      // Track emails in current file
+	var users []UserExcellData
+	var incompleteRows []int
+	localEmployeeIDs := make(map[string]int) // Track IDs in current file
+	localEmails := make(map[string]int)      // Track emails in current file
 
-    for i, row := range rows {
-        if i == 0 {
-            continue // Skip header
-        }
+	for i, row := range rows {
+		if i == 0 {
+			continue // Skip header
+		}
 
-        if len(row) < 10 {
-            incompleteRows = append(incompleteRows, i+1)
-            continue
-        }
+		if len(row) < 10 {
+			incompleteRows = append(incompleteRows, i+1)
+			continue
+		}
 
-        // Trim and validate fields
-        employeeID := strings.TrimSpace(row[0])
-        lastName := strings.TrimSpace(row[1])
-        firstName := strings.TrimSpace(row[2])
-        role := strings.TrimSpace(row[4])
-        password := strings.TrimSpace(row[5])
-        department := strings.TrimSpace(row[6])
-        position := strings.TrimSpace(row[7])
-        phone := strings.TrimSpace(row[8])
-        email := strings.TrimSpace(row[9])
+		// Trim and validate fields
+		employeeID := strings.TrimSpace(row[0])
+		lastName := strings.TrimSpace(row[1])
+		firstName := strings.TrimSpace(row[2])
+		role := strings.TrimSpace(row[4])
+		password := strings.TrimSpace(row[5])
+		department := strings.TrimSpace(row[6])
+		position := strings.TrimSpace(row[7])
+		phone := strings.TrimSpace(row[8])
+		email := strings.TrimSpace(row[9])
 
-        // Mandatory fields check
-        if employeeID == "" || lastName == "" || firstName == "" || 
-           role == "" || password == "" || department == "" || position == "" {
-            incompleteRows = append(incompleteRows, i+1)
-            continue
-        }
+		// Mandatory fields check
+		if employeeID == "" || lastName == "" || firstName == "" ||
+			role == "" || password == "" || department == "" || position == "" {
+			incompleteRows = append(incompleteRows, i+1)
+			continue
+		}
 
-        // Half-width characters check
-        if !isHalfWidth(employeeID) || !isHalfWidth(password) || 
-           (email != "" && !isHalfWidth(email)) {
-            incompleteRows = append(incompleteRows, i+1)
-            continue
-        }
+		// Half-width characters check
+		if !isHalfWidth(employeeID) || !isHalfWidth(password) ||
+			(email != "" && !isHalfWidth(email)) {
+			incompleteRows = append(incompleteRows, i+1)
+			continue
+		}
 
-        // Employee ID uniqueness checks
-        if _, exists := employeeIDMap[employeeID]; exists {
-            incompleteRows = append(incompleteRows, i+1) // Existing in DB
-            continue
-        }
-        if prevRow, exists := localEmployeeIDs[employeeID]; exists {
-            incompleteRows = append(incompleteRows, prevRow, i+1)
-            continue
-        }
+		// Employee ID uniqueness checks
+		if _, exists := employeeIDMap[employeeID]; exists {
+			incompleteRows = append(incompleteRows, i+1) // Existing in DB
+			continue
+		}
+		if prevRow, exists := localEmployeeIDs[employeeID]; exists {
+			incompleteRows = append(incompleteRows, prevRow, i+1)
+			continue
+		}
 
-        // Email uniqueness checks
-        if email != "" {
-            if _, exists := existingEmailMap[email]; exists {
-                incompleteRows = append(incompleteRows, i+1) // Existing in DB
-                continue
-            }
-            if prevRow, exists := localEmails[email]; exists {
-                incompleteRows = append(incompleteRows, prevRow, i+1)
-                continue
-            }
-        }
+		// Email uniqueness checks
+		if email != "" {
+			if _, exists := existingEmailMap[email]; exists {
+				incompleteRows = append(incompleteRows, i+1) // Existing in DB
+				continue
+			}
+			if prevRow, exists := localEmails[email]; exists {
+				incompleteRows = append(incompleteRows, prevRow, i+1)
+				continue
+			}
+		}
 
-        // Department/Position validation
-        departmentID, deptOK := departmentMap[department]
-        positionID, posOK := positionMap[position]
-        if !deptOK || !posOK {
-            incompleteRows = append(incompleteRows, i+1)
-            continue
-        }
+		// Department/Position validation
+		departmentID, deptOK := departmentMap[department]
+		positionID, posOK := positionMap[position]
+		if !deptOK || !posOK {
+			incompleteRows = append(incompleteRows, i+1)
+			continue
+		}
 
-        // Email format validation
-        if email != "" && !emailRegex.MatchString(email) {
-            incompleteRows = append(incompleteRows, i+1)
-            continue
-        }
+		// Email format validation
+		if email != "" && !emailRegex.MatchString(email) {
+			incompleteRows = append(incompleteRows, i+1)
+			continue
+		}
 
-        // Phone format validation
-        if phone != "" && !phoneRegex.MatchString(phone) {
-            incompleteRows = append(incompleteRows, i+1)
-            continue
-        }
+		// Phone format validation
+		if phone != "" && !phoneRegex.MatchString(phone) {
+			incompleteRows = append(incompleteRows, i+1)
+			continue
+		}
 
-        // Track unique values
-        localEmployeeIDs[employeeID] = i+1
-        if email != "" {
-            localEmails[email] = i+1
-        }
+		// Track unique values
+		localEmployeeIDs[employeeID] = i + 1
+		if email != "" {
+			localEmails[email] = i + 1
+		}
 
-        users = append(users, UserExcellData{
-            EmployeeID:   employeeID,
-            LastName:     lastName,
-            FirstName:    firstName,
-            NickName:     strings.TrimSpace(row[3]),
-            Role:         role,
-            Password:     password,
-            DepartmentID: departmentID,
-            PositionID:   positionID,
-            Phone:        phone,
-            Email:        email,
-        })
-    }
+		users = append(users, UserExcellData{
+			EmployeeID:   employeeID,
+			LastName:     lastName,
+			FirstName:    firstName,
+			NickName:     strings.TrimSpace(row[3]),
+			Role:         role,
+			Password:     password,
+			DepartmentID: departmentID,
+			PositionID:   positionID,
+			Phone:        phone,
+			Email:        email,
+		})
+	}
 
-    return users, incompleteRows, nil
+	return users, incompleteRows, nil
 }
 
-
-func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int) ([]UserExcellData, []int, error) {
+func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, existingIDs, existingEmails map[string]struct{}) ([]UserExcellData, []int, error) {
 	sheetName := "従業員"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() {
-		if err := f.Close(); err != nil {
-			log.Fatal(err)
+		if closeErr := f.Close(); closeErr != nil {
+			log.Printf("File close error: %v", closeErr)
 		}
 	}()
+
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+	phoneRegex := regexp.MustCompile(`^\+?\d+$`)
+
 	var users []UserExcellData
 	var incompleteRows []int
+	localIDs := make(map[string]int)
+	localEmails := make(map[string]int)
+
 	for i, row := range rows {
+		rowNumber := i + 1 // Excel 1-based row numbers
 		if i == 0 {
-			// Skip the header row
-			continue
+			continue // Skip header
 		}
 
-		// Check if the row has fewer columns than required
+		// Check minimum required columns
 		if len(row) < 10 {
-			incompleteRows = append(incompleteRows, i)
+			incompleteRows = append(incompleteRows, rowNumber)
 			continue
 		}
 
-		// Map department and position
-		departmentID, okDept := departmentMap[row[6]]
-		positionID, okPos := positionMap[row[7]]
-		if !okDept || !okPos {
-			incompleteRows = append(incompleteRows, i)
+		// Trim all fields
+		employeeID := strings.TrimSpace(row[0])
+		lastName := strings.TrimSpace(row[1])
+		firstName := strings.TrimSpace(row[2])
+		role := strings.TrimSpace(row[4])
+		password := strings.TrimSpace(row[5])
+		department := strings.TrimSpace(row[6])
+		position := strings.TrimSpace(row[7])
+		phone := strings.TrimSpace(row[8])
+		email := strings.TrimSpace(row[9])
+
+		// Validate mandatory fields
+		if employeeID == "" || lastName == "" || firstName == "" ||
+			role == "" || department == "" || position == "" {
+			incompleteRows = append(incompleteRows, rowNumber)
 			continue
 		}
 
-		// Add user data to the users slice
+		// Validate half-width characters
+		if !isHalfWidth(employeeID) || (password != "" && !isHalfWidth(password)) ||
+			(email != "" && !isHalfWidth(email)) {
+			incompleteRows = append(incompleteRows, rowNumber)
+			continue
+		}
+
+		// Check department and position existence
+		departmentID, deptOK := departmentMap[department]
+		positionID, posOK := positionMap[position]
+		if !deptOK || !posOK {
+			incompleteRows = append(incompleteRows, rowNumber)
+			continue
+		}
+
+		// Email validation
+		if email != "" {
+			if !emailRegex.MatchString(email) {
+				incompleteRows = append(incompleteRows, rowNumber)
+				continue
+			}
+		}
+
+		// Phone validation
+		if phone != "" && !phoneRegex.MatchString(phone) {
+			incompleteRows = append(incompleteRows, rowNumber)
+			continue
+		}
+
+		// Check local duplicates
+		if prevRow, exists := localIDs[employeeID]; exists {
+			incompleteRows = append(incompleteRows, prevRow, rowNumber)
+			continue
+		}
+		if email != "" {
+			if prevRow, exists := localEmails[email]; exists {
+				incompleteRows = append(incompleteRows, prevRow, rowNumber)
+				continue
+			}
+		}
+
+		// Check against existing IDs and Emails (global duplicates)
+		if _, exists := existingIDs[employeeID]; exists {
+			incompleteRows = append(incompleteRows, rowNumber)
+			continue
+		}
+		if email != "" {
+			if _, exists := existingEmails[email]; exists {
+				incompleteRows = append(incompleteRows, rowNumber)
+				continue
+			}
+		}
+
+		// Track processed values
+		localIDs[employeeID] = rowNumber
+		if email != "" {
+			localEmails[email] = rowNumber
+		}
+
 		users = append(users, UserExcellData{
-			EmployeeID:   row[0],
-			LastName:     row[1],
-			FirstName:    row[2],
-			NickName:     row[3],
-			Role:         row[4],
-			Password:     row[5],
+			EmployeeID:   employeeID,
+			LastName:     lastName,
+			FirstName:    firstName,
+			NickName:     strings.TrimSpace(row[3]),
+			Role:         role,
+			Password:     password,
 			DepartmentID: departmentID,
 			PositionID:   positionID,
-			Phone:        row[8],
-			Email:        row[9],
+			Phone:        phone,
+			Email:        email,
 		})
 	}
 

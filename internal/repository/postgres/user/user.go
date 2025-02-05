@@ -638,6 +638,45 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "loading position map"), http.StatusInternalServerError)
 	}
 
+	employeeIDMap := make(map[string]struct{})
+	emailMap := make(map[string]struct{})
+	
+	rows, err := r.QueryContext(ctx, 
+		"SELECT employee_id, email FROM users WHERE role='EMPLOYEE' AND deleted_at IS NULL")
+	if err != nil {
+		return 0, nil, web.NewRequestError(
+			errors.Wrap(err, "getting employee data"), 
+			http.StatusInternalServerError,
+		)
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		var employeeID, email string
+		
+		if err := rows.Scan(&employeeID, &email); err != nil {
+			return 0, nil, web.NewRequestError(
+				errors.Wrap(err, "scanning employee data"), 
+				http.StatusInternalServerError,
+			)
+		}
+		
+		// Employee ID ni mapga qo'shish
+		employeeIDMap[employeeID] = struct{}{}
+		
+		// Email bo'sh bo'lmaganda mapga qo'shish
+		if email != "" {
+			emailMap[email] = struct{}{}
+		}
+	}
+	
+	// Iteratsiya xatolari uchun tekshirish
+	if err := rows.Err(); err != nil {
+		return 0, nil, web.NewRequestError(
+			errors.Wrap(err, "database iteration error"), 
+			http.StatusInternalServerError,
+		)
+	}
 	if err := r.ValidateStruct(request.Excell); err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "validating excel request"), http.StatusBadRequest)
 	}
@@ -671,7 +710,7 @@ func (r Repository) UpdateByExcell(ctx context.Context, request ExcellRequest) (
 		8: "Phone",
 		9: "Email",
 	}
-	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap)
+	excelData, incompleteRows, err := hashing.ExcelReaderByEdit(tempFile.Name(), fields, departmentMap, positionMap,employeeIDMap,emailMap)
 	if err != nil {
 		return 0, nil, web.NewRequestError(errors.Wrap(err, "reading excel data"), http.StatusBadRequest)
 	}
