@@ -396,16 +396,8 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	}
 
 	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND id = ? ", request.ID)
-	if request.Email != nil {
-		emailStatus := true
-		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE email = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.Email, request.ID)).Scan(&emailStatus); err != nil {
-			return web.NewRequestError(errors.Wrap(err, "email check"), http.StatusInternalServerError)
-		}
-		if emailStatus {
-			return web.NewRequestError(errors.Wrap(errors.New(""), "メールアドレス はすでに使用されています。"), http.StatusBadRequest)
-		}
-		q.Set("email = ?", request.Email)
-	}
+
+
 	if request.EmployeeID != nil {
 		userIdStatus := true
 		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.EmployeeID, request.ID)).Scan(&userIdStatus); err != nil {
@@ -416,7 +408,17 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		}
 		q.Set("employee_id = ?", request.EmployeeID)
 	}
-
+	
+	if request.Email != nil {
+		emailStatus := true
+		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE email = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.Email, request.ID)).Scan(&emailStatus); err != nil {
+			return web.NewRequestError(errors.Wrap(err, "email check"), http.StatusInternalServerError)
+		}
+		if emailStatus {
+			return web.NewRequestError(errors.Wrap(errors.New(""), "メールアドレス はすでに使用されています。"), http.StatusBadRequest)
+		}
+		q.Set("email = ?", request.Email)
+	}
 	var deptExists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM department WHERE id = ? AND deleted_at IS NULL)", request.DepartmentID).Scan(&deptExists)
 	if err != nil || !deptExists {
