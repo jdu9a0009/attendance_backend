@@ -82,7 +82,9 @@ func (r Repository) GetFullName(ctx context.Context) (GetFullName, error) {
 
 	query := fmt.Sprintf(`
 		SELECT
-		     CONCAT(first_name, ' ', last_name) AS full_name
+		     CONCAT(first_name, ' ', last_name) AS full_name,
+			 employee_id
+
 		FROM
 		    users
 		WHERE deleted_at IS NULL AND role='EMPLOYEE' AND id = %d
@@ -92,6 +94,7 @@ func (r Repository) GetFullName(ctx context.Context) (GetFullName, error) {
 
 	err = r.QueryRowContext(ctx, query).Scan(
 		&detail.FullName,
+		&detail.EmployeeID,
 	)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -397,7 +400,6 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 
 	q := r.NewUpdate().Table("users").Where("deleted_at IS NULL AND id = ? ", request.ID)
 
-
 	if request.EmployeeID != nil {
 		userIdStatus := true
 		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE employee_id = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.EmployeeID, request.ID)).Scan(&userIdStatus); err != nil {
@@ -408,7 +410,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		}
 		q.Set("employee_id = ?", request.EmployeeID)
 	}
-	
+
 	if request.Email != nil {
 		emailStatus := true
 		if err := r.QueryRowContext(ctx, fmt.Sprintf("SELECT CASE WHEN (SELECT id FROM users WHERE email = '%s' AND deleted_at IS NULL AND id != %d) IS NOT NULL THEN true ELSE false END", *request.Email, request.ID)).Scan(&emailStatus); err != nil {
