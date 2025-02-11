@@ -230,18 +230,19 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 	localEmails := make(map[string]int)
 
 	for i, row := range rows {
-		rowNumber := i + 1 // Excel 1-based row numbers
+		rowNumber := i + 1 // Excel qator raqami (1-based)
 		if i == 0 {
-			continue // Skip header
+			continue // Header qatorini o'tkazib yuborish
 		}
 
-		// Check minimum required columns
+		// Yetarlicha ustun mavjudligini tekshirish
 		if len(row) < 10 {
+			log.Printf("Row %d: Missing columns. Expected at least 10, got %d\n", rowNumber, len(row))
 			incompleteRows = append(incompleteRows, rowNumber)
 			continue
 		}
 
-		// Trim all fields
+		// Qator ma'lumotlarini olish
 		employeeID := strings.TrimSpace(row[0])
 		lastName := strings.TrimSpace(row[1])
 		firstName := strings.TrimSpace(row[2])
@@ -252,72 +253,92 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 		phone := strings.TrimSpace(row[8])
 		email := strings.TrimSpace(row[9])
 
-		// Validate mandatory fields
-		if employeeID == "" || lastName == "" || firstName == "" ||
-			role == "" || department == "" || position == "" {
+		// Majburiy ustunlarni tekshirish
+		missingColumns := []string{}
+		if employeeID == "" {
+			missingColumns = append(missingColumns, "Employee ID")
+		}
+		if lastName == "" {
+			missingColumns = append(missingColumns, "Last Name")
+		}
+		if firstName == "" {
+			missingColumns = append(missingColumns, "First Name")
+		}
+		if role == "" {
+			missingColumns = append(missingColumns, "Role")
+		}
+		if department == "" {
+			missingColumns = append(missingColumns, "Department")
+		}
+		if position == "" {
+			missingColumns = append(missingColumns, "Position")
+		}
+
+		if len(missingColumns) > 0 {
+			log.Printf("Row %d: Missing required columns: %v\n", rowNumber, missingColumns)
 			incompleteRows = append(incompleteRows, rowNumber)
 			continue
 		}
-
-		// Validate half-width characters
-		if !isHalfWidth(employeeID) || (password != "" && !isHalfWidth(password)) ||
+		// Half-width characters check
+		if !isHalfWidth(employeeID) || !isHalfWidth(password) ||
 			(email != "" && !isHalfWidth(email)) {
-			incompleteRows = append(incompleteRows, rowNumber)
+			incompleteRows = append(incompleteRows, i+1)
 			continue
 		}
-
-		// Check department and position existence
+		// Department va Position tekshirish
 		departmentID, deptOK := departmentMap[department]
 		positionID, posOK := positionMap[position]
 		if !deptOK || !posOK {
+			log.Printf("Row %d: Invalid department or position - Department: '%s', Position: '%s'\n", rowNumber, department, position)
 			incompleteRows = append(incompleteRows, rowNumber)
 			continue
 		}
 
-		// Email validation
-		if email != "" {
-			if !emailRegex.MatchString(email) {
-				incompleteRows = append(incompleteRows, rowNumber)
-				continue
-			}
+		// Email tekshirish
+		if email != "" && !emailRegex.MatchString(email) {
+			log.Printf("Row %d: Invalid email format: %s\n", rowNumber, email)
+			incompleteRows = append(incompleteRows, rowNumber)
+			continue
 		}
 
-		// Phone validation
+		// Telefon raqamini tekshirish
 		if phone != "" && !phoneRegex.MatchString(phone) {
+			log.Printf("Row %d: Invalid phone format: %s\n", rowNumber, phone)
 			incompleteRows = append(incompleteRows, rowNumber)
 			continue
 		}
-
 		// Check local duplicates
 		if prevRow, exists := localIDs[employeeID]; exists {
-			incompleteRows = append(incompleteRows, prevRow, rowNumber)
+			log.Printf("Row %d: Duplicate Employee ID '%s' found (previously seen in Row %d)\n", rowNumber, employeeID, prevRow)
+			incompleteRows = append(incompleteRows, rowNumber) // Faqat joriy qatorni qo'shish
 			continue
 		}
 		if email != "" {
 			if prevRow, exists := localEmails[email]; exists {
-				incompleteRows = append(incompleteRows, prevRow, rowNumber)
+				log.Printf("Row %d: Duplicate Email '%s' found (previously seen in Row %d)\n", rowNumber, email, prevRow)
+				incompleteRows = append(incompleteRows, rowNumber) // Faqat joriy qatorni qo'shish
 				continue
 			}
 		}
 
 		// Check against existing IDs and Emails (global duplicates)
-		if _, exists := existingIDs[employeeID]; exists {
-			incompleteRows = append(incompleteRows, rowNumber)
-			continue
-		}
-		if email != "" {
-			if _, exists := existingEmails[email]; exists {
-				incompleteRows = append(incompleteRows, rowNumber)
-				continue
-			}
-		}
-
+		// if _, exists := existingIDs[employeeID]; exists {
+		// 	log.Printf("Row %d: Employee ID '%s' already exists in the system\n", rowNumber, employeeID)
+		// 	incompleteRows = append(incompleteRows, rowNumber)
+		// 	continue
+		// }
+		// if email != "" {
+		// 	if _, exists := existingEmails[email]; exists {
+		// 		log.Printf("Row %d: Email '%s' already exists in the system\n", rowNumber, email)
+		// 		incompleteRows = append(incompleteRows, rowNumber)
+		// 		continue
+		// 	}
+		// }
 		// Track processed values
 		localIDs[employeeID] = rowNumber
 		if email != "" {
 			localEmails[email] = rowNumber
 		}
-
 		users = append(users, UserExcellData{
 			EmployeeID:   employeeID,
 			LastName:     lastName,
@@ -331,7 +352,6 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 			Email:        email,
 		})
 	}
-
 	return users, incompleteRows, nil
 }
 
