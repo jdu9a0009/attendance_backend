@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/pkg/errors"
@@ -139,6 +140,8 @@ func (a *Auth) RemoveKey(kid string) {
 
 // GenerateToken generates a signed JWT token string representing the area Claims.
 func (a *Auth) GenerateToken(kid string, claims Claims) (string, error) {
+	claims.ExpiresAt = time.Now().Add(time.Minute * 1).Unix()
+
 	token := jwt.NewWithClaims(a.method, claims)
 	token.Header["kid"] = kid
 
@@ -164,6 +167,7 @@ func (a *Auth) GenerateToken(kid string, claims Claims) (string, error) {
 // ValidateToken recreates the Claims that were used to generate a token. It
 // verifies that the token was signed using our key.
 func (a *Auth) ValidateToken(tokenStr string) (Claims, error) {
+	
 	var claims Claims
 	token, err := a.parser.ParseWithClaims(tokenStr, &claims, a.keyFunc)
 	if err != nil {
