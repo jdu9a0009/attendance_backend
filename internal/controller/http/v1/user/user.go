@@ -374,7 +374,12 @@ func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 var dbPool *pgxpool.Pool
 
 func ConnectDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.Connect(ctx, dsn)
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	config.MaxConns = 300 // Poolning maksimal hajmini oshirish
+	pool, err := pgxpool.ConnectConfig(ctx, config)
 	if err != nil {
 		return nil, err
 	}
