@@ -1,14 +1,15 @@
 package commands
 
 import (
-	"crypto/rsa"
-	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/pkg/errors"
-	"os"
-	"time"
 	"attendance/backend/internal/auth"
 	user_service "attendance/backend/internal/repository/postgres/user"
+	"crypto/rsa"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/pkg/errors"
 )
 
 // GenToken generates a JWT for the specified area.

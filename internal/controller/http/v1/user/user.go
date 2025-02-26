@@ -378,7 +378,7 @@ func ConnectDB(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	config.MaxConns = 300 // Poolning maksimal hajmini oshirish
+	config.MaxConns = 1000 // Poolning maksimal hajmini oshirish
 	pool, err := pgxpool.ConnectConfig(ctx, config)
 	if err != nil {
 		return nil, err
