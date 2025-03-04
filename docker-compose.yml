@@ -29,26 +29,11 @@ services:
     networks:
       - app
     environment:
-      DB_HOST: "db"
+      DB_HOST: "127.0.0.1"
       DB_PORT: 5432
       DB_USERNAME: "postgres"
       DB_PASSWORD: "password1"
       DB_NAME: "attendances"
-  
-  db:
-    image: postgres:latest
-    container_name: postgres-db
-    restart: always
-    environment:
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "password1"
-      POSTGRES_DB: "attendances"
-    ports:
-      - "5432:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    networks:
-      - app
 
 networks:
   app:
