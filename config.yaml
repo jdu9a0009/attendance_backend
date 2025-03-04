@@ -1,9 +1,9 @@
 db_username: "postgres"
 db_password: "password1"
-db_host: "18.179.29.110"
+db_host: "54.238.140.132"
 db_name: "attendances"
 default_lang: "uz"
 port: 5432
 disable_tls: true
-base_url: "https:18.179.29.110:8080/api/v1"
+base_url: "http://54.238.140.132:8080/api/v1"
 jwt_key: "attendancePanel"
