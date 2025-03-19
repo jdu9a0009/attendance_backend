@@ -33,6 +33,7 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	q.Set("url = ?", request.Url)
 	q.Set("latitude = ?", request.Latitude)
 	q.Set("longitude = ?", request.Longitude)
+	q.Set("radius = ?", request.Radius)
 	q.Set("start_time = ?", request.StartTime)
 	q.Set("end_time = ?", request.EndTime)
 	q.Set("late_time = ?", request.LateTime)

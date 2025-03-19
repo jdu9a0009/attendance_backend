@@ -20,6 +20,7 @@ type UpdateRequest struct {
 	Url             string                `json:"url" form:"url"`
 	Latitude        *float64              `json:"latitude" form:"latitude"`
 	Longitude       *float64              `json:"longitude" form:"longitude"`
+	Radius          *float64              `json:"radius" form:"radius"`
 	StartTime       string                `json:"start_time" form:"start_time"`
 	EndTime         string                `json:"end_time" form:"end_time"`
 	LateTime        string                `json:"late_time" form:"late_time"`
@@ -40,6 +41,7 @@ type GetInfoResponse struct {
 	Url             string  `json:"url"`
 	Latitude        float64 `json:"latitude"`
 	Longitude       float64 `json:"longitude"`
+	Radius          float64 `json:"radius"`
 	StartTime       string  `json:"start_time"`
 	EndTime         string  `json:"end_time"`
 	LateTime        string  `json:"late_time"`
