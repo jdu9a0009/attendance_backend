@@ -12,7 +12,7 @@ type Attendance interface {
 	GetList(ctx context.Context, filter attendance.Filter) ([]attendance.GetListResponse, int, error)
 	GetDetailById(ctx context.Context, id int) (attendance.GetDetailByIdResponse, error)
 	GetHistoryById(ctx context.Context, employee_id string, date date.Date) ([]attendance.GetHistoryByIdResponse, int, error)
-
+	GetOfficeLocations(ctx context.Context) ([]attendance.OfficeLocation, error)
 	UpdateAll(ctx context.Context, request attendance.UpdateRequest) error
 	UpdateColumns(ctx context.Context, request attendance.UpdateRequest) error
 	Delete(ctx context.Context, id int) error

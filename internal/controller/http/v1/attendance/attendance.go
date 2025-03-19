@@ -23,39 +23,39 @@ func NewController(attendance Attendance, company_Info CompanyInfo) *Controller 
 	return &Controller{attendance, company_Info}
 }
 
-type OfficeLocation struct {
-	Latitude  float64
-	Longitude float64
-	Radius    float64 // in meters
-}
+// type OfficeLocation struct {
+// 	Latitude  float64
+// 	Longitude float64
+// 	Radius    float64 // in meters
+// }
 
-var OfficeLocations = []OfficeLocation{
-	{
-		Latitude:  41.3330625,
-		Longitude: 69.2550781,
-		Radius:    4000.0,
-	},
-	{
-		Latitude:  41.319006,
-		Longitude: 69.303411,
-		Radius:    3000.0,
-	},
-	{
-		Latitude:  35.7031509,
-		Longitude: 139.7745439,
-		Radius:    3000.0,
-	},
-	{
-		Latitude:  41.2844032,
-		Longitude: 69.2322304,
-		Radius:    3000.0,
-	},
-	{
-		Latitude:  40.650891,
-		Longitude: 72.574660,
-		Radius:    3000.0,
-	},
-}
+// var OfficeLocations = []OfficeLocation{
+// 	{
+// 		Latitude:  41.3330625,
+// 		Longitude: 69.2550781,
+// 		Radius:    4000.0,
+// 	},
+// 	{
+// 		Latitude:  41.319006,
+// 		Longitude: 69.303411,
+// 		Radius:    3000.0,
+// 	},
+// 	{
+// 		Latitude:  35.7031509,
+// 		Longitude: 139.7745439,
+// 		Radius:    3000.0,
+// 	},
+// 	{
+// 		Latitude:  41.2844032,
+// 		Longitude: 69.2322304,
+// 		Radius:    3000.0,
+// 	},
+// 	{
+// 		Latitude:  40.650891,
+// 		Longitude: 72.574660,
+// 		Radius:    3000.0,
+// 	},
+// }
 
 func (uc Controller) GetList(c *web.Context) error {
 	var filter attendance.Filter
@@ -337,23 +337,16 @@ func (uc Controller) CreateByQRCode(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	// Check distance to each office
-	for _, office := range OfficeLocations {
-		distance := CalculateDistance(request.Latitude, request.Longitude, office.Latitude, office.Longitude)
-		if distance <= office.Radius {
-			response, message, err := uc.attendance.CreateByQRCode(c.Ctx, request)
-			if err != nil {
-				return c.RespondError(err)
-			}
-
-			return c.Respond(map[string]interface{}{
-				"data":    response,
-				"message": message,
-				"status":  true,
-			}, http.StatusOK)
-		}
+	response, message, err := uc.attendance.CreateByQRCode(c.Ctx, request)
+	if err != nil {
+		return c.RespondError(err)
 	}
-	return c.RespondError(web.NewRequestError(errors.New("正常ないちではないためチェックインできません"), http.StatusBadRequest))
+
+	return c.Respond(map[string]interface{}{
+		"data":    response,
+		"message": message,
+		"status":  true,
+	}, http.StatusOK)
 
 }
 func (uc Controller) CreateByPhone(c *web.Context) error {
@@ -362,8 +355,12 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
+	officeLocations, err := uc.attendance.GetOfficeLocations(c.Ctx)
+	if err != nil {
+		return c.RespondError(err)
+	}
 	// Check distance to each office
-	for _, office := range OfficeLocations {
+	for _, office := range officeLocations {
 		distance := CalculateDistance(request.Latitude, request.Longitude, office.Latitude, office.Longitude)
 		if distance <= office.Radius {
 			response, err := uc.attendance.CreateByPhone(c.Ctx, request)

@@ -24,6 +24,24 @@ type Repository struct {
 func NewRepository(database *postgresql.Database) *Repository {
 	return &Repository{Database: database}
 }
+func (r *Repository) GetOfficeLocations(ctx context.Context) ([]OfficeLocation, error) {
+	query := `SELECT latitude, longitude,radius FROM company_info`
+	rows, err := r.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var locations []OfficeLocation
+	for rows.Next() {
+		var loc OfficeLocation
+		if err := rows.Scan(&loc.Latitude, &loc.Longitude, &loc.Radius); err != nil {
+			return nil, err
+		}
+		locations = append(locations, loc)
+	}
+	return locations, nil
+}
 
 func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListResponse, int, error) {
 	_, err := r.CheckClaims(ctx, auth.RoleAdmin, auth.RoleEmployee, auth.RoleDashboard)

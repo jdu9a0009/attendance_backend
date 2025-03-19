@@ -17,6 +17,11 @@ type Filter struct {
 	Status       *bool
 	Date         *string
 }
+type OfficeLocation struct {
+	Latitude  float64 `json:"latitude" bun:"latitude"`
+	Longitude float64 `json:"longitude" bun:"longitude"`
+	Radius    float64 `json:"radius" bun:"radius"`
+}
 
 type GetListResponse struct {
 	DepartmentID *int    `json:"department_id"`
