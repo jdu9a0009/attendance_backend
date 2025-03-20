@@ -27,13 +27,16 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if err != nil {
 		return err
 	}
-
+	radius := request.Radius
+	if radius == 0 {
+		radius = 3000.0
+	}
 	q := r.NewUpdate().Table("company_info").Where("deleted_at IS NULL AND id = ?", request.ID)
 	q.Set("company_name = ?", request.CompanyName)
 	q.Set("url = ?", request.Url)
 	q.Set("latitude = ?", request.Latitude)
 	q.Set("longitude = ?", request.Longitude)
-	q.Set("radius = ?", request.Radius)
+	q.Set("radius = ?", radius)
 	q.Set("start_time = ?", request.StartTime)
 	q.Set("end_time = ?", request.EndTime)
 	q.Set("late_time = ?", request.LateTime)

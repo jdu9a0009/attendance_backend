@@ -12,26 +12,22 @@ type Controller struct {
 	companyInfo CompanyInfo
 }
 
-const companyDir = "company_info" 
+const companyDir = "company_info"
 
 func NewController(companyInfo CompanyInfo) *Controller {
 	return &Controller{companyInfo}
 }
-
 func (uc Controller) UpdateAll(c *web.Context) error {
 	id := c.GetParam(reflect.Int, "id").(int)
 
 	if err := c.ValidParam(); err != nil {
 		return c.RespondError(err)
 	}
-
 	var request companyInfo.UpdateRequest
-
+	request.ID = id
 	if err := c.BindFunc(&request, "company_name", "latitude", "longitude"); err != nil {
 		return c.RespondError(err)
 	}
-
-	request.ID = id
 
 	// Check if image exists in the request
 	if request.Logo != nil {
@@ -52,6 +48,7 @@ func (uc Controller) UpdateAll(c *web.Context) error {
 		"status": true,
 	}, http.StatusOK)
 }
+
 func (uc Controller) GetInfo(c *web.Context) error {
 
 	if err := c.ValidQuery(); err != nil {
