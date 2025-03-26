@@ -268,10 +268,11 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	}
 
 	// Check if the department name already exists
+
 	var exists bool
 	if err := r.QueryRowContext(ctx,
-		`SELECT EXISTS (SELECT 1 FROM department WHERE name = ? AND deleted_at IS NULL)`,
-		*request.Name).Scan(&exists); err != nil {
+		`SELECT EXISTS (SELECT 1 FROM department WHERE name = ? AND id != ?  AND deleted_at IS NULL)`,
+		*request.Name, request.ID).Scan(&exists); err != nil {
 		return web.NewRequestError(errors.Wrap(err, "department name check"), http.StatusInternalServerError)
 	}
 
