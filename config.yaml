@@ -1,5 +1,5 @@
 db_username: "postgres"
-db_password: "pasword1"
+db_password: "password1"
 db_host: "43.207.0.156"
 db_name: "attendances"
 default_lang: "uz"

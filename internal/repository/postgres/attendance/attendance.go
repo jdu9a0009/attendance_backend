@@ -40,6 +40,7 @@ func (r *Repository) GetOfficeLocations(ctx context.Context) ([]OfficeLocation, 
 		}
 		locations = append(locations, loc)
 	}
+	fmt.Println("Locations:", locations)
 	return locations, nil
 }
 
@@ -403,6 +404,9 @@ func (r Repository) ExitByPhone(ctx context.Context, request ExitByPhoneRequest)
 		return CreateResponse{}, err
 	}
 
+	if err := r.ValidateStruct(&request); err != nil {
+		return CreateResponse{}, err
+	}
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE employee_id = ? AND deleted_at IS NULL)", request.EmployeeID).Scan(&exists)
 	if !exists {
@@ -430,6 +434,9 @@ func (r Repository) ExitByPhone(ctx context.Context, request ExitByPhoneRequest)
 func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, string, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
+		return CreateResponse{}, "", err
+	}
+	if err := r.ValidateStruct(&request); err != nil {
 		return CreateResponse{}, "", err
 	}
 
