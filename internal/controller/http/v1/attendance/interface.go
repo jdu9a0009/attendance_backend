@@ -23,7 +23,7 @@ type Attendance interface {
 
 	CreateByQRCode(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, string, error)
 	CreateByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
-	ExitByPhone(ctx context.Context, request attendance.EnterRequest) (attendance.CreateResponse, error)
+	ExitByPhone(ctx context.Context, request attendance.ExitByPhoneRequest) (attendance.CreateResponse, error)
 }
 type CompanyInfo interface {
 	GetAttendanceColor(ctx context.Context) (companyInfo.GetAttendanceColorResponse, error)

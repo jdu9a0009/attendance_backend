@@ -333,9 +333,6 @@ func (uc Controller) Delete(c *web.Context) error {
 }
 func (uc Controller) CreateByQRCode(c *web.Context) error {
 	var request attendance.EnterRequest
-	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
-		return c.RespondError(err)
-	}
 
 	response, message, err := uc.attendance.CreateByQRCode(c.Ctx, request)
 	if err != nil {
@@ -378,10 +375,7 @@ func (uc Controller) CreateByPhone(c *web.Context) error {
 
 }
 func (uc Controller) ExitByPhone(c *web.Context) error {
-	var request attendance.EnterRequest
-	if err := c.BindFunc(&request, "Latitude,Longitude"); err != nil {
-		return c.RespondError(err)
-	}
+	var request attendance.ExitByPhoneRequest
 
 	response, err := uc.attendance.ExitByPhone(c.Ctx, request)
 	if err != nil {

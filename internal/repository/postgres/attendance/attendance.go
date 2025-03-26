@@ -397,14 +397,12 @@ func (r Repository) CreateByPhone(ctx context.Context, request EnterRequest) (Cr
 	}
 	return r.createNewAttendance(ctx, claims, request)
 }
-func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (CreateResponse, error) {
+func (r Repository) ExitByPhone(ctx context.Context, request ExitByPhoneRequest) (CreateResponse, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
 		return CreateResponse{}, err
 	}
-	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
-		return CreateResponse{}, err
-	}
+
 	var exists bool
 	err = r.QueryRowContext(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE employee_id = ? AND deleted_at IS NULL)", request.EmployeeID).Scan(&exists)
 	if !exists {
@@ -432,9 +430,6 @@ func (r Repository) ExitByPhone(ctx context.Context, request EnterRequest) (Crea
 func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (CreateResponse, string, error) {
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
-		return CreateResponse{}, "", err
-	}
-	if err := r.ValidateStruct(&request, "Latitude", "Longitude"); err != nil {
 		return CreateResponse{}, "", err
 	}
 

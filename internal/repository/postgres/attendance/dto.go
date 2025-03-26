@@ -112,8 +112,6 @@ type PeriodsUpdate struct {
 
 type ExitByPhoneRequest struct {
 	EmployeeID *string `json:"employee_id" form:"employee_id"`
-	Latitude   float64 `json:"latitude" form:"latitude"`
-	Longitude  float64 `json:"longitude" form:"longitude"`
 }
 type EnterRequest struct {
 	Latitude   float64 `json:"latitude" form:"latitude"`
