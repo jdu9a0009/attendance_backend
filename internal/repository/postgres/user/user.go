@@ -1175,7 +1175,9 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 	if err != nil {
 		return DashboardResponse{}, err
 	}
-	workDay := time.Now().Format("2006-01-02")
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 
 	var detail DashboardResponse
 	var totalMinutes int
@@ -1206,7 +1208,7 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 	minutes := totalMinutes % 60
 	totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
 	detail.TotalHours = totalHours
-
+	fmt.Println("data:", detail.LeaveTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return DashboardResponse{}, nil
 	}
@@ -1230,8 +1232,10 @@ func (r Repository) GetDashboardList(ctx context.Context, filter Filter) ([]Depa
 		offsetQuery = fmt.Sprintf(" OFFSET %d", *filter.Offset)
 	}
 
-	workDay := time.Now().Format("2006-01-02")
-	query := fmt.Sprintf(`
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
+		query := fmt.Sprintf(`
 
                  SELECT
                     u.id,

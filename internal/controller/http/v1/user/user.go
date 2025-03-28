@@ -362,7 +362,6 @@ func (uc Controller) GetEmployeeDashboard(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-
 	return c.Respond(map[string]interface{}{
 		"employee":    employee.FullName,
 		"employee_id": employee.EmployeeID,

@@ -473,7 +473,9 @@ func (r Repository) CreateByQRCode(ctx context.Context, request EnterRequest) (C
 func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *string, claims auth.Claims) error {
 	var workEndTime, lastWorkDay string
 	var attendanceID int
-	workDay := time.Now().Add(4 * time.Hour).Format("2006-01-02")
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 
 	// Fetch company's default end time
 	query := `SELECT end_time FROM company_info ORDER BY created_at DESC LIMIT 1`
@@ -505,7 +507,7 @@ func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *str
 	}
 
 	// Update the work period for the incomplete record
-	err = r.updateAttendancePeriod(ctx, attendanceID, lastWorkDay, workEndTime)
+	err = r.updateAttendancePeriod(ctx, attendanceID, lastWorkDay)
 	if err != nil {
 		return fmt.Errorf("failed to update work period: %w", err)
 	}
@@ -521,7 +523,9 @@ func (r Repository) handleExistingAttendance(ctx context.Context, claims auth.Cl
 }
 
 func (r Repository) getExistingAttendance(ctx context.Context, employeeID *string) (CreateResponse, error) {
-	workDay := time.Now().Add(4 * time.Hour).Format("2006-01-02")
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 
 	var existingAttendance CreateResponse
 	err := r.NewSelect().
@@ -537,7 +541,9 @@ func (r Repository) getExistingAttendance(ctx context.Context, employeeID *strin
 	return existingAttendance, nil
 }
 func (r Repository) getExistingAttendancePeriod(ctx context.Context, attendance_id int) (AttendancePeriod, error) {
-	workDay := time.Now().Add(4 * time.Hour).Format("2006-01-02")
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 
 	var existingAttendancePeriod AttendancePeriod
 	err := r.NewSelect().
@@ -555,15 +561,17 @@ func (r Repository) getExistingAttendancePeriod(ctx context.Context, attendance_
 }
 func (r Repository) updateLeaveTime(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
 
-	currentTime := time.Now().Add(4 * time.Hour)
-	leaveTimeStr := currentTime.Format("15:04")
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
 	workDay := currentTime.Format("2006-01-02")
+	leaveTimeStr := currentTime.Format("15:04")
+
 	err := r.updateAttendanceLeaveTime(ctx, existingAttendance.ID, claims.UserId, leaveTimeStr)
 	if err != nil {
 		return CreateResponse{}, err
 	}
 	//change thsi place
-	err = r.updateAttendancePeriod(ctx, existingAttendance.ID, workDay, leaveTimeStr)
+	err = r.updateAttendancePeriod(ctx, existingAttendance.ID,  leaveTimeStr)
 	if err != nil {
 		return CreateResponse{}, err
 	}
@@ -592,7 +600,8 @@ func (r Repository) updateLeaveTime(ctx context.Context, claims auth.Claims, exi
 }
 
 func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims auth.Claims, existingAttendance CreateResponse, employeeID *string) (CreateResponse, error) {
-	currentTime := time.Now().Add(4 * time.Hour)
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
 	workDay := currentTime.Format("2006-01-02")
 	err := r.resetAttendanceLeaveTime(ctx, existingAttendance.ID, claims.UserId)
 	if err != nil {
@@ -620,7 +629,9 @@ func (r Repository) resetLeaveTimeAndCreatePeriod(ctx context.Context, claims au
 	}, nil
 }
 func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims, request EnterRequest) (CreateResponse, error) {
-	currentTime := time.Now().Add(4 * time.Hour)
+
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
 	workDay := currentTime.Format("2006-01-02")
 	response := CreateResponse{
 		EmployeeID: request.EmployeeID,
@@ -649,7 +660,9 @@ func (r Repository) createNewAttendance(ctx context.Context, claims auth.Claims,
 }
 
 func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userId int, leaveTimeStr string) error {
-	currentTime := time.Now().Add(4 * time.Hour)
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+
 	_, err := r.NewUpdate().
 		Table("attendance").
 		Where("deleted_at IS NULL AND id = ?", id).
@@ -661,7 +674,9 @@ func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userI
 	return err
 }
 func (r Repository) updateAttendanceLeaveTimeForgetLeave(ctx context.Context, id int, userId int, leaveTimeStr string) error {
-	currentTime := time.Now().Add(4 * time.Hour)
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+
 	_, err := r.NewUpdate().
 		Table("attendance").
 		Where("deleted_at IS NULL AND id = ?", id).
@@ -674,9 +689,10 @@ func (r Repository) updateAttendanceLeaveTimeForgetLeave(ctx context.Context, id
 	return err
 }
 
-func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int, workDay string, leaveTimeStr string) error {
-	currentTime := time.Now().Add(4 * time.Hour)
-	fmt.Println("Updated attendance_period table")
+func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int, leaveTimeStr string) error {
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 
 	_, err := r.NewUpdate().
 		Table("attendance_period").
@@ -700,7 +716,8 @@ func (r Repository) resetAttendanceLeaveTime(ctx context.Context, id int, userId
 }
 
 func (r Repository) createAttendancePeriod(ctx context.Context, attendanceID int) (int, error) {
-	currentTime := time.Now().Add(4 * time.Hour)
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
 	workDay := currentTime.Format("2006-01-02")
 	var periods PeriodsCreate
 	periods.Attendance = attendanceID
@@ -813,9 +830,11 @@ func (r Repository) Delete(ctx context.Context, id int) error {
 }
 
 func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, error) {
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 	var response GetStatisticResponse
-	workDay := time.Now().Add(4 * time.Hour).Format("2006-01-02")
-	timeNow := time.Now().Add(4 * time.Hour).Format("15:04")
+	timeNow := currentTime.Format("15:04")
 	// Create an instance of companyInfo.Repository
 	companyRepo := companyInfo.NewRepository(r.Database)
 
@@ -861,7 +880,9 @@ func (r Repository) GetStatistics(ctx context.Context) (GetStatisticResponse, er
 }
 
 func (r Repository) GetPieChartStatistic(ctx context.Context) (PieChartResponse, error) {
-	workDay := time.Now().Add(4 * time.Hour).Format("2006-01-02")
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 
 	query := `
   WITH today_attendance AS (
@@ -899,7 +920,9 @@ func Int(i int) *int {
 }
 
 func (r Repository) GetBarChartStatistic(ctx context.Context) ([]BarChartResponse, error) {
-	workDay := time.Now().Add(4 * time.Hour).Format("2006-01-02")
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+	workDay := currentTime.Format("2006-01-02")
 	query := `
     WITH today_attendance AS (
         SELECT
