@@ -1208,7 +1208,6 @@ func (r Repository) GetEmployeeDashboard(ctx context.Context) (DashboardResponse
 	minutes := totalMinutes % 60
 	totalHours := fmt.Sprintf("%02d:%02d", hours, minutes)
 	detail.TotalHours = totalHours
-	fmt.Println("data:", detail.LeaveTime)
 	if errors.Is(err, sql.ErrNoRows) {
 		return DashboardResponse{}, nil
 	}
