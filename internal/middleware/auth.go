@@ -5,6 +5,7 @@ import (
 	"attendance/backend/internal/auth"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -103,11 +104,11 @@ func ValidateHalfWidthInput() web.Middleware {
 	return func(handler web.Handler) web.Handler {
 		return func(c *web.Context) error {
 			// Iterate over form values and validate each one.
-			for _, values := range c.Request.Form {
+			for field, values := range c.Request.Form {
 				for _, value := range values {
 					if !isHalfWidth(value) {
-						return c.RespondError(web.NewRequestError(
-							errors.New("入力は半角文字のみ使用可能"), http.StatusBadRequest))
+						errMsg := fmt.Sprintf("入力は半角文字のみ使用可能 '%s'", field)
+						return c.RespondError(web.NewRequestError(errors.New(errMsg), http.StatusBadRequest))
 					}
 				}
 			}
