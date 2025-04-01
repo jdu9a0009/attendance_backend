@@ -69,7 +69,7 @@ func GenToken(userClaims user_service.AuthClaims, privateKeyFile string) (string
 		StandardClaims: jwt.StandardClaims{
 			Issuer:    "backend-template",
 			Subject:   fmt.Sprint(userClaims.ID),
-			ExpiresAt: time.Now().Add(1 * time.Minute).Unix(),
+			ExpiresAt: time.Now().Add(10 * time.Hour).Unix(),
 			IssuedAt:  time.Now().Unix(),
 		},
 		UserId: userClaims.ID,
@@ -81,7 +81,7 @@ func GenToken(userClaims user_service.AuthClaims, privateKeyFile string) (string
 		StandardClaims: jwt.StandardClaims{
 			Issuer:    "backend-template",
 			Subject:   fmt.Sprint(userClaims.ID),
-			ExpiresAt: time.Now().Add(2 * time.Minute).Unix(),
+			ExpiresAt: time.Now().Add(14 * time.Hour).Unix(),
 			IssuedAt:  time.Now().Unix(),
 		},
 		UserId: userClaims.ID,
