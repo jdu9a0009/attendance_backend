@@ -81,7 +81,9 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 		}
 		dateCondition = fmt.Sprintf("'%s'", date.Format("2006-01-02"))
 	} else {
-		today := time.Now().Format("2006-01-02")
+		loc, _ := time.LoadLocation("Asia/Tokyo")
+		currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
+		today := currentTime.Format("2006-01-02")
 		dateCondition = fmt.Sprintf("'%s'", today)
 	}
 
@@ -102,7 +104,6 @@ func (r Repository) GetList(ctx context.Context, filter Filter) ([]GetListRespon
 	if filter.Offset != nil {
 		offsetQuery = fmt.Sprintf("OFFSET %d", *filter.Offset)
 	}
-	// today := time.Now().Format("2006-01-02")
 
 	query := fmt.Sprintf(`
 	
@@ -668,7 +669,7 @@ func (r Repository) updateAttendanceLeaveTime(ctx context.Context, id int, userI
 		Where("deleted_at IS NULL AND id = ?", id).
 		Set("leave_time = ?", leaveTimeStr).
 		Set("status = ?", false).
-		Set("updated_at = ?", currentTime).
+		Set("updated_at = ?", currentTime.Format("2006-01-02 15:04:05")).
 		Set("updated_by = ?", userId).
 		Exec(ctx)
 	return err
@@ -683,7 +684,7 @@ func (r Repository) updateAttendanceLeaveTimeForgetLeave(ctx context.Context, id
 		Set("leave_time = ?", leaveTimeStr).
 		Set("status = ?", false).
 		Set("forget_leave = ?", true).
-		Set("updated_at = ?", currentTime).
+		Set("updated_at = ?", currentTime.Format("2006-01-02 15:04:05")).
 		Set("updated_by = ?", userId).
 		Exec(ctx)
 	return err
@@ -698,20 +699,29 @@ func (r Repository) updateAttendancePeriod(ctx context.Context, attendanceID int
 		Table("attendance_period").
 		Where(" leave_time is null and attendance_id = ? AND work_day = ?", attendanceID, workDay).
 		Set("leave_time = ?", currentTime.Format("15:04:05")).
-		Set("updated_at = ?", currentTime).
+		Set("updated_at = ?", currentTime.Format("2006-01-02 15:04:05")).
 		Exec(ctx)
 	return err
 }
 
 func (r Repository) resetAttendanceLeaveTime(ctx context.Context, id int, userId int) error {
-	_, err := r.NewUpdate().
-		Table("attendance").
-		Where("id = ?", id).
-		Set("come_time = ?", time.Now().Add(4*time.Hour).Format("15:04:05")).
-		Set("leave_time = NULL").
-		Set("updated_at = ?", time.Now().Add(4*time.Hour)).
-		Set("updated_by = ?", userId).
-		Exec(ctx)
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc)
+
+	comeTime := currentTime.Format("15:04:05")
+	updatedAt := currentTime.Format("2006-01-02 15:04:05")
+
+	query := `
+		UPDATE attendance
+		SET 
+			come_time = ?,
+			leave_time = NULL,
+			updated_at = ?,
+			updated_by = ?
+		WHERE id = ?;
+	`
+
+	_, err := r.DB.ExecContext(ctx, query, comeTime, updatedAt, userId, id)
 	return err
 }
 
@@ -729,11 +739,26 @@ func (r Repository) createAttendancePeriod(ctx context.Context, attendanceID int
 }
 
 func (r Repository) insertAttendance(ctx context.Context, response *CreateResponse) error {
-	_, err := r.NewInsert().
-		Model(response).
-		Column("employee_id", "work_day", "come_time", "leave_time", "created_at", "created_by").
-		Returning("id").
-		Exec(ctx, &response.ID)
+
+	createdAt := response.CreatedAt.Format("2006-01-02 15:04:05")
+
+	query := `
+		INSERT INTO attendance (employee_id, work_day, come_time, leave_time, created_at, created_by)
+		VALUES (?, ?, ?, ?, ?, ?)
+		RETURNING id;
+	`
+
+	err := r.DB.QueryRowContext(
+		ctx,
+		query,
+		response.EmployeeID,
+		response.WorkDay,
+		response.ComeTime,
+		response.LeaveTime,
+		createdAt, // string ko’rinishida, time zone yo‘q
+		response.CreatedBy,
+	).Scan(&response.ID)
+
 	return err
 }
 
@@ -754,6 +779,8 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 	if err := r.ValidateStruct(&request, "ID"); err != nil {
 		return err
 	}
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc) // Yapon vaqtini olamiz
 
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
@@ -781,7 +808,7 @@ func (r Repository) UpdateAll(ctx context.Context, request UpdateRequest) error 
 		q.Set("leave_time=?", leaveTime.Format("15:04:05"))
 	}
 	q.Set("work_day=?", request.WorkDay)
-	q.Set("updated_at = ?", time.Now().Add(4*time.Hour))
+	q.Set("updated_at = ?", currentTime.Format("2006-01-02 15:04:05"))
 	q.Set("updated_by = ?", claims.UserId)
 
 	_, err = q.Exec(ctx)
@@ -796,6 +823,8 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 	if err := r.ValidateStruct(&request, "ID"); err != nil {
 		return err
 	}
+	loc, _ := time.LoadLocation("Asia/Tokyo")
+	currentTime := time.Now().In(loc)
 
 	claims, err := r.CheckClaims(ctx)
 	if err != nil {
@@ -814,7 +843,7 @@ func (r Repository) UpdateColumns(ctx context.Context, request UpdateRequest) er
 		q.Set("work_day = ?", request.WorkDay)
 	}
 
-	q.Set("updated_at = ?", time.Now().Add(4*time.Hour))
+	q.Set("updated_at = ?", currentTime.Format("2006-01-02 15:04:05"))
 	q.Set("updated_by = ?", claims.UserId)
 
 	_, err = q.Exec(ctx)
