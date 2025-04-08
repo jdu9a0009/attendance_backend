@@ -157,6 +157,7 @@ var scheme = []Scheme{
         CREATE TABLE company_info (
             id SERIAL PRIMARY KEY,
             company_name VARCHAR(250) NOT NULL,
+			bold BOOLEAN DEFAULT false,
 			url VARCHAR(100),
 			latitude FLOAT NOT NULL,
 			longitude FLOAT NOT NULL,
