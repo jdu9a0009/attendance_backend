@@ -17,7 +17,7 @@ type UpdateRequest struct {
 	ID              int                   `json:"id" form:"id"`
 	CompanyName     string                `json:"company_name" form:"company_name"`
 	Logo            *multipart.FileHeader `json:"logo" form:"logo"`
-	Bold        bool                  `json:"bold" form:"bold"`
+	Bold            bool                  `json:"bold" form:"bold"`
 	Url             string                `json:"url" form:"url"`
 	Latitude        *float64              `json:"latitude" form:"latitude"`
 	Longitude       *float64              `json:"longitude" form:"longitude"`
@@ -40,7 +40,7 @@ type GetInfoResponse struct {
 	ID              int     `json:"id"`
 	CompanyName     string  `json:"company_name"`
 	Url             string  `json:"url"`
-	Bold        bool    `json:"bold"`
+	Bold            bool    `json:"bold"`
 	Latitude        float64 `json:"latitude"`
 	Longitude       float64 `json:"longitude"`
 	Radius          float64 `json:"radius"`
@@ -68,6 +68,7 @@ type GetAttendanceColorResponse struct {
 }
 type GetNewTableColorResponse struct {
 	bun.BaseModel   `bun:"table:company_info"`
+	TextBold        bool   `json:"bold" bun:"bold"`
 	NewPresentColor string `json:"new_present_color" bun:"new_present_color"`
 	NewAbsentColor  string `json:"new_absent_color" bun:"new_absent_color"`
 }
