@@ -486,9 +486,9 @@ func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *str
 	}
 
 	// Fetch the most recent attendance record
-	query = `SELECT id, work_day 
+	query = `SELECT id, work_day
 	         FROM attendance 
-	         WHERE employee_id = ? and work_day < ?
+	         WHERE employee_id = ? and work_day < ? AND leave_time IS NULL
 	         ORDER BY work_day DESC NULLS LAST, created_at DESC 
 	         LIMIT 1`
 	err = r.NewRaw(query, employeeID, workDay).Scan(ctx, &attendanceID, &lastWorkDay)
@@ -500,7 +500,6 @@ func (r Repository) fixIncompleteAttendance(ctx context.Context, employeeID *str
 		}
 		return fmt.Errorf("failed to fetch attendance's id, workday: %w", err)
 	}
-
 	// Update the LeaveTime for the incomplete record
 	err = r.updateAttendanceLeaveTimeForgetLeave(ctx, attendanceID, claims.UserId, workEndTime)
 	if err != nil {
