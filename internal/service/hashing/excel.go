@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 
@@ -81,9 +82,16 @@ type UserExcellData struct {
 	PositionID     int
 	Phone          string
 	Email          string
+	Error          string
 }
 
-func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, employeeIDMap, existingEmailMap map[string]struct{}) ([]UserExcellData, []int, error) {
+func ExcelReaderByCreate(
+	filePath string,
+	fields map[int]string,
+	departmentMap, positionMap map[string]int,
+	employeeIDMap, existingEmailMap map[string]struct{},
+) ([]UserExcellData, []UserExcellData, error) {
+
 	sheetName := "従業員"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -100,111 +108,124 @@ func ExcelReaderByCreate(filePath string, fields map[int]string, departmentMap, 
 	phoneRegex := regexp.MustCompile(`^\+?\d+$`)
 
 	var users []UserExcellData
-	var incompleteRows []int
-	localEmployeeIDs := make(map[string]int) // Track IDs in current file
-	localEmails := make(map[string]int)      // Track emails in current file
+	var incompleteUsers []UserExcellData
+
+	localEmployeeIDs := make(map[string]int)
+	localEmails := make(map[string]int)
 
 	for i, row := range rows {
 		if i == 0 {
-			continue // Skip header
-		}
-
-		if len(row) < 10 {
-			incompleteRows = append(incompleteRows, i+1)
 			continue
 		}
 
-		// Trim and validate fields
-		employeeID := strings.TrimSpace(row[0])
-		lastName := strings.TrimSpace(row[1])
-		firstName := strings.TrimSpace(row[2])
-		role := strings.TrimSpace(row[4])
-		password := strings.TrimSpace(row[5])
-		department := strings.TrimSpace(row[6])
-		position := strings.TrimSpace(row[7])
-		phone := strings.TrimSpace(row[8])
-		email := strings.TrimSpace(row[9])
-
-		// Mandatory fields check
-		if employeeID == "" || lastName == "" || firstName == "" ||
-			role == "" || password == "" || department == "" || position == "" {
-			incompleteRows = append(incompleteRows, i+1)
-			continue
-		}
-
-		// Half-width characters check
-		if !isHalfWidth(employeeID) || !isHalfWidth(password) ||
-			(email != "" && !isHalfWidth(email)) {
-			incompleteRows = append(incompleteRows, i+1)
-			continue
-		}
-
-		// Employee ID uniqueness checks
-		if _, exists := employeeIDMap[employeeID]; exists {
-			incompleteRows = append(incompleteRows, i+1) // Existing in DB
-			continue
-		}
-		if prevRow, exists := localEmployeeIDs[employeeID]; exists {
-			incompleteRows = append(incompleteRows, prevRow, i+1)
-			continue
-		}
-
-		// Email uniqueness checks
-		if email != "" {
-			if _, exists := existingEmailMap[email]; exists {
-				incompleteRows = append(incompleteRows, i+1) // Existing in DB
-				continue
+		get := func(idx int) string {
+			if idx < len(row) {
+				return strings.TrimSpace(row[idx])
 			}
-			if prevRow, exists := localEmails[email]; exists {
-				incompleteRows = append(incompleteRows, prevRow, i+1)
-				continue
+			return ""
+		}
+
+		user := UserExcellData{
+			EmployeeID:     get(0),
+			LastName:       get(1),
+			FirstName:      get(2),
+			NickName:       get(3),
+			Role:           get(4),
+			Password:       get(5),
+			Phone:          get(8),
+			Email:          get(9),
+			DepartmentName: get(6),
+			PositionName:   get(7),
+		}
+
+		var errors []string
+
+		// Majburiy ustunlarni tekshirish
+		if user.EmployeeID == "" {
+			errors = append(errors, "Employee ID maydoni to‘liq emas")
+
+		}
+		if user.LastName == "" {
+			errors = append(errors, "Last Name maydoni to‘liq emas")
+
+		}
+		if user.FirstName == "" {
+			errors = append(errors, "First Name maydoni to‘liq emas")
+
+		}
+		if user.Role == "" {
+			errors = append(errors, "Role maydoni to‘liq emas")
+
+		}
+		if user.DepartmentName == "" {
+			errors = append(errors, "Department maydoni to‘liq emas")
+
+		}
+		if user.PositionName == "" {
+			errors = append(errors, "Position maydoni to‘liq emas")
+
+		}
+
+		if !isHalfWidth(user.EmployeeID) || !isHalfWidth(user.Password) || (user.Email != "" && !isHalfWidth(user.Email)) {
+			errors = append(errors, "EmployeeID, Email va Password Half-width formatda bo‘lishi kerak")
+		}
+
+		if _, exists := employeeIDMap[user.EmployeeID]; exists {
+			errors = append(errors, "Bu EmployeeID allaqachon mavjud (DBda)")
+		}
+		if prevRow, exists := localEmployeeIDs[user.EmployeeID]; exists {
+			errors = append(errors, fmt.Sprintf("Bu EmployeeID faylda dublikat (%d-qator)", prevRow))
+		}
+
+		if user.Email != "" {
+			if _, exists := existingEmailMap[user.Email]; exists {
+				errors = append(errors, "Bu Email allaqachon mavjud (DBda)")
+			}
+			if prevRow, exists := localEmails[user.Email]; exists {
+				errors = append(errors, fmt.Sprintf("Bu Email faylda dublikat (%d-qator)", prevRow))
+			} else {
+				localEmails[user.Email] = i + 1 // Hamma holatda qo‘shish
+			}
+
+			if !emailRegex.MatchString(user.Email) {
+				errors = append(errors, "Email formati noto‘g‘ri")
 			}
 		}
 
-		// Department/Position validation
-		departmentID, deptOK := departmentMap[department]
-		positionID, posOK := positionMap[position]
-		if !deptOK || !posOK {
-			incompleteRows = append(incompleteRows, i+1)
+		if user.Phone != "" && !phoneRegex.MatchString(user.Phone) {
+			errors = append(errors, "Telefon raqam formati noto‘g‘ri")
+		}
+
+		deptID, deptOK := departmentMap[user.DepartmentName]
+		posID, posOK := positionMap[user.PositionName]
+		if !deptOK {
+			errors = append(errors, "Department nomi mavjud emas")
+		}
+		if !posOK {
+			errors = append(errors, "Position nomi mavjud emas")
+		}
+
+		if len(errors) > 0 {
+			user.Error = strings.Join(errors, "; ")
+			incompleteUsers = append(incompleteUsers, user)
 			continue
 		}
 
-		// Email format validation
-		if email != "" && !emailRegex.MatchString(email) {
-			incompleteRows = append(incompleteRows, i+1)
-			continue
+		user.DepartmentID = deptID
+		user.PositionID = posID
+
+		localEmployeeIDs[user.EmployeeID] = i + 1
+		if user.Email != "" {
+			localEmails[user.Email] = i + 1
 		}
 
-		// Phone format validation
-		if phone != "" && !phoneRegex.MatchString(phone) {
-			incompleteRows = append(incompleteRows, i+1)
-			continue
-		}
-
-		// Track unique values
-		localEmployeeIDs[employeeID] = i + 1
-		if email != "" {
-			localEmails[email] = i + 1
-		}
-
-		users = append(users, UserExcellData{
-			EmployeeID:   employeeID,
-			LastName:     lastName,
-			FirstName:    firstName,
-			NickName:     strings.TrimSpace(row[3]),
-			Role:         role,
-			Password:     password,
-			DepartmentID: departmentID,
-			PositionID:   positionID,
-			Phone:        phone,
-			Email:        email,
-		})
+		users = append(users, user)
 	}
 
-	return users, incompleteRows, nil
+	return users, incompleteUsers, nil
 }
 
-func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, existingIDs, existingEmails map[string]struct{}) ([]UserExcellData, []int, error) {
+func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, positionMap map[string]int, existingIDs, existingEmails map[string]struct{}) ([]UserExcellData, []UserExcellData, error) {
 	sheetName := "従業員"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
@@ -225,141 +246,147 @@ func ExcelReaderByEdit(filePath string, fields map[int]string, departmentMap, po
 	phoneRegex := regexp.MustCompile(`^\+?\d+$`)
 
 	var users []UserExcellData
-	var incompleteRows []int
+	var incompleteUsers []UserExcellData
+
+	// Bu yerda Excel fayldagi ID va Email’larni yig‘ib olamiz
+	localExistingIDs := make(map[string]struct{})
+	localExistingEmails := make(map[string]struct{})
+	for i, row := range rows {
+		if i == 0 {
+			continue
+		}
+		if len(row) > 0 {
+			id := strings.TrimSpace(row[0])
+			if id != "" {
+				localExistingIDs[id] = struct{}{}
+			}
+		}
+		if len(row) > 9 {
+			email := strings.TrimSpace(row[9])
+			if email != "" {
+				localExistingEmails[email] = struct{}{}
+			}
+		}
+	}
+
+	// Fayldagi ID va Email dublikatlarini aniqlash uchun
 	localIDs := make(map[string]int)
 	localEmails := make(map[string]int)
 
 	for i, row := range rows {
-		rowNumber := i + 1 // Excel qator raqami (1-based)
+		rowNumber := i + 1
 		if i == 0 {
-			continue // Header qatorini o'tkazib yuborish
-		}
-
-		// Yetarlicha ustun mavjudligini tekshirish
-		if len(row) < 10 {
-			log.Printf("Row %d: Missing columns. Expected at least 10, got %d\n", rowNumber, len(row))
-			incompleteRows = append(incompleteRows, rowNumber)
 			continue
 		}
 
-		// Qator ma'lumotlarini olish
-		employeeID := strings.TrimSpace(row[0])
-		lastName := strings.TrimSpace(row[1])
-		firstName := strings.TrimSpace(row[2])
-		role := strings.TrimSpace(row[4])
-		password := strings.TrimSpace(row[5])
-		department := strings.TrimSpace(row[6])
-		position := strings.TrimSpace(row[7])
-		phone := strings.TrimSpace(row[8])
-		email := strings.TrimSpace(row[9])
-
-		// Majburiy ustunlarni tekshirish
-		missingColumns := []string{}
-		if employeeID == "" {
-			missingColumns = append(missingColumns, "Employee ID")
-		}
-		if lastName == "" {
-			missingColumns = append(missingColumns, "Last Name")
-		}
-		if firstName == "" {
-			missingColumns = append(missingColumns, "First Name")
-		}
-		if role == "" {
-			missingColumns = append(missingColumns, "Role")
-		}
-		if department == "" {
-			missingColumns = append(missingColumns, "Department")
-		}
-		if position == "" {
-			missingColumns = append(missingColumns, "Position")
+		get := func(idx int) string {
+			if idx < len(row) {
+				return strings.TrimSpace(row[idx])
+			}
+			return ""
 		}
 
-		if len(missingColumns) > 0 {
-			log.Printf("Row %d: Missing required columns: %v\n", rowNumber, missingColumns)
-			incompleteRows = append(incompleteRows, rowNumber)
-			continue
-		}
-		// Half-width characters check
-		if !isHalfWidth(employeeID) || !isHalfWidth(password) ||
-			(email != "" && !isHalfWidth(email)) {
-			incompleteRows = append(incompleteRows, i+1)
-			continue
-		}
-		// Department va Position tekshirish
-		departmentID, deptOK := departmentMap[department]
-		positionID, posOK := positionMap[position]
-		if !deptOK || !posOK {
-			log.Printf("Row %d: Invalid department or position - Department: '%s', Position: '%s'\n", rowNumber, department, position)
-			incompleteRows = append(incompleteRows, rowNumber)
-			continue
+		user := UserExcellData{
+			EmployeeID:     get(0),
+			LastName:       get(1),
+			FirstName:      get(2),
+			NickName:       get(3),
+			Role:           get(4),
+			Password:       get(5),
+			Phone:          get(8),
+			Email:          get(9),
+			DepartmentName: get(6),
+			PositionName:   get(7),
 		}
 
-		// Email tekshirish
-		if email != "" && !emailRegex.MatchString(email) {
-			log.Printf("Row %d: Invalid email format: %s\n", rowNumber, email)
-			incompleteRows = append(incompleteRows, rowNumber)
-			continue
+		var errors []string
+
+		if user.EmployeeID == "" {
+			errors = append(errors, "Employee ID maydoni to‘liq emas")
+		}
+		if user.LastName == "" {
+			errors = append(errors, "Last Name maydoni to‘liq emas")
+		}
+		if user.FirstName == "" {
+			errors = append(errors, "First Name maydoni to‘liq emas")
+		}
+		if user.Role == "" {
+			errors = append(errors, "Role maydoni to‘liq emas")
+		}
+		if user.DepartmentName == "" {
+			errors = append(errors, "Department maydoni to‘liq emas")
+		}
+		if user.PositionName == "" {
+			errors = append(errors, "Position maydoni to‘liq emas")
 		}
 
-		// Telefon raqamini tekshirish
-		if phone != "" && !phoneRegex.MatchString(phone) {
-			log.Printf("Row %d: Invalid phone format: %s\n", rowNumber, phone)
-			incompleteRows = append(incompleteRows, rowNumber)
-			continue
+		if !isHalfWidth(user.EmployeeID) || !isHalfWidth(user.Password) || (user.Email != "" && !isHalfWidth(user.Email)) {
+			errors = append(errors, "EmployeeID, Email va Password Half-width formatda bo‘lishi kerak")
 		}
-		// Check local duplicates
-		if prevRow, exists := localIDs[employeeID]; exists {
-			log.Printf("Row %d: Duplicate Employee ID '%s' found (previously seen in Row %d)\n", rowNumber, employeeID, prevRow)
-			incompleteRows = append(incompleteRows, rowNumber) // Faqat joriy qatorni qo'shish
-			continue
+
+		departmentID, deptOK := departmentMap[user.DepartmentName]
+		positionID, posOK := positionMap[user.PositionName]
+		if !deptOK {
+			errors = append(errors, "Department nomi mavjud emas")
 		}
-		if email != "" {
-			if prevRow, exists := localEmails[email]; exists {
-				log.Printf("Row %d: Duplicate Email '%s' found (previously seen in Row %d)\n", rowNumber, email, prevRow)
-				incompleteRows = append(incompleteRows, rowNumber) // Faqat joriy qatorni qo'shish
-				continue
+		if !posOK {
+			errors = append(errors, "Position nomi mavjud emas")
+		}
+
+		if user.Email != "" && !emailRegex.MatchString(user.Email) {
+			errors = append(errors, fmt.Sprintf("Email formati noto‘g‘ri: %s", user.Email))
+		}
+
+		if _, exists := existingIDs[user.EmployeeID]; exists {
+			if _, selfExists := localExistingIDs[user.EmployeeID]; !selfExists {
+				errors = append(errors, "Bu EmployeeID allaqachon mavjud (DBda)")
+			}
+		}
+		if user.Email != "" {
+			if _, exists := existingEmails[user.Email]; exists {
+				if _, selfExists := localExistingEmails[user.Email]; !selfExists {
+					errors = append(errors, "Bu Email allaqachon mavjud (DBda)")
+				}
 			}
 		}
 
-		// Check against existing IDs and Emails (global duplicates)
-		// if _, exists := existingIDs[employeeID]; exists {
-		// 	log.Printf("Row %d: Employee ID '%s' already exists in the system\n", rowNumber, employeeID)
-		// 	incompleteRows = append(incompleteRows, rowNumber)
-		// 	continue
-		// }
-		// if email != "" {
-		// 	if _, exists := existingEmails[email]; exists {
-		// 		log.Printf("Row %d: Email '%s' already exists in the system\n", rowNumber, email)
-		// 		incompleteRows = append(incompleteRows, rowNumber)
-		// 		continue
-		// 	}
-		// }
-		// Track processed values
-		localIDs[employeeID] = rowNumber
-		if email != "" {
-			localEmails[email] = rowNumber
+		if user.Phone != "" && !phoneRegex.MatchString(user.Phone) {
+			errors = append(errors, fmt.Sprintf("Telefon raqam formati noto‘g‘ri: %s", user.Phone))
 		}
-		users = append(users, UserExcellData{
-			EmployeeID:   employeeID,
-			LastName:     lastName,
-			FirstName:    firstName,
-			NickName:     strings.TrimSpace(row[3]),
-			Role:         role,
-			Password:     password,
-			DepartmentID: departmentID,
-			PositionID:   positionID,
-			Phone:        phone,
-			Email:        email,
-		})
+
+		// Faylda dublikat borligini tekshiramiz
+		if prevRow, exists := localIDs[user.EmployeeID]; exists {
+			errors = append(errors, fmt.Sprintf("Bu Employee ID faylda dublikat (%d-qator)", prevRow))
+		}
+		if user.Email != "" {
+			if prevRow, exists := localEmails[user.Email]; exists {
+				errors = append(errors, fmt.Sprintf("Bu Email faylda dublikat (%d-qator)", prevRow))
+			}
+		}
+
+		if len(errors) > 0 {
+			user.Error = strings.Join(errors, "; ")
+			incompleteUsers = append(incompleteUsers, user)
+			continue
+		}
+
+		localIDs[user.EmployeeID] = rowNumber
+		if user.Email != "" {
+			localEmails[user.Email] = rowNumber
+		}
+		user.DepartmentID = departmentID
+		user.PositionID = positionID
+		users = append(users, user)
 	}
-	return users, incompleteRows, nil
+
+	return users, incompleteUsers, nil
 }
 
-func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]string, []int, error) {
+func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]string, string, error) {
 	sheetName := "従業員"
 	f, err := excelize.OpenFile(filePath)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 	defer func() {
 		if err := f.Close(); err != nil {
@@ -368,30 +395,22 @@ func ExcelReaderByDelete(filePath string, rowLen int, fields map[int]string) ([]
 	}()
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", err
 	}
 
 	var employeeIDs []string
-	var incompleteRows []int
 	for i, row := range rows {
 		if i == 0 {
 			// Skip the header row
 			continue
 		}
 
-		if len(row) < rowLen { // Check if the row has enough columns
-			incompleteRows = append(incompleteRows, i)
-			continue
-		}
-
 		// Collect only EmployeeID (column 0 in your data)
 		if len(row) > 0 && row[0] != "" {
 			employeeIDs = append(employeeIDs, row[0])
-		} else {
-			incompleteRows = append(incompleteRows, i)
 		}
 	}
-	return employeeIDs, incompleteRows, nil
+	return employeeIDs, "", nil
 }
 
 // isHalfWidth checks if a string contains only half-width characters.
@@ -467,4 +486,54 @@ func EditExcell(departments, positions []string) (string, error) {
 		return "", fmt.Errorf("error saving file: %w", err)
 	}
 	return "template.xlsx", nil
+}
+
+func SaveInvalidUsersToExcel(employees []UserExcellData) (string, error) {
+	templateFileName := "invalid_employees.xlsx"
+
+	var f *excelize.File
+
+	// Check if file exists
+	if _, err := os.Stat(templateFileName); os.IsNotExist(err) {
+		// Create a new file if the template doesn't exist
+		f = excelize.NewFile()
+		f.NewSheet("従業員")
+	} else {
+		// Open the existing template file
+		f, err = excelize.OpenFile(templateFileName)
+		if err != nil {
+			return "", fmt.Errorf("failed to open template file: %w", err)
+		}
+	}
+	defer f.Close()
+
+	// Write Employee Data to the "Employees" sheet
+	employeeSheet := "従業員"
+	f.SetSheetName("Sheet1", employeeSheet)
+	headers := []string{"社員番号", "姓", "名", "表示名", "権限", "パスワード", "部署", "役職", "電話番号", "メールアドレス", "エラー"}
+	for i, header := range headers {
+		cell := fmt.Sprintf("%c1", 'A'+i)
+		if err := f.SetCellValue(employeeSheet, cell, header); err != nil {
+			return "", fmt.Errorf("failed to write header in Employees sheet: %w", err)
+		}
+	}
+
+	for i, emp := range employees {
+		row := i + 2 // Start from the second row
+		values := []interface{}{emp.EmployeeID, emp.LastName, emp.FirstName, emp.NickName, emp.Role, emp.Password, emp.DepartmentName, emp.PositionName, emp.Phone, emp.Email, emp.Error}
+		for j, value := range values {
+			cell := fmt.Sprintf("%c%d", 'A'+j, row)
+			if err := f.SetCellValue(employeeSheet, cell, value); err != nil {
+				return "", fmt.Errorf("failed to write employee data: %w", err)
+			}
+		}
+	}
+
+	// Save the file
+	if err := f.SaveAs(templateFileName); err != nil {
+		return "", fmt.Errorf("failed to save the Excel file: %w", err)
+	}
+
+	return "invalid_employees.xlsx", nil
+
 }

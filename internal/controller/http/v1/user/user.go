@@ -213,30 +213,52 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	var response int
-	var incomplete []int // Declare outside switch to use later
-	var err error        // Declare error variable
+	var (
+		count           int
+		invalidFilePath string
+		err             error
+	)
 
 	switch request.Mode {
 	case 1: // Create mode
-		response, incomplete, err = uc.user.CreateByExcell(c.Ctx, request)
-	case 2: // Update mode
-		response, incomplete, err = uc.user.UpdateByExcell(c.Ctx, request)
-	case 3: // Delete mode
-		response, incomplete, err = uc.user.DeleteByExcell(c.Ctx, request)
+		count, invalidFilePath, err = uc.user.CreateByExcell(c.Ctx, request)
+	case 2:
+		count, invalidFilePath, err = uc.user.UpdateByExcell(c.Ctx, request)
+	case 3:
+		count, invalidFilePath, err = uc.user.DeleteByExcell(c.Ctx, request)
 	default:
 		return c.RespondError(errors.New("invalid mode specified"))
 	}
 
-	// Check for any error that occurred during the operation
 	if err != nil {
 		return c.RespondError(err)
 	}
 
+	// Agar invalid fayl mavjud bo‘lsa, yuklashni boshlaymiz
+	if invalidFilePath != "" {
+		file, err := os.Open(invalidFilePath)
+		if err != nil {
+			return c.RespondError(err)
+		}
+		defer file.Close()
+
+		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		c.Header("Content-Disposition", "attachment; filename=\"invalid_users.xlsx\"")
+
+		_, err = io.Copy(c.Writer, file)
+		if err != nil {
+			return c.RespondError(err)
+		}
+
+		// Agar kerak bo‘lsa, faylni keyin o‘chirish
+		os.Remove(invalidFilePath)
+		return nil
+	}
+
+	// Agar invalid fayl yo‘q bo‘lsa, json formatda qaytaramiz
 	return c.Respond(map[string]interface{}{
-		"成功した従業員数":      response,
-		"不完全な従業員のエクセル行": incomplete,
-		"ステータス":         true,
+		"成功した従業員数": count,
+		"ステータス":    true,
 	}, http.StatusOK)
 }
 
@@ -329,7 +351,6 @@ func (uc Controller) GetMonthlyStatistics(c *web.Context) error {
 	if monthStr == "" {
 		return c.RespondError(web.NewRequestError(errors.New("month parameter is required"), http.StatusBadRequest))
 	}
-	fmt.Println("Month", monthStr)
 	parsedMonth, err := date.ParseDate(monthStr)
 	if err != nil {
 		return c.RespondError(web.NewRequestError(errors.New("invalid date format"), http.StatusBadRequest))
@@ -339,7 +360,6 @@ func (uc Controller) GetMonthlyStatistics(c *web.Context) error {
 	if err != nil {
 		return c.RespondError(err)
 	}
-	fmt.Println("Clist", list)
 	return c.Respond(map[string]interface{}{
 		"data": map[string]interface{}{
 			"results": list,
