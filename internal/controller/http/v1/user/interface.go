@@ -18,9 +18,9 @@ type User interface {
 	GetFullName(ctx context.Context) (user.GetFullName, error)
 
 	Create(ctx context.Context, request user.CreateRequest) (user.CreateResponse, error)
-	CreateByExcell(ctx context.Context, request user.ExcellRequest) (int, string, error)
-	UpdateByExcell(ctx context.Context, request user.ExcellRequest) (int, string, error)
-	DeleteByExcell(ctx context.Context, request user.ExcellRequest) (int, string, error)
+	CreateByExcell(ctx context.Context, request user.ExcellRequest) (int, []int, error)
+	UpdateByExcell(ctx context.Context, request user.ExcellRequest) (int, []int, error)
+	DeleteByExcell(ctx context.Context, request user.ExcellRequest) (int, []int, error)
 	ExportEmployee(ctx context.Context) (string, error)
 	ExportTemplate(ctx context.Context) (string, error)
 	UpdateColumns(ctx context.Context, request user.UpdateRequest) error

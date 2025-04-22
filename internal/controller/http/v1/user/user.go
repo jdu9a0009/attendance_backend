@@ -213,52 +213,39 @@ func (uc Controller) CreateUserByExcell(c *web.Context) error {
 		return c.RespondError(err)
 	}
 
-	var (
-		count           int
-		invalidFilePath string
-		err             error
-	)
+	var response int
+	var incomplete []int // Declare outside switch to use later
+	var err error        // Declare error variable
 
 	switch request.Mode {
 	case 1: // Create mode
-		count, invalidFilePath, err = uc.user.CreateByExcell(c.Ctx, request)
-	case 2:
-		count, invalidFilePath, err = uc.user.UpdateByExcell(c.Ctx, request)
-	case 3:
-		count, invalidFilePath, err = uc.user.DeleteByExcell(c.Ctx, request)
+		response, incomplete, err = uc.user.CreateByExcell(c.Ctx, request)
+	case 2: // Update mode
+		response, incomplete, err = uc.user.UpdateByExcell(c.Ctx, request)
+	case 3: // Delete mode
+		response, incomplete, err = uc.user.DeleteByExcell(c.Ctx, request)
 	default:
 		return c.RespondError(errors.New("invalid mode specified"))
 	}
 
+	// Check for any error that occurred during the operation
 	if err != nil {
 		return c.RespondError(err)
 	}
 
-	// Agar invalid fayl mavjud bo‘lsa, yuklashni boshlaymiz
-	if invalidFilePath != "" {
-		file, err := os.Open(invalidFilePath)
-		if err != nil {
-			return c.RespondError(err)
-		}
-		defer file.Close()
+	status := 0
 
-		c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-		c.Header("Content-Disposition", "attachment; filename=\"invalid_users.xlsx\"")
+	if status == len(incomplete) {
+		status = 1
+	} else if len(incomplete) > 0 && response != 0 {
+		status = 2
+	} else if response == 0 {
+		status = 3
 
-		_, err = io.Copy(c.Writer, file)
-		if err != nil {
-			return c.RespondError(err)
-		}
-
-		// Agar kerak bo‘lsa, faylni keyin o‘chirish
-		os.Remove(invalidFilePath)
-		return nil
 	}
 
-	// Agar invalid fayl yo‘q bo‘lsa, json formatda qaytaramiz
 	return c.Respond(map[string]interface{}{
-		"成功した従業員数": count,
-		"ステータス":    true,
+		"ステータス": status,
 	}, http.StatusOK)
 }
 
